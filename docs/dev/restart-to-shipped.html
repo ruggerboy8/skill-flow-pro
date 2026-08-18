@@ -1,0 +1,468 @@
+<title>Restart to Shipped</title>
+<style>
+  :root {
+    --paper: #f3f4f7;
+    --card: #ffffff;
+    --ink: #14181f;
+    --ink-soft: #565f6e;
+    --line: #dde1e7;
+    --accent: #2a5fd9;
+    --accent-soft: #e9effd;
+    --accent-ink: #1a3f99;
+
+    --c-claude: #2a5fd9;
+    --c-claude-soft: #e9effd;
+    --c-github: #333944;
+    --c-github-soft: #e7e9ec;
+    --c-lovable: #c22d6e;
+    --c-lovable-soft: #fbe8f0;
+    --c-motion: #0e8f7a;
+    --c-motion-soft: #e3f5f2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #0f1216;
+      --card: #171b21;
+      --ink: #e8eaed;
+      --ink-soft: #9aa3b2;
+      --line: #262b33;
+      --accent: #6e9bff;
+      --accent-soft: #1c2a4a;
+      --accent-ink: #bfd3ff;
+
+      --c-claude: #6e9bff;
+      --c-claude-soft: #1c2a4a;
+      --c-github: #c7cdd6;
+      --c-github-soft: #23262c;
+      --c-lovable: #f17eb0;
+      --c-lovable-soft: #3a1f2b;
+      --c-motion: #4cd3b6;
+      --c-motion-soft: #113230;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0f1216;
+    --card: #171b21;
+    --ink: #e8eaed;
+    --ink-soft: #9aa3b2;
+    --line: #262b33;
+    --accent: #6e9bff;
+    --accent-soft: #1c2a4a;
+    --accent-ink: #bfd3ff;
+
+    --c-claude: #6e9bff;
+    --c-claude-soft: #1c2a4a;
+    --c-github: #c7cdd6;
+    --c-github-soft: #23262c;
+    --c-lovable: #f17eb0;
+    --c-lovable-soft: #3a1f2b;
+    --c-motion: #4cd3b6;
+    --c-motion-soft: #113230;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+
+  header.page h1 {
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    margin: 0 0 10px;
+  }
+  header.page p {
+    font-size: 16px;
+    color: var(--ink-soft);
+    max-width: 60ch;
+    margin: 0;
+  }
+
+  h2.section-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+    margin: 56px 0 16px;
+  }
+
+  /* ---- the four tool cards ---- */
+  .tools {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .tool-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 14px;
+    border-top: 3px solid var(--tool);
+  }
+  .tool-card .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--tool);
+    display: inline-block;
+    margin-bottom: 10px;
+  }
+  .tool-card h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0 0 4px;
+  }
+  .tool-card p {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+  .t-claude { --tool: var(--c-claude); }
+  .t-github { --tool: var(--c-github); }
+  .t-lovable { --tool: var(--c-lovable); }
+  .t-motion { --tool: var(--c-motion); }
+
+  /* ---- diagram ---- */
+  figure.diagram {
+    margin: 24px 0 0;
+  }
+  figure.diagram svg {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+  }
+  figcaption {
+    font-size: 13px;
+    color: var(--ink-soft);
+    text-align: center;
+    margin-top: 14px;
+    max-width: 46ch;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* ---- phases ---- */
+  .phase {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px 22px 22px;
+    margin-top: 14px;
+    border-left: 4px solid var(--tool);
+  }
+  .phase-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .phase-num {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--tool);
+    font-variant-numeric: tabular-nums;
+  }
+  .phase h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+  }
+  .phase .where {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--tool);
+    background: var(--tool-soft);
+    padding: 3px 9px;
+    border-radius: 999px;
+    margin-left: auto;
+  }
+  .phase ol {
+    margin: 14px 0 0;
+    padding-left: 20px;
+  }
+  .phase li {
+    font-size: 14.5px;
+    margin-bottom: 8px;
+    padding-left: 2px;
+  }
+  .phase li:last-child { margin-bottom: 0; }
+  .phase li b { font-weight: 650; }
+  .you-decide {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    padding: 2px 7px;
+    border-radius: 5px;
+    margin-left: 6px;
+  }
+
+  .p-claude { --tool: var(--c-claude); --tool-soft: var(--c-claude-soft); }
+  .p-github { --tool: var(--c-github); --tool-soft: var(--c-github-soft); }
+  .p-lovable { --tool: var(--c-lovable); --tool-soft: var(--c-lovable-soft); }
+
+  .warning {
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: var(--c-lovable-soft);
+    border: 1px solid var(--c-lovable);
+    border-radius: 8px;
+    font-size: 13.5px;
+    color: var(--ink);
+  }
+  .warning b { color: var(--c-lovable); }
+
+  /* ---- motion aside ---- */
+  .aside {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--c-motion);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-top: 14px;
+  }
+  .aside h3 {
+    font-size: 15px;
+    margin: 0 0 4px;
+    color: var(--c-motion);
+  }
+  .aside p {
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+
+  /* ---- quick reference table ---- */
+  table.ref {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 14px;
+  }
+  table.ref th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+    font-weight: 700;
+    padding: 0 12px 8px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  table.ref td {
+    padding: 12px 12px 12px 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  table.ref tr:last-child td { border-bottom: none; }
+  .ref-chip {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .rc-claude { color: var(--c-claude); background: var(--c-claude-soft); }
+  .rc-github { color: var(--c-github); background: var(--c-github-soft); }
+  .rc-lovable { color: var(--c-lovable); background: var(--c-lovable-soft); }
+  .rc-motion { color: var(--c-motion); background: var(--c-motion-soft); }
+
+  .overflow { overflow-x: auto; }
+</style>
+
+<div class="wrap">
+
+  <header class="page">
+    <h1>Restart to Shipped</h1>
+    <p>Four tools, one job each. This is exactly what happens, in order, from turning your computer on to a new feature going live.</p>
+  </header>
+
+  <h2 class="section-title">The four tools</h2>
+  <div class="tools">
+    <div class="tool-card t-claude">
+      <span class="dot"></span>
+      <h3>Warp</h3>
+      <p>Where you talk to Claude and it writes the code.</p>
+    </div>
+    <div class="tool-card t-github">
+      <span class="dot"></span>
+      <h3>GitHub</h3>
+      <p>Where you click one green button: Merge.</p>
+    </div>
+    <div class="tool-card t-lovable">
+      <span class="dot"></span>
+      <h3>Lovable</h3>
+      <p>Where you look at the app, then click Publish.</p>
+    </div>
+    <div class="tool-card t-motion">
+      <span class="dot"></span>
+      <h3>Motion</h3>
+      <p>A board you can glance at. Nothing to do here.</p>
+    </div>
+  </div>
+
+  <h2 class="section-title">The path a feature takes</h2>
+  <figure class="diagram">
+    <svg viewBox="0 0 620 800" role="img" aria-label="A feature starts with you describing it in Warp to Claude, which pushes a branch to GitHub. You preview that branch in Lovable; if it needs changes, it loops back to Claude. Once it looks right, you switch Lovable back to main, click Merge on GitHub, then Lovable re-syncs main and you click Publish to go live. Claude also checks in with Motion off to the side, optionally.">
+
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
+        </marker>
+      </defs>
+
+      <g font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12">
+
+        <!-- YOU -->
+        <rect x="230" y="16" width="160" height="40" rx="20" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <text x="310" y="41" text-anchor="middle" font-weight="700">You: describe it</text>
+        <line x1="310" y1="56" x2="310" y2="94" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" />
+
+        <!-- WARP/CLAUDE -->
+        <rect x="130" y="96" width="360" height="72" rx="10" fill="var(--c-claude-soft)" stroke="var(--c-claude)" stroke-width="1.5" />
+        <text x="310" y="126" text-anchor="middle" font-weight="700" fill="var(--c-claude)">WARP — Claude builds</text>
+        <text x="310" y="148" text-anchor="middle" fill="currentColor">writes code, tests it, pushes a branch</text>
+        <line x1="310" y1="168" x2="310" y2="206" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" />
+        <text x="322" y="192" fill="currentColor" font-size="11">opens a PR</text>
+
+        <!-- GITHUB (PR) -->
+        <rect x="130" y="208" width="360" height="60" rx="10" fill="var(--c-github-soft)" stroke="var(--c-github)" stroke-width="1.5" />
+        <text x="310" y="234" text-anchor="middle" font-weight="700" fill="var(--c-github)">GITHUB — the PR waits</text>
+        <text x="310" y="253" text-anchor="middle" fill="currentColor">nothing to click yet</text>
+        <line x1="310" y1="268" x2="310" y2="306" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" />
+        <text x="322" y="292" fill="currentColor" font-size="11">you switch Lovable to this branch</text>
+
+        <!-- LOVABLE (branch preview) -->
+        <rect x="130" y="308" width="360" height="72" rx="10" fill="var(--c-lovable-soft)" stroke="var(--c-lovable)" stroke-width="1.5" />
+        <text x="310" y="338" text-anchor="middle" font-weight="700" fill="var(--c-lovable)">LOVABLE — preview the branch</text>
+        <text x="310" y="360" text-anchor="middle" fill="currentColor">click through it like a customer</text>
+
+        <!-- loop back to Claude -->
+        <path d="M 130 340 C 60 340, 60 132, 128 132" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arrow)" />
+        <text x="34" y="238" fill="var(--ink-soft)" font-size="11" text-anchor="middle" transform="rotate(-90 34 238)">not quite right</text>
+
+        <line x1="310" y1="380" x2="310" y2="418" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" />
+        <text x="322" y="404" fill="currentColor" font-size="11">looks right — switch back to “main”</text>
+
+        <!-- GITHUB (merge) -->
+        <rect x="130" y="420" width="360" height="60" rx="10" fill="var(--c-github-soft)" stroke="var(--c-github)" stroke-width="1.5" />
+        <text x="310" y="446" text-anchor="middle" font-weight="700" fill="var(--c-github)">GITHUB — click Merge</text>
+        <text x="310" y="465" text-anchor="middle" fill="currentColor">the one green button</text>
+        <line x1="310" y1="480" x2="310" y2="518" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" />
+        <text x="322" y="504" fill="currentColor" font-size="11">“main” updates itself</text>
+
+        <!-- LOVABLE (publish) -->
+        <rect x="130" y="520" width="360" height="72" rx="10" fill="var(--c-lovable-soft)" stroke="var(--c-lovable)" stroke-width="1.5" />
+        <text x="310" y="550" text-anchor="middle" font-weight="700" fill="var(--c-lovable)">LOVABLE — click Publish</text>
+        <text x="310" y="572" text-anchor="middle" fill="currentColor">re-syncs “main”, then ships it</text>
+        <line x1="310" y1="592" x2="310" y2="630" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" />
+
+        <!-- LIVE -->
+        <rect x="200" y="632" width="220" height="46" rx="23" fill="var(--accent)" />
+        <text x="310" y="661" text-anchor="middle" font-weight="800" fill="#ffffff">Live for everyone</text>
+
+        <!-- MOTION aside -->
+        <path d="M 490 132 C 560 132, 560 200, 560 230" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arrow)" />
+        <rect x="500" y="232" width="110" height="52" rx="8" fill="var(--c-motion-soft)" stroke="var(--c-motion)" stroke-width="1.5" />
+        <text x="555" y="254" text-anchor="middle" font-weight="700" fill="var(--c-motion)" font-size="11">MOTION</text>
+        <text x="555" y="270" text-anchor="middle" fill="currentColor" font-size="10">checks in, optional</text>
+
+      </g>
+    </svg>
+    <figcaption>Lovable shows up twice, for two different reasons: once to preview your branch before you decide it's good, once on “main” right before you publish. Switching it back to “main” between those two moments is the one step that keeps you from accidentally shipping the wrong branch.</figcaption>
+  </figure>
+
+  <h2 class="section-title">The walkthrough</h2>
+
+  <div class="phase p-claude">
+    <div class="phase-head">
+      <span class="phase-num">1</span>
+      <h3>Warp: describe it, let Claude build</h3>
+      <span class="where">Warp</span>
+    </div>
+    <ol>
+      <li>Open Warp. Type <b>cd ~/skill-flow-pro</b>, then <b>claude</b>.</li>
+      <li>Tell Claude what you want, in plain English.</li>
+      <li>Claude proposes a plan. You read it and say “approved” or ask for changes. <span class="you-decide">you decide</span></li>
+      <li>Claude builds it, tests it, and pushes a branch with a pull request. This part you can walk away from.</li>
+    </ol>
+  </div>
+
+  <div class="phase p-lovable">
+    <div class="phase-head">
+      <span class="phase-num">2</span>
+      <h3>Lovable: look at it</h3>
+      <span class="where">Lovable</span>
+    </div>
+    <ol>
+      <li>Claude tells you the branch name.</li>
+      <li>In Lovable, open the branch picker and switch to that branch. The preview rebuilds.</li>
+      <li>Click through it like a customer would. <span class="you-decide">you decide</span></li>
+      <li>Not right? Tell Claude what's off — back to step 1. Looks good? Switch the branch picker back to <b>main</b>.</li>
+    </ol>
+    <div class="warning"><b>Don't skip this switch-back.</b> Publish always ships whichever branch Lovable is currently pointed at.</div>
+  </div>
+
+  <div class="phase p-github">
+    <div class="phase-head">
+      <span class="phase-num">3</span>
+      <h3>GitHub: make it official</h3>
+      <span class="where">GitHub</span>
+    </div>
+    <ol>
+      <li>Open the PR link Claude gave you.</li>
+      <li>Click the green <b>Merge pull request</b> button. <span class="you-decide">you decide</span></li>
+    </ol>
+  </div>
+
+  <div class="phase p-lovable">
+    <div class="phase-head">
+      <span class="phase-num">4</span>
+      <h3>Lovable: ship it</h3>
+      <span class="where">Lovable</span>
+    </div>
+    <ol>
+      <li>Lovable notices <b>main</b> changed and re-syncs on its own.</li>
+      <li>Click <b>Publish</b>. <span class="you-decide">you decide</span></li>
+      <li>It's live.</li>
+    </ol>
+  </div>
+
+  <div class="aside">
+    <h3>Where does Motion fit in?</h3>
+    <p>It doesn't sit in this path. It's a board Claude keeps updated with what's queued, being built, or waiting on review. Open it whenever you're curious "where are we" — you never have to act on anything there.</p>
+  </div>
+
+  <h2 class="section-title">Quick reference</h2>
+  <div class="overflow">
+    <table class="ref">
+      <thead>
+        <tr><th>You want to&hellip;</th><th>Open this</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Start or continue working on something</td><td><span class="ref-chip rc-claude">Warp</span></td></tr>
+        <tr><td>See what a change actually looks like</td><td><span class="ref-chip rc-lovable">Lovable</span></td></tr>
+        <tr><td>Make a change official</td><td><span class="ref-chip rc-github">GitHub</span></td></tr>
+        <tr><td>Make a change live for everyone</td><td><span class="ref-chip rc-lovable">Lovable</span></td></tr>
+        <tr><td>Check what's in progress</td><td><span class="ref-chip rc-motion">Motion</span></td></tr>
+        <tr><td>Undo something that shipped</td><td><span class="ref-chip rc-claude">Warp</span> — tell Claude, it reverts</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>

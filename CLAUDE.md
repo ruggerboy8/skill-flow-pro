@@ -1,5 +1,36 @@
 # Skill Flow Pro — Claude Context
 
+## Who you're working with (added 2026-08-18)
+
+John, the founder, is strong at product thinking, UX intent, requirements, and
+describing behavior — not at reading code or CLI/git mechanics. He is actively
+building that fluency (see `docs/dev-workflow-redesign.md` and
+`docs/dev-workflow-kit-instructions.md`), but treat him as new to this in any
+session, including ones running here in his terminal (Warp), not just the
+desktop app.
+
+Consequences for how you work with him, in this repo specifically:
+
+- **Narrate terminal/git actions in plain language as you do them**, not just
+  their names. Instead of "rebasing," say what's actually happening and why.
+  Don't assume familiarity with branches, merges, PRs, or diffs — a one-clause
+  reminder of what a thing is costs little and saves a derailed session.
+- **Never assume he'll read a diff to verify your work.** Summarize what
+  changed and why in outcomes, not code. If something needs his literal eyes
+  on it, point him at the Lovable preview or a screenshot, not a `git diff`.
+- **State the safety rule before a risky step**, don't just do it: pushing to
+  `main`, merging, or anything that touches production data gets a plain-
+  English heads-up first, even if he's technically already approved the plan.
+- **Default to more explanation, not less**, when a request touches git,
+  CI, deploys, or infra he hasn't worked with before. If unsure whether he
+  needs the explanation, give the short version and offer to go deeper.
+- He is deliberately moving toward the workflow in
+  `docs/dev-workflow-kit-instructions.md` (branches, PRs, a Motion board,
+  human-only merges). Reinforce that workflow's habits in how you present
+  work, even before the tooling in that doc is fully built.
+- If he asks a question that reveals a gap in a foundational concept, answer
+  it plainly, and don't act as if it should have been obvious.
+
 ## Project overview
 
 Skill Flow Pro is a coaching/training platform for dental practices. It was

@@ -121,12 +121,35 @@ that overhead would dominate.
 
 **Maturity and trust (as of 2026-08-18):** created 2026-06-15, **6 stars,
 4 forks, 3 contributors, 101 commits, last push 2026-07-31**, Apache-2.0,
-zero open issues, no releases cadence to speak of. It has real tests for
-itself and a serious operating manual, and its design is unusually
-principled. It is also two months old, essentially single-maintainer,
-and quiet for the last three weeks. That's a "learn from and maybe use
-one command from" level of trust, not a "route all development through
-it" level.
+zero open issues (all 15 ever filed were the maintainer's own tracking
+issues), no releases or tags. Roughly a quarter of its commit history
+was authored by autoDev's own bot building itself. Its design is
+unusually principled and its docs are candid. It is also two months
+old, effectively single-maintainer, and quiet for three weeks. That's a
+"learn from and maybe use one command from" level of trust, not a "route
+all development through it" level.
+
+Two findings from the deep read that matter more than the star count:
+- **Almost every guarantee is prose, not code.** The two human gates,
+  fresh-context QA, "ask, don't invent," and the three QA angles live in
+  ~1,750 lines of markdown that Claude re-interprets every session. Only
+  two guarantees are mechanically enforced by hooks: the default-branch
+  push guard and the CLAUDE.md edit guard. Its own smoke test states the
+  pipeline logic can't be tested outside a live Claude session. Nothing
+  verifies that three QA subagents actually ran versus one agent
+  narrating three headings.
+- **Its most safety-critical claim already failed once in the field.**
+  Issues #9/#10: headless mode could bypass "only humans merge"; patched
+  later. Young project, real scar.
+
+Also worth knowing: the "preview" it launches is a local dev server on
+whatever machine ran the loop; the live-browser and visual QA checks are
+permanently advisory (they flag, never block); the hermetic
+`forbid_endpoints` list only catches endpoints you hand-write into it, so
+a Supabase URL is not caught unless you add it; and its example config is
+lightly genericized from the maintainer's own Elixir/Phoenix + React/MUI
+client stack, so a Vite/Supabase/Tailwind repo hand-authors that whole
+section.
 
 **Its assumptions, and where they collide with this repo:**
 
@@ -138,6 +161,8 @@ it" level.
 | **Hermetic runs: `doctor` FAILS if prod endpoints are in `.env` and hermetic overrides are off** | `.env` points at the one and only Supabase project, which is production; there is no staging DB | **hard conflict**: to run at all it needs a local Supabase (`supabase start`) or a second project, plus env overrides |
 | Preview = it launches your app locally (`commands.app_run` + `app_url`) and hands you `localhost` | Vite dev server works locally, but the app is only meaningful against real data | preview would show a *hermetic* app; against a local Supabase, that means empty or seeded data, not John's world |
 | Feature branches + draft PRs, merge in GitHub | possible; unused today; **Lovable syncs one branch at a time** | workable but interacts with Lovable (section 3) |
+| Merge to default branch = shipped; then a "post-deploy smoke on the real environment" is prod sign-off | merge is NOT shipped here; Lovable Publish is a separate, later, human click | its post-merge smoke would run against pre-Publish production and report "shipped" prematurely |
+| It controls the feature/story branch lineage | Lovable's bot commits to the active branch independently | concurrent non-Claude commits are not addressed anywhere in its docs |
 | CI/post-merge clean-room verify | no CI; it does its own local verify | fine, degrades gracefully |
 | Migrations/secrets handled by the repo's own tooling | Lovable owns migrations; DDL via dashboard/MCP; `db push` doesn't work here | autoDev has no opinion; the DB path stays manual regardless |
 | CLAUDE.md is read-only to the AI | fine, matches our practice | fine |

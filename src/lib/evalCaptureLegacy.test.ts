@@ -122,6 +122,23 @@ describe("convertLegacyNotes", () => {
     expect(res.converted[0]).toMatchObject({ glow: "Kept calm with a nervous patient.", grow: null });
   });
 
+  it("still processes every item when concurrency is not a usable number (QA finding)", async () => {
+    const separate = vi.fn(async () => ({ glow: "g", grow: "r" }));
+    const save = vi.fn(async () => {});
+    const d = data([
+      { domainId: 1, domainName: "Clinical", summary: null, competencies: [
+        comp({ competencyId: 10, legacyNote: "one" }),
+        comp({ competencyId: 11, legacyNote: "two" }),
+      ] },
+    ]);
+    for (const bad of [Number("abc"), 0, -3, Infinity]) {
+      separate.mockClear();
+      const res = await convertLegacyNotes(d, { separate, save, concurrency: bad });
+      expect(separate).toHaveBeenCalledTimes(2);
+      expect(res.converted.length + res.failed.length).toBe(2);
+    }
+  });
+
   it("does nothing when there are no legacy notes", async () => {
     const separate = vi.fn();
     const save = vi.fn();

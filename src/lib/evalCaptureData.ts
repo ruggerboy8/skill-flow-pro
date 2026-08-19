@@ -261,8 +261,11 @@ type SaveFn = typeof saveCaptureItem;
  * Split every legacy note in the eval into Glow/Grow and persist the result.
  * The original observer_note is left untouched, so nothing is lost if the split
  * is poor: the coach can still see and edit it, and staff-facing screens that
- * fall back to observer_note are unaffected. Idempotent: items that already have
- * glow or grow are skipped, so a second open converts nothing.
+ * fall back to observer_note are unaffected. Items that already have glow or
+ * grow are skipped, so once a split has succeeded a second open converts
+ * nothing. Items whose split failed still have no glow/grow, so they are
+ * retried on the next open; that is deliberate (a transient outage should not
+ * strand a note), and the caller surfaces them for manual Polish meanwhile.
  *
  * Dependencies are injectable so this can be tested without the network.
  */
@@ -272,7 +275,10 @@ export async function convertLegacyNotes(
 ): Promise<LegacyConversionResult> {
   const separate = deps.separate ?? separateFeedback;
   const save = deps.save ?? saveCaptureItem;
-  const concurrency = Math.max(1, deps.concurrency ?? 4);
+  const requested = deps.concurrency;
+  const concurrency = typeof requested === "number" && Number.isFinite(requested) && requested >= 1
+    ? Math.floor(requested)
+    : 4;
 
   const items = findLegacyNoteItems(data);
   const result: LegacyConversionResult = { converted: [], failed: [] };

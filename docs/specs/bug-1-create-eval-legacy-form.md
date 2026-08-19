@@ -1,6 +1,6 @@
 # Spec: BUG-1, Create Evaluation opens the legacy form
 
-**Status:** approved by John 2026-08-19 (verbal, in session)
+**Status:** approved by John 2026-08-19 (verbal, in session); QA pass 2 after fixes
 **Lane:** bug
 **Ticket:** BUG-1 (Motion, MyProMoves Dev Board)
 **Branch:** fix/bug-1-create-eval-opens-legacy-form
@@ -31,11 +31,18 @@ came up blank for the coach.
    idempotent (a second open converts nothing).
 3. If a split fails for a competency, the legacy note is placed in that
    competency's feedback box so the coach can Polish it by hand. A toast says
-   what happened either way.
+   what happened either way. Failed items are retried on the next open.
+4. Only drafts are auto-converted. For an eval that is already submitted, the
+   capture flow makes no write on open; it just shows the legacy note in the
+   feedback box so it is readable. (QA 2026-08-19 pointed out that opening a
+   submitted eval should not silently write to it.)
+5. If the coach navigates to a different eval before the conversion finishes,
+   the late results are not painted onto the new screen (QA finding, fixed).
 
 Live data check on 2026-08-19: two recent drafts by one evaluator with 12 and 5
-legacy notes, plus two July submitted evals in the same shape. All convert the
-first time the capture flow opens them.
+legacy notes, plus two July submitted evals in the same shape. The drafts
+convert the first time the capture flow opens them; the July ones stay as they
+are and simply show their notes.
 
 ## Acceptance script (as a coach)
 

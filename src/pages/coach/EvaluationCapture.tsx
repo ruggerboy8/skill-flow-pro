@@ -73,6 +73,10 @@ export default function EvaluationCapture() {
     catch { setTourOpen(true); }
   }, []);
 
+  // Which eval this mounted screen currently shows; see convertLegacyNotesInPlace.
+  const activeEvalRef = useRef<string | undefined>(evalId);
+  useEffect(() => { activeEvalRef.current = evalId; }, [evalId]);
+
   async function reload() {
     if (!evalId) return null;
     const result = await loadCaptureData(evalId);
@@ -91,11 +95,20 @@ export default function EvaluationCapture() {
         setData(result);
         setLoading(false);
         // Legacy notes: evals started in the classic form carry one combined
-        // note per competency that this screen cannot show. Split them into
-        // Glow/Grow now (original note kept on the row), so the coach picks up
-        // exactly where they left off instead of facing blank boxes.
+        // note per competency that this screen cannot show. For drafts, split
+        // them into Glow/Grow now (original note kept on the row), so the coach
+        // picks up exactly where they left off instead of facing blank boxes.
+        // For anything already submitted, do not write to the row on open: just
+        // surface the legacy note in the feedback box so it is readable.
         if (result && findLegacyNoteItems(result).length > 0) {
-          await convertLegacyNotesInPlace(result);
+          if (result.staffStatus === "draft") {
+            await convertLegacyNotesInPlace(result);
+          } else if (!cancelled) {
+            surfaceLegacyNotesInDrafts(findLegacyNoteItems(result).map((i) => ({
+              competencyId: i.competency.competencyId,
+              legacyNote: i.competency.legacyNote as string,
+            })));
+          }
         }
       } catch (e) {
         if (!cancelled) {
@@ -109,25 +122,34 @@ export default function EvaluationCapture() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evalId, toast]);
 
+  // Put unsplit legacy notes into the feedback box so the coach can read them
+  // and Polish by hand. Never overwrites something the coach already typed.
+  function surfaceLegacyNotesInDrafts(items: { competencyId: number; legacyNote: string }[]) {
+    if (items.length === 0) return;
+    setDrafts((prev) => {
+      const next = { ...prev };
+      for (const f of items) {
+        if (!next[f.competencyId]?.trim()) next[f.competencyId] = f.legacyNote;
+      }
+      return next;
+    });
+  }
+
   async function convertLegacyNotesInPlace(loaded: CaptureData) {
     const pending = findLegacyNoteItems(loaded).length;
     setConvertingLegacy(pending);
+    // The route component stays mounted when only :evalId changes, so a
+    // conversion started for eval A must not paint onto eval B's screen if the
+    // coach navigates away before it finishes. The DB writes are scoped to A by
+    // evalId inside convertLegacyNotes; this guards the on-screen state.
+    const stillOnThisEval = () => activeEvalRef.current === loaded.evalId;
     try {
       const { converted, failed } = await convertLegacyNotes(loaded);
+      if (!stillOnThisEval()) return;
       for (const c of converted) {
         patchCompetency(c.domainId, c.competencyId, { glow: c.glow, grow: c.grow, legacyNote: null });
       }
-      if (failed.length > 0) {
-        // Surface the unsplit note in the feedback box so the coach can Polish
-        // it by hand. Never overwrite something the coach already typed.
-        setDrafts((prev) => {
-          const next = { ...prev };
-          for (const f of failed) {
-            if (!next[f.competencyId]?.trim()) next[f.competencyId] = f.legacyNote;
-          }
-          return next;
-        });
-      }
+      surfaceLegacyNotesInDrafts(failed);
       if (converted.length > 0 && failed.length === 0) {
         toast({
           title: `Converted ${converted.length} note${converted.length === 1 ? "" : "s"} from the classic form`,
@@ -146,7 +168,7 @@ export default function EvaluationCapture() {
         });
       }
     } finally {
-      setConvertingLegacy(0);
+      if (stillOnThisEval()) setConvertingLegacy(0);
     }
   }
 

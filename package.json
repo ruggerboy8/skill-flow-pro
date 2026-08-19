@@ -9,7 +9,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "test": "vitest run",
-    "check": "tsc --noEmit -p tsconfig.app.json && vitest run && vite build",
+    "check": "tsc --noEmit -p tsconfig.app.json && npm run lint && vitest run && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -2,8 +2,14 @@
 
 **What this is.** The first full engineering review Skill Flow Pro has ever had.
 It was produced by the dev workflow kit running on the codebase itself, which was
-phase 4 of the kit build. Nine reviewers swept in parallel, all read-only. Every
-finding became a Motion ticket. **No code was changed by this assessment.**
+phase 4 of the kit build. Nine reviewers swept in parallel, all read-only.
+**No code was changed by this assessment.**
+
+Most findings became Motion tickets. Six did not, and are marked in the tables
+below as `(observation)` with a reason. Those are deliberately untracked: they are
+either context worth knowing rather than work to do, or they are already covered
+by an existing ticket or an existing document. Nothing in this assessment is
+silently dropped, but do not read the tables as "every row is on the board.
 
 **Why it happened.** The project was built entirely in Lovable, then in Claude
 Desktop, and is now moving to CLI management. It has never been reviewed
@@ -152,7 +158,7 @@ classes of access sit beside RLS and ignore it.
 | Two competing org resolvers; "org" still means "group" in six DB functions | medium | yes | COR-2 |
 | Alcan-specific constants in gates, defaults and fallbacks | medium | yes | COR-2 |
 | Two permission systems disagree; 3 org-admin rows divergent live | medium | yes | COR-4 |
-| Half of app queries rely entirely on RLS with no second line of defence | low | no | (architectural note) |
+| Half of app queries rely entirely on RLS with no second line of defence | low | no | (observation: explains why SEC-1/SEC-2 exposed everything rather than part) |
 
 **The regression chain worth remembering.** The view fix was applied correctly in
 January, then silently reverted three times by later migrations that rebuilt those
@@ -174,7 +180,7 @@ is too narrow, and its "masquerade hardening" argument is defeated by SEC-3.
 | Migration naming and applied-timestamp mismatch make history unreplayable | medium | yes | DOC-2, GOV-1 |
 | Generated TypeScript types lag the live schema | medium | no | GOV-1 |
 | `staff` has undocumented denormalized org columns with no sync guarantee | medium | no | COR-2 |
-| Framework-versioning `change_reason` discipline unproven (not violated) | low | no | (process note) |
+| Framework-versioning `change_reason` discipline unproven (not violated) | low | no | (observation: nothing is broken; watch the first framework edit) |
 | `user_capabilities` and `organization_pro_moves` lack assumed unique constraints | low | no | COR-3 |
 
 **Framework versioning is working.** The delete-guard and history-capture triggers
@@ -224,7 +230,7 @@ TST-4 is the largest single ticket in the assessment.
 | Deprecated "tenant" terminology in 5 comments | low | no | CLN-1 |
 | Two variables named for organizations that actually hold groups | low | no | CLN-1 |
 | Feature flag hardcoded `|| true`, env toggle is a no-op | low | no | CLN-1 |
-| Eval v2 data-fetch duplication | low | no | (overlaps existing audit) |
+| Eval v2 data-fetch duplication | low | no | (observation: already tracked as finding 8 in code-quality-audit.md) |
 
 **A negative finding worth keeping.** The pass counted roughly 2,459 comment
 lines, checked them, and confirmed they are real documentation rather than
@@ -275,12 +281,12 @@ output, and a real production build.
 | Dashboards fire one DB round-trip per staff member (measured: 72ms, 17,436 buffer reads each) | high | no | PRF-1 |
 | 145 RLS policies re-evaluate auth per row; 243 stacked permissive policies | high | no | PRF-2 |
 | Single 3.4MB bundle (959kB gzipped), no route-level code splitting | high | no | PRF-3 |
-| Confidence repair flow chains up to 4 sequential DB calls | medium | no | (deferred, legacy retirement) |
+| Confidence repair flow chains up to 4 sequential DB calls | medium | no | (observation: subsumed by the planned legacy cycle retirement) |
 | Duplicate indexes on the busiest write table | low | no | COR-3 |
 | `ProMoveForm` N+1 against a 4-row table | low | no | CLN-1 |
 | Unindexed foreign keys on the two busiest tables | low | no | COR-3 |
-| ~30 files `select('*')` where a few columns would do | low | no | (deferred) |
-| No list virtualization anywhere | low | no | (watch item, no action) |
+| ~30 files `select('*')` where a few columns would do | low | no | (observation: no measured impact at current row counts) |
+| No list virtualization anywhere | low | no | (observation: no screen renders enough rows to need it yet) |
 
 **Calibration worth noting.** This pass was careful to distinguish real pain from
 theoretical pain. It explicitly reported that unindexed foreign keys are *not*
@@ -316,7 +322,7 @@ documentation in this repo? **Today, no.**
 | No production error monitoring, health check, or rollback runbook | high | yes | DOC-4 |
 | `roadmap.md` claims to be updated every session, 5+ months stale | high | yes | DOC-3 |
 | `architecture.md` stale banner undersells how wrong it is | high | yes | DOC-3 |
-| `kit-log.md` specified by the kit instructions but never created | medium | no | (fixed here) |
+| `kit-log.md` specified by the kit instructions but never created | medium | no | (fixed in this PR) |
 | `docs/audits/` mixes trustworthy and stale docs with no consistent banners | medium | yes | DOC-3 |
 | `.env` committed and not gitignored | low | yes | DOC-1 |
 | `the-alcan-way/` dormant, no deploy path, unreferenced from the app | medium | no | CLN-5 |
@@ -341,15 +347,17 @@ it is created alongside this document.
 
 ## Ticket index
 
-Thirty-five tickets, all created at `stage:backlog` on the MyProMoves Dev Board.
+Thirty-six tickets on the MyProMoves Dev Board. (GOV-3 was split into GOV-3 and
+GOV-4 after John flagged that gating CI on lint would block every merge. He was
+right: there are 2,457 lint errors today. See GOV-4.)
 
 **Security (7):** SEC-1 anon read surface · SEC-2 SECURITY DEFINER grants ·
 SEC-3 privilege escalation · SEC-4 unauthenticated edge functions ·
 SEC-5 org-scope unfiltered policies · SEC-6 admin-users guards and logging ·
 SEC-7 leaked token cleanup
 
-**Governance (3):** GOV-1 backfill missing migrations · GOV-2 recover orphaned
-edge functions · GOV-3 branch protection and lint
+**Governance (4):** GOV-1 backfill missing migrations · GOV-2 recover orphaned
+edge functions · GOV-3 branch protection · GOV-4 lint config and debt
 
 **Correctness (4):** COR-1 timezone dates and Monday consolidation ·
 COR-2 org-vs-group ID confusion · COR-3 database integrity ·
@@ -370,7 +378,7 @@ DOC-3 staleness sweep · DOC-4 error monitoring
 **Cleanup (5):** CLN-1 dead code · CLN-2 dependencies · CLN-3 licensing ·
 CLN-4 branches · CLN-5 the-alcan-way
 
-**Severity spread:** 6 critical, 21 high, 7 medium, 1 low.
+**Severity spread:** 6 critical, 21 high, 8 medium, 1 low.
 
 ## A suggested order
 
@@ -388,3 +396,119 @@ Not prescriptive, but the dependencies are real:
 
 CLN-1 and TST-2 are the two easiest tickets on the board and are good first
 practice reps if you would rather start somewhere low-stakes.
+
+## Appendix: source locations
+
+Added after review feedback on PR #11 pointed out, correctly, that the tables
+above give counts and component names rather than the file references the spec
+promised. Full detail including line numbers lives in each Motion ticket; this is
+the quick lookup.
+
+**SEC-1** views `view_evaluation_items_enriched`, `view_weekly_scores_with_competency`,
+`view_staff_submission_windows`; tables `eval_payload_recovery_backup`,
+`_eval_repair_targets`. Regression trail: fixed in
+`20260106174259_d56cb614-*.sql:8`, reverted by `20260204222301_c756ff5d-*.sql:4-6`,
+`20260305215452_158aa2b6-*.sql:14-47`, and `20260612170000_org_move_visibility.sql:17`.
+Public key at `src/integrations/supabase/client.ts:6`.
+
+**SEC-2** `get_staff_all_weekly_scores`, `get_coach_roster_summary`,
+`get_staff_submission_windows`, `get_calibration`, `get_eval_distribution_metrics`,
+`get_location_domain_staff_averages`, `get_location_skill_gaps`,
+`get_performance_trend`, `get_evaluations_summary`, `get_best_weekly_win`,
+`org_visible_pro_moves`. Write functions: `save_eval_acknowledgement_and_focus`
+(4-arg overload), `admin_fix_backfill_week_of`. Callers include
+`src/hooks/useStaffAllWeeklyScores.tsx:56`, `src/components/coach/OnTimeRateWidget.tsx:30`.
+
+**SEC-3** policies `staff / "Users can update own profile"` and
+`"Users can create own profile"`; `public.is_coach_or_admin(uuid)`;
+`uc_admin_write` on `user_capabilities`; trigger `trg_staff_fill_organization_id`;
+`supabase/functions/admin-users/index.ts:79`; `src/hooks/useUserRole.tsx:60`.
+
+**SEC-4** `supabase/functions/deputy-sync-dispatcher/index.ts:35-113`,
+`supabase/functions/planner-upsert/index.ts:72-77` (body-supplied orgId at `:218`,
+updaterUserId at `:229`), `supabase/functions/polish-note/index.ts`,
+`supabase/functions/format-reflection/index.ts`, `supabase/config.toml:49-50,55-56,97-98`.
+
+**SEC-5** `coach_baseline_assessments`, `coach_baseline_items`, `coach_baseline_audit`,
+`doctor_baseline_assessments`, `doctor_baseline_items`, `doctor_coach_assignments`,
+`coaching_session_selections`, `user_capabilities`, `excused_weeks`, `staff_audit`,
+`reminder_log`, `staff_quarter_focus`, `app_kv`, `organization_role_names`.
+
+**SEC-6** `supabase/functions/admin-users/index.ts`: guard defined `:92-114`, called
+`:624`, `:1023`, `:1097`; missing from `:533`, `:970`, `:992`, `:1181`. Gate `:68-80`.
+PII logging `:41`, `:54`, `:110`, `:1017`, `:1197`.
+
+**SEC-7** `docs/audits/security-rls-audit.md:142`; commits `8ef83ac0`, `f8d25bdd`,
+`d86d4934`, `1d67e693`, `b130d7c5`.
+
+**COR-1** `src/hooks/useWeeklyAssignments.tsx:75`, `WeekBuilderPanel.tsx`,
+`GlobalAssignmentBuilder.tsx`, `MonthView.tsx`, `HistoryStrip.tsx`,
+`useStaffSubmissionRates.tsx`, `ScoreHistoryV2.tsx`, `submissionRateCalc.ts`, plus 3
+more. Monday implementations: `src/lib/submissionPolicy.ts:109` (canonical),
+`src/lib/dateUtils.ts`, `src/lib/plannerUtils.ts:9-75`. Correct pattern to copy is in
+`src/lib/locationState.ts`.
+
+**COR-2** `get_staff_domain_avgs`, `get_strengths_weaknesses`,
+`get_eval_distribution_metrics`, `get_location_domain_staff_averages`,
+`seq_latest_quarterly_evals`, `get_coach_roster_summary`,
+`is_org_allowed_for_sequencing`; resolvers `current_user_org_id()` vs
+`get_user_org_id(uuid)`; caller example
+`src/components/admin/eval-results-v2/OrgSummaryStrip.tsx:42`. Alcan constants:
+`src/lib/askAlcanAccess.ts:6`, `src/components/RequireAccess.tsx:71`,
+`src/components/Layout.tsx:192`, `src/hooks/useAlcanTargets.ts:20,38`,
+`src/pages/admin/SurveyBuilderPage.tsx:94`,
+`supabase/functions/deputy-initiate-oauth/index.ts:96`,
+`supabase/functions/deputy-oauth-callback/index.ts:49`,
+`supabase/functions/send-hr-export/index.ts:31`,
+`supabase/functions/admin-users/index.ts:410-411`,
+`src/lib/content/roleDefinitions.ts:65-69`, `src/lib/plannerUtils.ts:4`,
+`src/lib/centralTime.ts:5`, `supabase/functions/transcribe-audio/index.ts:42`.
+
+**COR-3** `weekly_assignments.location_id`, `weekly_scores.assignment_id`,
+`weekly_scores.weekly_focus_id`; indexes `idx_weekly_scores_focus_id` /
+`idx_weekly_scores_focusid`, `uq_weekly_scores_staff_focus` /
+`weekly_scores_staff_id_weekly_focus_id_key`; tables `user_capabilities`,
+`organization_pro_moves`.
+
+**COR-4** `src/hooks/useUserRole.tsx:43-100`; `is_coach_or_admin(uuid)`,
+`is_super_admin(uuid)`, `is_superadmin()`; `supabase/functions/admin-users/index.ts:48-80`.
+
+**TST-1** `src/hooks/useUserRole.tsx:60-155`; `src/lib/evaluationEligibility.ts:10-26,33-38,49-72`;
+`src/lib/evaluations.ts:779-816`; `src/lib/submissionStatus.ts:39-53,55-149`;
+`src/lib/submissionRateCalc.ts:27-99`; `src/lib/pivot.ts:29-85`.
+**TST-2** `src/lib/recommenderUtils.ts:5-27,44-79,95-175`.
+**TST-3** `src/lib/locationState.ts:37-88` and `:240-536`.
+**TST-4** `supabase/functions/sequencer-rank/index.ts:428-600`.
+**TST-5** `src/integrations/supabase/client.ts`, `vitest.config.ts`.
+
+**PRF-1** `src/hooks/useStaffSubmissionRates.tsx:42-65`,
+`src/hooks/useOrgAccountability.tsx:93-139`, `src/hooks/useLocationAccountability.tsx:79+`,
+`src/components/dashboard/LocationSubmissionWidget.tsx:63-83`,
+`src/components/dashboard/DomainConfidenceHeatmap.tsx:59-69`; RPC
+`get_staff_submission_windows`.
+**PRF-3** `src/App.tsx` (67 static imports), `dist/assets/index-*.js`.
+
+**DSN-1** `src/lib/domainColors.ts`; safe variants used only in
+`src/components/my-role/CraftAtlasOverview.tsx`, `CraftAtlasArea.tsx`.
+**DSN-2** `src/components/dashboard/ExcuseSubmissionsDialog.tsx:254,260`,
+`src/components/clinical/DoctorDetailThread.tsx:477`,
+`src/components/admin/AdminUsersTab.tsx:575`, `src/components/coach/AudioRecorder.tsx`,
+`src/pages/doctor/DoctorReviewPrep.tsx`, `src/pages/EvaluationReviewV2.tsx:272,292,316,331,364,389,415,469,513`,
+`src/pages/EvaluationReview.tsx`, `src/components/coach/CaptureTour.tsx`.
+**DSN-3** worst files `src/pages/Index.tsx`, `src/components/dashboard/EvalCadenceWidget.tsx`,
+`SignalsBanner.tsx`, `LocationSubmissionWidget.tsx`, `src/components/coach/OnTimeRateWidget.tsx`,
+`src/components/admin/eval-results-v2/DeliveryStatusPill.tsx`, `src/pages/coach/EvaluationHub.tsx`.
+**DSN-4** `src/components/ui/StatusBadge.tsx` and the hand-rolled versions listed in DSN-3.
+
+**DOC-1** `README.md`, `.env`, `.gitignore`.
+**DOC-2** `docs/architecture.md:25-26` vs CLAUDE.md "Applying migrations".
+**DOC-3** `docs/roadmap.md`, `docs/architecture.md:138`, `docs/data-model.md`,
+`docs/glossary.md`, `docs/audits/*`, `docs/enterprise-blockers.md`, `docs/phase2-qa.md`.
+
+**CLN-1** `src/pages/admin/EvalResults.tsx`, `src/components/admin/eval-results/*`,
+`src/index.backup.css`, `src/components/ui/button.backup.tsx`, `card.backup.tsx`,
+`src/components/home/ChristmasWelcome.backup.tsx`, `RecentWinBanner.backup.tsx`,
+`src/lib/participation.ts`, `src/lib/backfillDetection.ts`, `src/lib/featureFlags.ts:2`,
+`src/components/admin/ProMoveForm.tsx:139-149`,
+`src/components/admin/eval-results-v2/DeliveryTab.tsx`, `src/pages/coach/CoachDashboardV2.tsx`.
+**GOV-4** `eslint.config.js:8`, `.claude/worktrees/*`.

@@ -16,6 +16,90 @@ Desktop, and is now moving to CLI management. It has never been reviewed
 systematically. The goal is a codebase that reads as professional and would hold
 up under technical due diligence.
 
+## How this codebase was built, and why it changes the reading
+
+Skill Flow Pro was written almost entirely by AI assistance directed by a founder
+who is not a trained engineer, starting early in the era of AI coding tools and
+running through several generations of them. That is context, not an excuse, and
+it is load-bearing for how this backlog should be worked.
+
+**It explains the shape of what was found.** Nearly every finding here is a
+characteristic artifact of generated code that no engineer reviewed, rather than
+evidence of carelessness:
+
+- **587 `any` types.** `any` switches TypeScript's checking off. A model reaches
+  for it when it does not know the shape of something, which means the type
+  system is disabled precisely where the generator was least confident.
+- **Three independent implementations of "what is Monday this week."** Each
+  session solved the same problem fresh, without knowing the previous solution
+  existed.
+- **The same security fix reverted three times.** Views rebuilt by later
+  generations, each unaware of the January fix.
+- **~865 hardcoded colors despite documented token conventions.** The conventions
+  exist in CLAUDE.md; generation did not consistently apply them.
+- **A dead v1 evaluation surface sitting beside v2.** The new version was
+  generated; nothing removed the old one.
+- **Eight migrations applied to production but never committed.** A gap in the
+  tooling flow, not a decision anyone made.
+
+**The useful question is therefore not "how severe is this" but "will it come
+back if I fix it?"** Severity tells you what to do first. Provenance tells you
+what *done* means.
+
+### One-time findings
+
+Fix once and they stay fixed. Nothing regenerates them.
+
+GOV-1 missing migrations · SEC-7 leaked token · CLN-3 licensing ·
+CLN-4 branch cleanup · COR-3 orphan rows and constraints · CLN-2 dependencies ·
+DOC-1 README · GOV-3 branch protection
+
+### Systemic findings, which need a guard rather than a fix
+
+Fixing the instances without adding a guard puts you on a treadmill. For each of
+these, the ticket is only complete when something automated fails loudly if the
+pattern reappears.
+
+| Finding | The guard it needs |
+|---|---|
+| SEC-1 anon-readable views (already reverted 3 times) | A check that fails if any public view is anon-readable without `security_invoker`. This is the clearest case in the whole assessment: it has demonstrably come back three times. |
+| SEC-2 unguarded `SECURITY DEFINER` functions | A check that fails if a new function grants EXECUTE to `anon` |
+| GOV-4 the 587 `any`s | The lint rule enforced in CI, so the count can only go down |
+| DSN-3 hardcoded semantic colors | A lint rule banning raw color classes, since the written convention alone has not held |
+| COR-1 duplicated date logic | One canonical module, plus a lint rule against the `toISOString` pattern |
+| COR-4 split-brain permissions | A test that fails when the two permission systems disagree |
+| CLN-1 dead code beside its replacement | A periodic unreferenced-export check |
+
+**A rule of thumb for this codebase:** if a convention lives only in a document,
+generation will drift from it. Conventions that matter need to be executable.
+CLAUDE.md documents the color tokens and the icon scale; the assessment found
+roughly 865 violations of the first and about 1 in 4 declarations off the second.
+The documentation is not the problem. The absence of enforcement is.
+
+### On tool capability changing underneath the project
+
+Coding agents are meaningfully more capable now than when this project started,
+which cuts two ways worth planning around.
+
+Some of this debt is now cheaper to regenerate than to hand-repair, given the
+conventions are written down and a current model can hold far more of the
+codebase in view at once. DSN-3 is the obvious candidate: an 865-instance token
+migration is miserable by hand and tractable with tooling plus a lint rule to
+hold the line.
+
+But capability is also why this assessment could happen at all. Nine reviewers
+sweeping a 421-file codebase in parallel, verifying findings against a live
+database, was not a realistic option when this project began. The same is true of
+the guards recommended above. Several of them were impractical to write and
+maintain a year ago and are routine now.
+
+**For due diligence, this framing is an asset rather than a liability.** A
+codebase built this way, then systematically audited, with findings tracked and
+systemic issues closed with enforcement rather than one-off patches, is a
+substantially better story than an unexplained mess. What a reviewer looks for is
+not the absence of debt. It is evidence that someone knows where it is and has a
+method for retiring it. This document plus the board is that evidence.
+
 ## Read this first
 
 If you read nothing else, read these four:

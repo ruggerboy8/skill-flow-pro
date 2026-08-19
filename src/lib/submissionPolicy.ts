@@ -106,13 +106,29 @@ export interface SubmissionPolicy {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function resolveMonday(now: Date, tz: string): Date {
+/**
+ * Canonical "what is the Monday of this week" resolver. Pure, with an
+ * injectable `now`/`tz`, so every other Monday calculation in the app
+ * should delegate to this one instead of reimplementing it.
+ *
+ * Returns the UTC instant for local midnight on the Monday of the week
+ * containing `now`, as observed in `tz`.
+ */
+export function resolveMonday(now: Date, tz: string): Date {
   const isoDow = Number(formatInTimeZone(now, tz, 'i')); // 1=Mon..7=Sun
   const todayMidnightUtc = fromZonedTime(
     `${formatInTimeZone(now, tz, 'yyyy-MM-dd')}T00:00:00`,
     tz,
   );
   return addDays(todayMidnightUtc, -(isoDow - 1)); // Monday 00:00 as UTC instant
+}
+
+/**
+ * The upcoming Monday, strictly after `now`'s week: if `now` falls on a
+ * Monday, this is next week's Monday, not today. Built on `resolveMonday`.
+ */
+export function resolveNextMonday(now: Date, tz: string): Date {
+  return addDays(resolveMonday(now, tz), 7);
 }
 
 function resolveOffset(mondayZ: Date, offset: PolicyOffset, tz: string): Date {

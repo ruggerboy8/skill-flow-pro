@@ -13,7 +13,8 @@ After John has approved a spec (ticket is at `stage:spec-approved`).
 
 2. **Cut a branch**: `feature/<slug>` for new work, `fix/<slug>` for bugs.
 
-3. **Spawn a Sonnet subagent** with:
+3. **Spawn the `kit-builder` subagent** (pinned to Sonnet 5, see
+   `.claude/skills/_shared/model-tiering.md`) with:
    - The spec
    - The doc subset named in the spec
    - The Ground rules from `docs/features/mobile-build-instructions.md`
@@ -32,7 +33,7 @@ After John has approved a spec (ticket is at `stage:spec-approved`).
 
 ## Rules
 
-- The builder is a Sonnet-class subagent, not the main session. This keeps
+- The builder is the `kit-builder` agent, not the main session. This keeps
   cost down and lets the main session review the output.
 - For tiny lane: skip the subagent, build directly in the main session.
 - Never push to `main`. The branch stays local until `/ship`.

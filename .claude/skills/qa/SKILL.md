@@ -10,7 +10,7 @@ After `/build` reports complete (ticket is at `stage:qa`).
 
 1. **Read the spec and acceptance script** from the ticket.
 
-2. **Spawn a FRESH subagent** -- never the same agent that built it. This is the
+2. **Spawn a FRESH `kit-qa` subagent** -- never the same agent that built it. This is the
    whole point: a clean perspective catches what the builder's assumptions miss.
 
 3. **The QA agent walks three angles:**
@@ -38,7 +38,9 @@ After `/build` reports complete (ticket is at `stage:qa`).
 
 ## Rules
 
-- Model: Sonnet for tiny/medium, Opus for cross-cutting.
+- Agent: `kit-qa` (Sonnet 5) for tiny/medium; `kit-reviewer` (Opus 4.8) for
+  cross-cutting. Do not pass a `model` override, it would undo the pin. See
+  `.claude/skills/_shared/model-tiering.md`.
 - The QA agent must NOT be the builder. Use a fresh subagent.
 - QA is code-level review + logic verification. It cannot test against real data
   or verify visual appearance -- those go in the "not verifiable" list for John.

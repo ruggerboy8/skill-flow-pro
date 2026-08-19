@@ -30,6 +30,7 @@ import {
   buildDemoStaffDraft,
   containsAnySourceIdentity,
   fullName,
+  type PersonaCandidate,
   type SourceStaffRow,
 } from './lib/anonymize';
 import {
@@ -192,6 +193,34 @@ async function main(): Promise<void> {
 
   if (existingOrg) {
     console.log(`Demo org "${DEMO_ORG.slug}" already exists (id ${existingOrg.id}).`);
+
+    const completeness = await assessOrgCompleteness(supabase, existingOrg.id);
+    if (!completeness.complete) {
+      // Issue 2: a previous run died partway through (org row landed, but
+      // staff/assignments never finished). Do not report "nothing to do"
+      // here -- resume the copy. freshSeed is itself idempotent throughout
+      // (get-or-create for staff/auth users, natural-key get-or-create for
+      // assignments, skip-if-exists for scores), so calling it again picks
+      // up exactly where the previous attempt stopped instead of
+      // duplicating anything already written.
+      console.log(
+        `Demo org looks incomplete (staff=${completeness.staffCount}, ` +
+          `assignments=${completeness.assignmentCount}) -- resuming the copy.`,
+      );
+      if (!args.sourceLocationId) {
+        console.error(
+          'Resuming an incomplete seed needs --source-location=<uuid> again (the same location as ' +
+            'before is fine -- already-created rows are detected and skipped, not duplicated).',
+        );
+        process.exit(1);
+      }
+      if (args.refresh) {
+        console.log('Ignoring --refresh until the initial copy finishes; re-run --refresh afterward.');
+      }
+      await freshSeed(supabase, args.sourceLocationId, args.dryRun);
+      return;
+    }
+
     if (args.refresh) {
       await refreshExistingOrg(supabase, existingOrg.id, args.dryRun);
     } else {
@@ -207,6 +236,45 @@ async function main(): Promise<void> {
   }
 
   await freshSeed(supabase, args.sourceLocationId, args.dryRun);
+}
+
+/**
+ * Best-effort completeness check for an already-existing demo org. Not a
+ * precise "does it have everything the source location had" comparison
+ * (that would require re-reading the source location, which we may not
+ * have a --source-location for yet) -- just enough to tell "org row exists
+ * but the copy clearly never finished" apart from "fully seeded, nothing
+ * to do here". staffCount >= 3 covers the 3 login personas; assignmentCount
+ * > 0 covers the weekly_assignments copy. See README "Resuming an
+ * interrupted seed" for the full reasoning.
+ */
+async function assessOrgCompleteness(
+  supabase: SupabaseClient,
+  demoOrgId: string,
+): Promise<{ complete: boolean; staffCount: number; assignmentCount: number }> {
+  const locationIds = await demoLocationIds(supabase, demoOrgId);
+  let staffCount = 0;
+  if (locationIds.length > 0) {
+    const { count, error } = await supabase
+      .from('staff')
+      .select('id', { count: 'exact', head: true })
+      .in('primary_location_id', locationIds);
+    if (error) throw error;
+    staffCount = count ?? 0;
+  }
+
+  const { count: assignmentCount, error: assignErr } = await supabase
+    .from('weekly_assignments')
+    .select('id', { count: 'exact', head: true })
+    .eq('org_id', demoOrgId)
+    .is('superseded_at', null);
+  if (assignErr) throw assignErr;
+
+  return {
+    complete: locationIds.length >= DEMO_LOCATIONS.length && staffCount >= 3 && (assignmentCount ?? 0) > 0,
+    staffCount,
+    assignmentCount: assignmentCount ?? 0,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -264,7 +332,7 @@ async function freshSeed(supabase: SupabaseClient, sourceLocationId: string, dry
 
   const { data: sourceAssignmentsRaw, error: assignErr } = await supabase
     .from('weekly_assignments')
-    .select('id, role_id, week_start_date, display_order, action_id, competency_id, status, self_select')
+    .select('id, role_id, week_start_date, display_order, action_id, competency_id, self_select')
     .eq('location_id', sourceLocationId)
     .is('superseded_at', null);
   if (assignErr) throw assignErr;
@@ -309,118 +377,229 @@ async function freshSeed(supabase: SupabaseClient, sourceLocationId: string, dry
     return competencyDomainMap.get(compId) ?? null;
   }
 
-  // --- 2. Anonymize + distribute ---------------------------------------------
-  const castAssignment = assignCast(
-    sourceStaff.map((s) => ({ id: s.id })),
-    CAST,
-  );
+  // --- 2. Persona selection + anonymize + distribute --------------------------
+  // Issue 4: the participant/coach/admin logins are chosen by suitability
+  // (role_id present, and for the participant, most recent weekly_scores
+  // activity), not by an arbitrary UUID sort. See lib/anonymize.ts
+  // selectParticipant/selectCoach/selectAdmin for the exact rule.
+  const lastActivityByStaffId = new Map<string, string>();
+  for (const score of sourceScores) {
+    if (!score.week_of) continue;
+    const current = lastActivityByStaffId.get(score.staff_id);
+    if (!current || score.week_of > current) lastActivityByStaffId.set(score.staff_id, score.week_of);
+  }
+  const personaCandidates: PersonaCandidate[] = sourceStaff.map((s) => ({
+    id: s.id,
+    roleId: s.role_id,
+    isCoach: s.is_coach,
+    lastActivity: lastActivityByStaffId.get(s.id) ?? null,
+  }));
+
+  // assignCast throws (hard-fails) if no candidate is suitable to become
+  // the demo-staff (participant) login -- see selectParticipant. That is
+  // intentional: Clip 1 depends entirely on this choice, so an unsuitable
+  // --source-location must stop the run here, not degrade to a warning.
+  const castAssignment = assignCast(personaCandidates, CAST);
   const castBySourceId = new Map(castAssignment.map((c) => [c.sourceId, c.cast]));
 
   console.log(`Copying ${sourceStaff.length} staff from location ${sourceLocationId}:`);
   for (const { sourceId, cast } of castAssignment) {
     const src = sourceStaff.find((s) => s.id === sourceId)!;
-    console.log(`  ${src.name} -> ${cast.firstName} ${cast.lastName} (${cast.email})`);
+    const roleTag = cast.loginRole ? ` [${cast.loginRole} login]` : '';
+    console.log(`  ${src.name} -> ${cast.firstName} ${cast.lastName} (${cast.email})${roleTag}`);
   }
 
   if (dryRun) {
     console.log(`\nWould create org "${DEMO_ORG.name}" (${DEMO_ORG.slug}), 1 group, 3 locations.`);
-    console.log(`Would copy ${sourceAssignments.length} weekly_assignments x 3 locations = ${sourceAssignments.length * 3} demo assignment rows.`);
+    console.log(`Would copy ${sourceAssignments.length} weekly_assignments x 3 locations = ${sourceAssignments.length * 3} demo assignment rows, all status=locked.`);
     console.log(`Would copy ${sourceScores.length} weekly_scores rows (reshaped for variance).`);
     console.log('Would create 3 auth users with known passwords (demo-staff / demo-coach / demo-admin)');
     console.log(`and ${sourceStaff.length - 3 >= 0 ? sourceStaff.length - 3 : sourceStaff.length} more auth users with random, unused passwords.`);
+    console.log('Already-existing rows (org/group/locations/staff/assignments/scores, if resuming a');
+    console.log('partial previous run) would be detected and skipped, not duplicated.');
     console.log('\nDry run only -- nothing was written.');
     return;
   }
 
   // --- 3. Org / group / locations (get-or-create, never clobber an existing row) ---
-  const demoOrgId = await getOrCreateOrg(supabase, sourceOrg?.practice_type ?? 'pediatric');
-  const demoGroupId = await getOrCreateGroup(supabase, demoOrgId);
+  const demoOrg = await getOrCreateOrg(supabase, sourceOrg?.practice_type ?? 'pediatric');
+  const demoGroupId = await getOrCreateGroup(supabase, demoOrg.id);
 
-  const now = new Date();
+  // Issue 2 (resumability): anchor every date computation below on the demo
+  // org's own created_at, not wall-clock `now`. The org row is the first
+  // thing a fresh seed creates and never changes on resume, so every
+  // resumed attempt at the same partial seed recomputes the exact same
+  // shiftDays / programStartDate as the first attempt -- which is what
+  // makes the natural-key get-or-create checks below actually find the
+  // earlier attempt's rows instead of creating duplicates with a
+  // different week_start_date. `--refresh` (a separate, later operation)
+  // is what re-anchors an already-complete org to the real current week.
+  const now = new Date(demoOrg.createdAt);
+
   const programStartDate = shiftDateString(
     mondayInTimezone(ANCHOR_TZ, now),
     -PROGRAM_WEEKS_ELAPSED_AT_SEED * 7,
   );
-  const demoLocationIds: string[] = [];
+  const demoLocationIdList: string[] = [];
   for (const loc of DEMO_LOCATIONS) {
-    demoLocationIds.push(await getOrCreateLocation(supabase, demoGroupId, loc, programStartDate));
+    demoLocationIdList.push(await getOrCreateLocation(supabase, demoGroupId, loc, programStartDate));
   }
 
-  // --- 4. Staff + auth users --------------------------------------------------
+  // --- 4. Staff + auth users (get-or-create, keyed on the demo email) --------
   const locationForSource = assignLocationRoundRobin(
     sourceStaff.map((s) => ({ id: s.id })),
-    demoLocationIds,
+    demoLocationIdList,
   );
+
+  // One pagination sweep of auth.users, reused for every staff member below
+  // instead of re-querying per person. Also lets a resumed run find an auth
+  // user a previous, crashed attempt already created (whose staff insert
+  // never landed), instead of erroring on a duplicate email.
+  const authIdByEmail = await loadAuthUserIdsByEmail(supabase);
 
   const demoStaffIdBySourceId = new Map<string, string>();
   const demoRoleIdByStaffId = new Map<string, number | null>();
+  let staffCreated = 0;
+  let staffReused = 0;
+
   for (const source of sourceStaff) {
     const cast = castBySourceId.get(source.id)!;
     const demoLocationId = locationForSource.get(source.id)!;
     const draft = buildDemoStaffDraft(source, cast, demoLocationId);
-    const password = cast.loginRole
-      ? requireEnv(`DEMO_${cast.loginRole.toUpperCase()}_PASSWORD`)
-      : randomUnusedPassword();
 
-    const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
-      email: cast.email,
-      password,
-      email_confirm: true,
-      user_metadata: { demo_seed: true, demo_org_slug: DEMO_ORG.slug },
-    });
-    if (authErr) throw new Error(`auth.admin.createUser(${cast.email}) failed: ${authErr.message}`);
-    const userId = authUser.user!.id;
-
-    const { data: staffRow, error: staffInsertErr } = await supabase
+    const { data: existingStaff, error: existingStaffErr } = await supabase
       .from('staff')
-      .insert({ ...draft, user_id: userId })
-      .select('id')
-      .single();
-    if (staffInsertErr) throw staffInsertErr;
+      .select('id, user_id')
+      .eq('email', cast.email)
+      .maybeSingle();
+    if (existingStaffErr) throw existingStaffErr;
 
-    demoStaffIdBySourceId.set(source.id, staffRow.id);
-    demoRoleIdByStaffId.set(staffRow.id, draft.role_id);
+    let demoStaffId: string;
+    if (existingStaff) {
+      demoStaffId = existingStaff.id;
+      staffReused++;
+      // Keep structural fields in sync with source on resume/re-run; the
+      // identity fields (name/email/user_id) are never touched here.
+      const { error: updateErr } = await supabase.from('staff').update(draft).eq('id', demoStaffId);
+      if (updateErr) throw updateErr;
+    } else {
+      const password = cast.loginRole
+        ? requireEnv(`DEMO_${cast.loginRole.toUpperCase()}_PASSWORD`)
+        : randomUnusedPassword();
+      const userId = await getOrCreateAuthUserId(supabase, cast.email, password, authIdByEmail);
+
+      const { data: staffRow, error: staffInsertErr } = await supabase
+        .from('staff')
+        .insert({ ...draft, user_id: userId })
+        .select('id')
+        .single();
+      if (staffInsertErr) throw staffInsertErr;
+      demoStaffId = staffRow.id;
+      staffCreated++;
+    }
+
+    demoStaffIdBySourceId.set(source.id, demoStaffId);
+    demoRoleIdByStaffId.set(demoStaffId, draft.role_id);
 
     if (cast.loginRole) {
-      console.log(`  Login created: ${cast.email} (${cast.loginRole}) -> staff id ${staffRow.id}`);
+      console.log(`  Login ${existingStaff ? 'reused' : 'created'}: ${cast.email} (${cast.loginRole}) -> staff id ${demoStaffId}`);
     }
   }
+  console.log(`Staff: ${staffCreated} created, ${staffReused} already existed and were reused.`);
 
   // --- 5. weekly_assignments: replicate to all 3 demo locations --------------
+  // Get-or-create on the natural key (org, location, role, week, slot), so
+  // resuming after a partial previous run reuses rows that already made it
+  // in instead of duplicating them.
   const sourceMaxWeek = sourceAssignments.reduce((max, a) => (a.week_start_date > max ? a.week_start_date : max), sourceAssignments[0].week_start_date);
   const shiftDays = computeWeekShiftDays(sourceMaxWeek, now, ANCHOR_TZ);
   console.log(`\nShifting copied weeks by ${shiftDays} day(s) so ${sourceMaxWeek} lands on this week's Monday.`);
 
   const demoAssignmentIdByKey = new Map<string, string>();
   const domainByAssignmentKey = new Map<string, number | null>();
+  let assignmentsCreated = 0;
+  let assignmentsReused = 0;
 
-  for (const demoLocationId of demoLocationIds) {
+  for (const demoLocationId of demoLocationIdList) {
     for (const src of sourceAssignments) {
       const draft = buildDemoAssignmentDraft(
         { ...src, week_start_date: shiftDateString(src.week_start_date, shiftDays) },
-        demoOrgId,
+        demoOrg.id,
         demoLocationId,
       );
-      const { data: inserted, error: insertErr } = await supabase
+
+      const { data: existingAssignment, error: existingAssignErr } = await supabase
         .from('weekly_assignments')
-        .insert(draft)
-        .select('id')
-        .single();
-      if (insertErr) throw insertErr;
+        .select('id, status')
+        .eq('org_id', demoOrg.id)
+        .eq('location_id', demoLocationId)
+        .eq('role_id', draft.role_id)
+        .eq('week_start_date', draft.week_start_date)
+        .eq('display_order', draft.display_order)
+        .is('superseded_at', null)
+        .maybeSingle();
+      if (existingAssignErr) throw existingAssignErr;
+
+      let assignmentId: string;
+      if (existingAssignment) {
+        assignmentId = existingAssignment.id;
+        assignmentsReused++;
+        // Issue 1 defense-in-depth: if a row already occupies this natural
+        // key with a non-locked status (should not happen for a demo-seed
+        // row, since buildDemoAssignmentDraft always forces 'locked' --
+        // but this key could in principle already be occupied by
+        // something else), force it locked rather than trusting it.
+        if (existingAssignment.status !== 'locked') {
+          const { error: fixErr } = await supabase
+            .from('weekly_assignments')
+            .update({ status: 'locked' })
+            .eq('id', assignmentId);
+          if (fixErr) throw fixErr;
+        }
+      } else {
+        const { data: inserted, error: insertErr } = await supabase
+          .from('weekly_assignments')
+          .insert(draft)
+          .select('id')
+          .single();
+        if (insertErr) throw insertErr;
+        assignmentId = inserted.id;
+        assignmentsCreated++;
+      }
 
       const key = demoAssignmentKey(demoLocationId, draft.role_id, draft.week_start_date, draft.display_order);
-      demoAssignmentIdByKey.set(key, inserted.id);
+      demoAssignmentIdByKey.set(key, assignmentId);
       domainByAssignmentKey.set(key, resolveDomainId(src));
     }
   }
+  console.log(`Assignments: ${assignmentsCreated} created, ${assignmentsReused} already existed and were reused (all locked).`);
 
   // Also index source assignments by their original id, to resolve each
   // weekly_scores row's assignment_id back to (role_id, week_start_date, display_order).
   const sourceAssignmentById = new Map(sourceAssignments.map((a) => [a.id, a]));
 
   // --- 6. weekly_scores: map source scores onto the new demo assignments -----
+  // Pre-fetch which (staff_id, assignment_id) pairs already exist for this
+  // org's staff, so a resumed run skips rows an earlier attempt already
+  // wrote instead of duplicating them (weekly_scores has no unique
+  // constraint on that pair at the DB level, so this check has to happen
+  // here, not via an upsert/onConflict).
+  const demoStaffIds = [...demoStaffIdBySourceId.values()];
+  const existingScoreKeys = new Set<string>();
+  if (demoStaffIds.length > 0) {
+    const { data: existingScores, error: existingScoresErr } = await supabase
+      .from('weekly_scores')
+      .select('staff_id, assignment_id')
+      .in('staff_id', demoStaffIds);
+    if (existingScoresErr) throw existingScoresErr;
+    for (const row of existingScores ?? []) {
+      existingScoreKeys.add(`${row.staff_id}|${row.assignment_id}`);
+    }
+  }
+
   const demoScoreDrafts: (DemoScoreDraft & { locationId: string; domainId: number | null })[] = [];
   let skipped = 0;
+  let scoresAlreadyPresent = 0;
 
   for (const score of sourceScores) {
     const demoStaffId = demoStaffIdBySourceId.get(score.staff_id);
@@ -443,6 +622,11 @@ async function freshSeed(supabase: SupabaseClient, sourceLocationId: string, dry
       continue;
     }
 
+    if (existingScoreKeys.has(`${demoStaffId}|assign:${demoAssignmentId}`)) {
+      scoresAlreadyPresent++;
+      continue;
+    }
+
     const shiftedScore: SourceScoreRow = {
       ...score,
       week_of: score.week_of ? shiftDateString(score.week_of, shiftDays) : null,
@@ -461,6 +645,9 @@ async function freshSeed(supabase: SupabaseClient, sourceLocationId: string, dry
   if (skipped > 0) {
     console.log(`Skipped ${skipped} source score row(s) that could not be mapped to a copied assignment.`);
   }
+  if (scoresAlreadyPresent > 0) {
+    console.log(`${scoresAlreadyPresent} score row(s) already existed (resumed run) and were left as-is.`);
+  }
 
   // --- 7. Variance pass --------------------------------------------------------
   const domainIds = Array.from(new Set(demoScoreDrafts.map((d) => d.domainId).filter((d): d is number => d != null))).sort(
@@ -473,44 +660,79 @@ async function freshSeed(supabase: SupabaseClient, sourceLocationId: string, dry
     weekOf: d.week_of ?? '',
     confidenceScore: d.confidence_score,
   }));
-  const shaped = shapeVariance(scoreLikes, domainIds, demoLocationIds);
+  const shaped = shapeVariance(scoreLikes, domainIds, demoLocationIdList);
   const shapedByIndex = new Map(shaped.map((s, i) => [i, s]));
   demoScoreDrafts.forEach((d, i) => {
     d.confidence_score = shapedByIndex.get(i)!.confidenceScore;
   });
 
-  // --- 8. Guarantee an uncompleted current-week assignment for demo-staff ----
-  const staffLoginId = castAssignment.find((c) => c.cast.loginRole === 'participant');
-  if (staffLoginId) {
-    const demoStaffId = demoStaffIdBySourceId.get(staffLoginId.sourceId)!;
-    const demoLocationId = locationForSource.get(staffLoginId.sourceId)!;
-    const currentWeek = shiftDateString(sourceMaxWeek, shiftDays);
-    const cleared = clearCurrentWeekScore(demoScoreDrafts, demoStaffId, currentWeek);
-    cleared.forEach((c, i) => {
-      demoScoreDrafts[i].confidence_score = c.confidence_score;
-      demoScoreDrafts[i].confidence_date = c.confidence_date;
-      demoScoreDrafts[i].confidence_late = c.confidence_late;
-      demoScoreDrafts[i].performance_score = c.performance_score;
-      demoScoreDrafts[i].performance_date = c.performance_date;
-      demoScoreDrafts[i].performance_late = c.performance_late;
-    });
+  // --- 8. Guarantee an uncompleted, locked current-week assignment for demo-staff ----
+  // Issue 1: this must hard-fail, not warn, if the guarantee can't be met --
+  // a warning here previously let the seed "succeed" while Clip 1 had
+  // nothing to rate.
+  const staffLogin = castAssignment.find((c) => c.cast.loginRole === 'participant');
+  if (!staffLogin) {
+    throw new Error('No cast member is tagged loginRole "participant" -- check cast.ts.');
+  }
 
-    const staffRoleId = demoRoleIdByStaffId.get(demoStaffId);
-    const hasCurrentWeekAssignment =
-      staffRoleId != null &&
-      [...demoAssignmentIdByKey.keys()].some((k) => {
-        const [locId, roleIdStr, week] = k.split('|');
-        return locId === demoLocationId && week === currentWeek && Number(roleIdStr) === staffRoleId;
-      });
-    if (!hasCurrentWeekAssignment) {
-      console.warn(
-        `WARNING: could not confirm a ${currentWeek} weekly_assignments row exists for demo-staff's ` +
-          `role at location ${demoLocationId}. Clip 1 (staff self-eval) may not have anything to rate. ` +
-          `Check the source location's current-week assignments for this role.`,
+  const demoStaffId = demoStaffIdBySourceId.get(staffLogin.sourceId)!;
+  const demoLocationId = locationForSource.get(staffLogin.sourceId)!;
+  const currentWeek = shiftDateString(sourceMaxWeek, shiftDays);
+  const cleared = clearCurrentWeekScore(demoScoreDrafts, demoStaffId, currentWeek);
+  cleared.forEach((c, i) => {
+    demoScoreDrafts[i].confidence_score = c.confidence_score;
+    demoScoreDrafts[i].confidence_date = c.confidence_date;
+    demoScoreDrafts[i].confidence_late = c.confidence_late;
+    demoScoreDrafts[i].performance_score = c.performance_score;
+    demoScoreDrafts[i].performance_date = c.performance_date;
+    demoScoreDrafts[i].performance_late = c.performance_late;
+  });
+
+  const staffRoleId = demoRoleIdByStaffId.get(demoStaffId);
+  // display_order isn't known here (a staff member's role can have slots
+  // 1-3), so search all keys for this location/role/week rather than
+  // guessing the slot.
+  const currentWeekAssignmentStatus =
+    staffRoleId != null
+      ? [...demoAssignmentIdByKey.keys()]
+          .filter((k) => {
+            const [locId, roleIdStr, week] = k.split('|');
+            return locId === demoLocationId && week === currentWeek && Number(roleIdStr) === staffRoleId;
+          })
+          .map((k) => ({ key: k, id: demoAssignmentIdByKey.get(k)! }))
+      : [];
+
+  if (currentWeekAssignmentStatus.length === 0) {
+    throw new Error(
+      `Could not create/find a ${currentWeek} weekly_assignments row (status=locked) for demo-staff's ` +
+        `role (${staffRoleId}) at location ${demoLocationId}. Clip 1 (staff self-eval) would have ` +
+        `nothing to rate. This is a hard failure, not a warning: pick a different --source-location, ` +
+        `or check that the source location actually has current-week assignments for this role. ` +
+        `The demo org's staff/assignments/scores written so far are safe to leave in place -- ` +
+        `re-running this script will resume and skip what already exists.`,
+    );
+  }
+
+  // Every row that satisfies the search above was built via
+  // buildDemoAssignmentDraft, which always forces status: 'locked' (Issue
+  // 1's fix), or was an existing row that step 5 force-corrected to
+  // 'locked' if it wasn't already. Verify that guarantee explicitly rather
+  // than trusting it silently, per the QA request to check status
+  // specifically.
+  for (const { id } of currentWeekAssignmentStatus) {
+    const { data: verifyRow, error: verifyErr } = await supabase
+      .from('weekly_assignments')
+      .select('status')
+      .eq('id', id)
+      .maybeSingle();
+    if (verifyErr) throw verifyErr;
+    if (verifyRow?.status !== 'locked') {
+      throw new Error(
+        `weekly_assignments row ${id} for demo-staff's current week is status='${verifyRow?.status}', ` +
+          `not 'locked'. This should be impossible given buildDemoAssignmentDraft always forces ` +
+          `'locked' -- treating as a hard failure rather than letting Clip 1 silently show nothing.`,
       );
     }
-  } else {
-    console.warn('WARNING: no cast member is tagged loginRole "participant" -- check cast.ts.');
   }
 
   // --- 9. Write scores ----------------------------------------------------------
@@ -533,8 +755,8 @@ async function freshSeed(supabase: SupabaseClient, sourceLocationId: string, dry
     console.warn(`WARNING: possible identity leak detected in cast entries: ${leaked.map((l) => l.cast.email).join(', ')}`);
   }
 
-  console.log(`\nDone. Demo org: ${DEMO_ORG.slug} (${demoOrgId})`);
-  console.log(`  ${sourceStaff.length} staff, ${demoAssignmentIdByKey.size} weekly_assignments, ${scoreRowsToInsert.length} weekly_scores.`);
+  console.log(`\nDone. Demo org: ${DEMO_ORG.slug} (${demoOrg.id})`);
+  console.log(`  ${sourceStaff.length} staff, ${demoAssignmentIdByKey.size} weekly_assignments, ${scoreRowsToInsert.length + scoresAlreadyPresent} weekly_scores.`);
   console.log(`  demo-staff login: ${CAST.find((c) => c.loginRole === 'participant')!.email}`);
   console.log(`  demo-coach login: ${CAST.find((c) => c.loginRole === 'coach')!.email}`);
   console.log(`  demo-admin login: ${CAST.find((c) => c.loginRole === 'admin')!.email}`);
@@ -567,21 +789,54 @@ async function refreshExistingOrg(supabase: SupabaseClient, demoOrgId: string, d
   }
 
   const orgLocationIds = await demoLocationIds(supabase, demoOrgId);
-  const { data: orgStaff, error: orgStaffErr } = await supabase
-    .from('staff')
-    .select('id')
-    .in('primary_location_id', orgLocationIds);
-  if (orgStaffErr) throw orgStaffErr;
-  const orgStaffIds = (orgStaff ?? []).map((s) => s.id);
 
-  const { data: scores, error: scoresErr } = await supabase
-    .from('weekly_scores')
-    .select('id, week_of, confidence_date, performance_date, staff_id')
-    .in('staff_id', orgStaffIds);
-  if (scoresErr) throw scoresErr;
+  // Issue 3: --refresh must also shift program_start_date on every demo
+  // location, by the same shiftDays, so the legacy cycle/week-in-cycle
+  // position (still read by some legacy code, and still backed by NOT
+  // NULL columns on `locations`) stays exactly where it was set at seed
+  // time. Without this, only week_start_date/week_of moved forward while
+  // program_start_date stood still, so the location's cycle position
+  // drifted forward every refresh and would eventually land on week 1 of
+  // a cycle -- the "just onboarded" state -- no matter how mid-program it
+  // started. See lib/refreshWeek.ts#weekInCycle and its tests for the
+  // invariant this preserves.
+  let locations: { id: string; program_start_date: string }[] = [];
+  if (orgLocationIds.length > 0) {
+    const { data: locationRows, error: locationsErr } = await supabase
+      .from('locations')
+      .select('id, program_start_date')
+      .in('id', orgLocationIds);
+    if (locationsErr) throw locationsErr;
+    locations = locationRows ?? [];
+  }
+
+  // Issue 5: guard the empty-array case explicitly (Supabase's `.in()`
+  // with an empty array is a real query that always returns zero rows,
+  // but there is no reason to send it -- freshSeed's queries already
+  // short-circuit the same way).
+  let orgStaffIds: string[] = [];
+  if (orgLocationIds.length > 0) {
+    const { data: orgStaff, error: orgStaffErr } = await supabase
+      .from('staff')
+      .select('id')
+      .in('primary_location_id', orgLocationIds);
+    if (orgStaffErr) throw orgStaffErr;
+    orgStaffIds = (orgStaff ?? []).map((s) => s.id);
+  }
+
+  let scores: { id: string; week_of: string | null; confidence_date: string | null; performance_date: string | null; staff_id: string | null }[] = [];
+  if (orgStaffIds.length > 0) {
+    const { data: scoreRows, error: scoresErr } = await supabase
+      .from('weekly_scores')
+      .select('id, week_of, confidence_date, performance_date, staff_id')
+      .in('staff_id', orgStaffIds);
+    if (scoresErr) throw scoresErr;
+    scores = scoreRows ?? [];
+  }
 
   if (dryRun) {
-    console.log(`Would update ${assignments.length} weekly_assignments and ${scores?.length ?? 0} weekly_scores.`);
+    console.log(`Would update ${assignments.length} weekly_assignments and ${scores.length} weekly_scores.`);
+    console.log(`Would shift program_start_date on ${locations.length} location(s) by the same ${shiftDays} day(s).`);
     console.log('Would sync the 3 login passwords from env vars.');
     console.log('\nDry run only -- nothing was written.');
     return;
@@ -595,7 +850,7 @@ async function refreshExistingOrg(supabase: SupabaseClient, demoOrgId: string, d
         .eq('id', a.id);
       if (error) throw error;
     }
-    for (const s of scores ?? []) {
+    for (const s of scores) {
       const { error } = await supabase
         .from('weekly_scores')
         .update({
@@ -604,6 +859,13 @@ async function refreshExistingOrg(supabase: SupabaseClient, demoOrgId: string, d
           performance_date: s.performance_date ? shiftIsoDate(s.performance_date, shiftDays) : null,
         })
         .eq('id', s.id);
+      if (error) throw error;
+    }
+    for (const loc of locations) {
+      const { error } = await supabase
+        .from('locations')
+        .update({ program_start_date: shiftDateString(loc.program_start_date, shiftDays) })
+        .eq('id', loc.id);
       if (error) throw error;
     }
   }
@@ -654,13 +916,73 @@ async function demoLocationIds(supabase: SupabaseClient, demoOrgId: string): Pro
 }
 
 // ---------------------------------------------------------------------------
+// Auth admin helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * One full pagination sweep of auth.users, mapping lowercased email -> id.
+ * Loaded once per script run and reused for every staff member, both for
+ * efficiency (this is a service-role project-wide listing, not scoped to
+ * the demo org) and for resumability (Issue 2): a crashed previous run may
+ * have created an auth user whose staff row never landed, and looking it
+ * up here before calling createUser again avoids a duplicate-email error.
+ */
+async function loadAuthUserIdsByEmail(supabase: SupabaseClient): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const perPage = 200;
+  let page = 1;
+  for (;;) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    for (const u of data.users) {
+      if (u.email) map.set(u.email.toLowerCase(), u.id);
+    }
+    if (data.users.length < perPage) break;
+    page++;
+  }
+  return map;
+}
+
+/** Looks up `email` in the pre-loaded map before ever calling createUser. */
+async function getOrCreateAuthUserId(
+  supabase: SupabaseClient,
+  email: string,
+  password: string,
+  authIdByEmail: Map<string, string>,
+): Promise<string> {
+  const existing = authIdByEmail.get(email.toLowerCase());
+  if (existing) return existing;
+
+  const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { demo_seed: true, demo_org_slug: DEMO_ORG.slug },
+  });
+  if (createErr) throw new Error(`auth.admin.createUser(${email}) failed: ${createErr.message}`);
+  const userId = created.user!.id;
+  authIdByEmail.set(email.toLowerCase(), userId);
+  return userId;
+}
+
+// ---------------------------------------------------------------------------
 // get-or-create helpers -- select first, insert only if missing, never
 // overwrite an existing row's identity-bearing fields on re-run.
 // ---------------------------------------------------------------------------
 
-async function getOrCreateOrg(supabase: SupabaseClient, practiceType: string): Promise<string> {
-  const { data: existing } = await supabase.from('organizations').select('id').eq('slug', DEMO_ORG.slug).maybeSingle();
-  if (existing) return existing.id;
+interface DemoOrgRef {
+  id: string;
+  createdAt: string;
+}
+
+async function getOrCreateOrg(supabase: SupabaseClient, practiceType: string): Promise<DemoOrgRef> {
+  const { data: existing, error: existingErr } = await supabase
+    .from('organizations')
+    .select('id, created_at')
+    .eq('slug', DEMO_ORG.slug)
+    .maybeSingle();
+  if (existingErr) throw existingErr;
+  if (existing) return { id: existing.id, createdAt: existing.created_at };
 
   const { data, error } = await supabase
     .from('organizations')
@@ -670,10 +992,10 @@ async function getOrCreateOrg(supabase: SupabaseClient, practiceType: string): P
       app_display_name: DEMO_ORG.appDisplayName,
       practice_type: practiceType === 'general' ? 'general' : 'pediatric',
     })
-    .select('id')
+    .select('id, created_at')
     .single();
   if (error) throw error;
-  return data.id;
+  return { id: data.id, createdAt: data.created_at };
 }
 
 async function getOrCreateGroup(supabase: SupabaseClient, orgId: string): Promise<string> {
@@ -734,6 +1056,7 @@ function shiftIsoDate(isoStr: string, shiftDays: number): string {
 }
 
 main().catch((err) => {
+
   console.error('\nDEMO-1a seed failed:');
   console.error(err);
   process.exit(1);

@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
 import { fetchOrgProMoveMetaByIds } from '@/lib/proMoves';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { CT_TZ } from '@/lib/centralTime';
+import { addDaysToDateString, instantToDateString } from '@/lib/dateUtils';
 
 interface SlotRecord {
   displayOrder: number;
@@ -56,11 +58,12 @@ export function HistoryStrip({ roleId, orgId, onHistoryLoaded }: HistoryStripPro
   }, [roleId, orgId]);
 
   const loadHistory = async () => {
-    const today = new Date();
-    const sixWeeksAgo = new Date(today);
-    sixWeeksAgo.setDate(sixWeeksAgo.getDate() - 42);
-    const startStr = sixWeeksAgo.toISOString().split('T')[0];
-    const todayStr = today.toISOString().split('T')[0];
+    // Timezone-safe: was computing today's/six-weeks-ago's date via
+    // toISOString(), which converts to UTC before taking the date portion
+    // and shifts the result a day early for anyone in a negative-UTC
+    // timezone (Central time).
+    const todayStr = instantToDateString(new Date(), CT_TZ);
+    const startStr = addDaysToDateString(todayStr, -42, CT_TZ);
 
     let query = supabase
       .from('weekly_assignments')

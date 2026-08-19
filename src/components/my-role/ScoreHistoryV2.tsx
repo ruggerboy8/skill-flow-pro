@@ -12,6 +12,7 @@ import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { useMyWeeklyScores } from '@/hooks/useMyWeeklyScores';
 import { RawScoreRow } from '@/types/coachV2';
 import { getDomainColorRich } from '@/lib/domainColors';
+import { getChicagoMonday } from '@/lib/plannerUtils';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { Trash2, Tag, History, Wrench } from 'lucide-react';
 import {
@@ -103,18 +104,12 @@ export default function ScoreHistoryV2() {
     }
   }, [loading, weekSummaries]);
 
-  const mondayOf = (d: Date = new Date()): Date => {
-    const day = d.getDay();
-    const diff = (day === 0 ? -6 : 1) - day;
-    const m = new Date(d);
-    m.setDate(d.getDate() + diff);
-    m.setHours(0, 0, 0, 0);
-    return m;
-  };
-
   useEffect(() => {
-    const currentMonday = mondayOf(new Date()).toISOString().split('T')[0];
-    setCurrentWeekOf(currentMonday);
+    // Timezone-safe: was computing Monday from the browser's local date and
+    // then converting to UTC before taking the date portion, which shifts
+    // the result a day early for anyone in a negative-UTC timezone (Central
+    // time). Delegates to the canonical Monday resolver instead.
+    setCurrentWeekOf(getChicagoMonday());
   }, []);
 
   const groupedData = useMemo(() => {

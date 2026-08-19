@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getChicagoMonday } from '@/lib/plannerUtils';
 
 export interface WeeklyAssignment {
   id: string;
@@ -19,14 +20,12 @@ interface UseWeeklyAssignmentsParams {
   enabled?: boolean;
 }
 
-function getCurrentMondayString() {
-  const now = new Date();
-  const dayOfWeek = now.getDay();
-  const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  const thisMonday = new Date(now);
-  thisMonday.setDate(now.getDate() + daysToMonday);
-  thisMonday.setHours(0, 0, 0, 0);
-  return thisMonday.toISOString().split('T')[0];
+// Timezone-safe: was computing "this Monday" from the browser's local date
+// and then converting to UTC before taking the date portion, which shifts
+// the result a day early for anyone in a negative-UTC timezone (Central
+// time). Delegates to the canonical Monday resolver instead.
+function getCurrentMondayString(): string {
+  return getChicagoMonday();
 }
 
 /**

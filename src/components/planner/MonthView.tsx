@@ -3,6 +3,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle, HelpCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeToPlannerWeek, formatWeekOf } from '@/lib/plannerUtils';
+import { CT_TZ } from '@/lib/centralTime';
+import { mondaysInMonth } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 
 interface MonthViewProps {
@@ -24,24 +26,11 @@ export function MonthView({ roleId, selectedMonthAnchor, onSelectWeek }: MonthVi
     loadMonthData();
   }, [roleId, selectedMonthAnchor]);
 
-  const getMondaysInMonth = (monthStartStr: string): string[] => {
-    const mondays: string[] = [];
-    const date = new Date(monthStartStr + 'T12:00:00');
-    
-    // Find first Monday of month
-    while (date.getDay() !== 1 && date.getDate() <= 7) {
-      date.setDate(date.getDate() + 1);
-    }
-    
-    // Collect all Mondays in this month
-    const targetMonth = date.getMonth();
-    while (date.getMonth() === targetMonth) {
-      mondays.push(date.toISOString().split('T')[0]);
-      date.setDate(date.getDate() + 7);
-    }
-    
-    return mondays;
-  };
+  // Timezone-safe: was walking a Date via getDay()/setDate() (both read the
+  // browser's own local timezone, not America/Chicago) and then converting
+  // to UTC before taking the date portion, either of which can shift the
+  // result a day off for anyone in a negative-UTC timezone (Central time).
+  const getMondaysInMonth = (monthStartStr: string): string[] => mondaysInMonth(monthStartStr, CT_TZ);
 
   const loadMonthData = async () => {
     setLoading(true);

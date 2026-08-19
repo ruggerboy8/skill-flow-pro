@@ -6,6 +6,9 @@
  * - LocationSubmissionWidget
  */
 
+import { CT_TZ } from './centralTime';
+import { addDaysToDateString, instantToDateString } from './dateUtils';
+
 export interface SubmissionWindow {
   week_of: string;
   metric: 'confidence' | 'performance';
@@ -122,16 +125,20 @@ export function calculateSubmissionStats(
 
 /**
  * Calculate cutoff date string for time filters.
+ *
+ * Timezone-safe: was computing the cutoff via toISOString(), which converts
+ * to UTC before taking the date portion and shifts the result a day early
+ * for anyone in a negative-UTC timezone (Central time).
+ *
+ * @param now - injectable for testing; defaults to the current moment
  */
-export function calculateCutoffDate(filter: '3weeks' | '6weeks' | 'all'): string | null {
-  if (filter === '3weeks') {
-    const date = new Date();
-    date.setDate(date.getDate() - 21);
-    return date.toISOString().split('T')[0];
-  } else if (filter === '6weeks') {
-    const date = new Date();
-    date.setDate(date.getDate() - 42);
-    return date.toISOString().split('T')[0];
+export function calculateCutoffDate(
+  filter: '3weeks' | '6weeks' | 'all',
+  now: Date = new Date(),
+): string | null {
+  if (filter === 'all') {
+    return null;
   }
-  return null;
+  const daysBack = filter === '3weeks' ? 21 : 42;
+  return addDaysToDateString(instantToDateString(now, CT_TZ), -daysBack, CT_TZ);
 }

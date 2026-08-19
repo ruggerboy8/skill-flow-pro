@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { calculateSubmissionStats, type SubmissionWindow } from '@/lib/submissionRateCalc';
+import { CT_TZ } from '@/lib/centralTime';
+import { addDaysToDateString, instantToDateString } from '@/lib/dateUtils';
 
 export interface StaffSubmissionRate {
   staffId: string;
@@ -27,9 +29,11 @@ export function useStaffSubmissionRates(staffIds: string[]): UseStaffSubmissionR
         return new Map<string, number | null>();
       }
 
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - 42);
-      const cutoffStr = cutoffDate.toISOString().split('T')[0];
+      // Timezone-safe: was computing the cutoff via toISOString(), which
+      // converts to UTC before taking the date portion and shifts the
+      // result a day early for anyone in a negative-UTC timezone (Central
+      // time).
+      const cutoffStr = addDaysToDateString(instantToDateString(new Date(), CT_TZ), -42, CT_TZ);
 
       const newRates = new Map<string, number | null>();
 

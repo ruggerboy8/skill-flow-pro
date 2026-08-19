@@ -6,6 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X, Trash2, Unlock, CalendarOff, Sparkles } from 'lucide-react';
 import { normalizeToPlannerWeek, formatWeekOf } from '@/lib/plannerUtils';
+import { CT_TZ } from '@/lib/centralTime';
+import { addDaysToDateString, firstMondayOfMonth } from '@/lib/dateUtils';
 import { ProMovePickerDialog } from './ProMovePickerDialog';
 import { SmartSlotPicker } from './SmartSlotPicker';
 import type { RankedMove } from '@/lib/sequencerAdapter';
@@ -246,17 +248,13 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
     setLoading(false);
   };
 
-  const getNextMonday = (monday: string): string => {
-    const d = new Date(monday + 'T12:00:00');
-    d.setDate(d.getDate() + 7);
-    return d.toISOString().split('T')[0];
-  };
+  // Timezone-safe: these all used to end with `.toISOString().split('T')[0]`,
+  // which converts a local instant to UTC before taking the date portion and
+  // shifts the result a day early for anyone in a negative-UTC timezone
+  // (Central time).
+  const getNextMonday = (monday: string): string => addDaysToDateString(monday, 7, CT_TZ);
 
-  const getPrevMonday = (monday: string): string => {
-    const d = new Date(monday + 'T12:00:00');
-    d.setDate(d.getDate() - 7);
-    return d.toISOString().split('T')[0];
-  };
+  const getPrevMonday = (monday: string): string => addDaysToDateString(monday, -7, CT_TZ);
 
   const handleNavigatePrev = () => {
     setSelectedMonday(getPrevMonday(selectedMonday));
@@ -271,31 +269,26 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
     return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
-  const getFirstMondayOfMonth = (dateStr: string): string => {
-    const d = new Date(dateStr + 'T12:00:00');
-    d.setDate(1);
-    while (d.getDay() !== 1) d.setDate(d.getDate() + 1);
-    return d.toISOString().split('T')[0];
-  };
+  const getFirstMondayOfMonth = (dateStr: string): string => firstMondayOfMonth(dateStr, CT_TZ);
 
-  const getMonthStart = (dateStr: string): string => {
-    const d = new Date(dateStr + 'T12:00:00');
-    d.setDate(1);
-    return d.toISOString().split('T')[0];
+  const getMonthStart = (dateStr: string): string => `${dateStr.slice(0, 7)}-01`;
+
+  // Pure "yyyy-MM" integer arithmetic, no Date object involved: safe from
+  // both the browser-timezone and UTC-round-trip pitfalls above.
+  const shiftMonthStart = (dateStr: string, monthDelta: number): string => {
+    const [year, month] = dateStr.slice(0, 7).split('-').map(Number);
+    const total = year * 12 + (month - 1) + monthDelta;
+    const newYear = Math.floor(total / 12);
+    const newMonth = (total % 12) + 1;
+    return `${newYear}-${String(newMonth).padStart(2, '0')}-01`;
   };
 
   const handleMonthPrev = () => {
-    const d = new Date(selectedMonday + 'T12:00:00');
-    d.setDate(1);
-    d.setMonth(d.getMonth() - 1);
-    setSelectedMonday(getFirstMondayOfMonth(d.toISOString().split('T')[0]));
+    setSelectedMonday(getFirstMondayOfMonth(shiftMonthStart(selectedMonday, -1)));
   };
 
   const handleMonthNext = () => {
-    const d = new Date(selectedMonday + 'T12:00:00');
-    d.setDate(1);
-    d.setMonth(d.getMonth() + 1);
-    setSelectedMonday(getFirstMondayOfMonth(d.toISOString().split('T')[0]));
+    setSelectedMonday(getFirstMondayOfMonth(shiftMonthStart(selectedMonday, 1)));
   };
 
   const handleToggleExempt = async (weekStart: string, exempt: boolean) => {

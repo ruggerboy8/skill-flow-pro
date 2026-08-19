@@ -72,12 +72,13 @@ create policy uc_admin_write on public.user_capabilities
       where staff.user_id = auth.uid()
         and (staff.is_super_admin = true or staff.is_org_admin = true)
     )
-    -- (a) is_platform_admin pin: a caller may only set is_platform_admin on
-    -- THEIR OWN user_capabilities row if they are already a super admin.
-    -- (Blocks an org_admin from granting themselves platform admin.)
+    -- (a) is_platform_admin pin: is_platform_admin may only be set true by a
+    -- caller who is ALREADY a super admin, for ANY target row. There is no
+    -- same-row-only escape: allowing it on another row let an org_admin grant
+    -- platform admin to a second account they control and sign in as it
+    -- (PR #32, Codex P1).
     and (
       is_platform_admin is distinct from true
-      or staff_id <> (select id from public.staff where staff.user_id = auth.uid() limit 1)
       or exists (
         select 1 from public.staff
         where staff.user_id = auth.uid() and staff.is_super_admin = true

@@ -1,3 +1,8 @@
+// The calculateCutoffDate suite below must pass under any host TZ (the
+// machine/CI runner running it), not just America/Chicago or UTC. CI runs
+// it under TZ=UTC, TZ=America/Chicago, TZ=Pacific/Kiritimati, and
+// TZ=America/Los_Angeles. See COR-1.
+
 import { describe, it, expect } from 'vitest';
 import { calculateSubmissionStats, calculateCutoffDate, type SubmissionWindow } from './submissionRateCalc';
 

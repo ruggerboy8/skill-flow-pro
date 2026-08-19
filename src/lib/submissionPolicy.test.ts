@@ -6,7 +6,10 @@
 // All expectations are exact UTC instants, computed by hand from known
 // America/Chicago UTC offsets (CST = UTC-6, CDT = UTC-5), so these tests
 // are not sensitive to whatever timezone the machine running them happens
-// to be in.
+// to be in. That is deliberate and load-bearing: this suite must pass
+// under any host TZ, not just America/Chicago or UTC. CI runs it under
+// TZ=UTC, TZ=America/Chicago, TZ=Pacific/Kiritimati, and
+// TZ=America/Los_Angeles.
 
 import { describe, it, expect } from 'vitest';
 import {

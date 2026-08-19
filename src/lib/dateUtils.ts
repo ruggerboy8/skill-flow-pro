@@ -9,9 +9,9 @@
  * pattern already used in src/lib/locationState.ts and submissionPolicy.ts.
  */
 
-import { addDays } from 'date-fns';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { resolveMonday, resolveNextMonday } from './submissionPolicy';
+import { addCalendarDays } from './calendarDate';
 
 /**
  * The UTC instant for local midnight of a calendar-date string
@@ -40,11 +40,19 @@ export function isoDayOfWeekInTz(instant: Date, tz: string): number {
 
 /**
  * Add (or subtract, with a negative count) whole calendar days to a
- * "yyyy-MM-dd" date string, in the given IANA timezone. DST-safe: this adds
- * whole calendar days, not 24-hour blocks.
+ * "yyyy-MM-dd" date string.
+ *
+ * `tz` is accepted for API consistency with the rest of this module (every
+ * other helper here needs one), but a date-only string has no time-of-day,
+ * so shifting it by N days is unambiguous calendar arithmetic and does not
+ * actually depend on any timezone. This delegates to `addCalendarDays`
+ * rather than converting to an instant and calling date-fns' `addDays` on
+ * it, which mutates using the HOST runtime's own local timezone and
+ * corrupts the result whenever the host's DST transitions don't line up
+ * with `tz`'s. See calendarDate.ts and COR-1.
  */
 export function addDaysToDateString(dateStr: string, days: number, tz: string): string {
-  return instantToDateString(addDays(dateStringToInstant(dateStr, tz), days), tz);
+  return addCalendarDays(dateStr, days);
 }
 
 /**

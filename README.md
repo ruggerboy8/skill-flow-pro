@@ -1,73 +1,134 @@
-# Welcome to your Lovable project
+# Skill Flow Pro
 
-## Project info
+Skill Flow Pro (the app's UI brand is **ProMoves**) is a coaching and
+skills-development platform for dental practices. It turns "getting better at
+your job" into a structured, measurable weekly habit: each week, staff rate
+their confidence on a set of assigned **Pro Moves** (specific, coachable
+behaviors), then rate their actual performance at the end of the week. Coaches
+review that gap, run evaluations, and a recommender engine (the "sequencer")
+suggests what to assign next. It was originally built as an internal tool for
+a single pediatric dental organization (Alcan) and is now being expanded into
+a multi-tenant SaaS product. See `docs/system-overview.md` for the full tour.
 
-**URL**: https://lovable.dev/projects/70da5b77-cb48-41c1-b283-631284f33ad9
+## Stack
 
-## How can I edit this code?
+- **Frontend**: Vite + React + TypeScript, Tailwind + shadcn/ui
+- **Backend**: Supabase (Postgres, Auth, Row-Level Security, Edge Functions)
+- **Package manager**: npm
 
-There are several ways of editing your application.
+## Prerequisites
 
-**Use Lovable**
+- Node.js. CI runs Node 24; use that or newer.
+- npm (ships with Node).
+- No local database or Supabase CLI setup is required to run the app. See
+  "Local dev talks to production" below before you assume otherwise.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/70da5b77-cb48-41c1-b283-631284f33ad9) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Running locally
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
 npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+This starts the Vite dev server (default port 8080, or `$PORT` if set).
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Local dev talks to the LIVE production Supabase project
 
-**Use GitHub Codespaces**
+There is no local Supabase stack for this project. When you run `npm run dev`,
+the app connects straight to the real production database
+(`yeypngaufuualdfzcjpk.supabase.co`) — the same one the live app uses. There
+is no seeded local copy and no staging environment. Be careful with anything
+that writes data; you are working against real practice data, not a sandbox.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+The Supabase URL and anon (publishable) key are hardcoded in
+`src/integrations/supabase/client.ts`, so they don't come from environment
+variables at all. See CLAUDE.md for the Supabase CLI commands used to inspect
+the live schema.
 
-## What technologies are used for this project?
+## Environment variables
 
-This project is built with:
+Copy `.env.example` to `.env` and fill in real values (or keep the ones
+already checked in — see "About the committed `.env`" below) before running
+the app. Each variable is documented with a comment in `.env.example`.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+None of the variables currently gate the Supabase connection itself (that's
+hardcoded, see above). The `VITE_*` flags gate optional UI behavior; see the
+comments in `.env.example` and the "About the committed `.env`" section for
+what's actually wired up versus what's currently dead.
 
-## How can I deploy this project?
+### About the committed `.env`
 
-Simply open [Lovable](https://lovable.dev/projects/70da5b77-cb48-41c1-b283-631284f33ad9) and click on Share -> Publish.
+`.env` is committed to this repo and is **not** gitignored. That's an
+intentional decision for now, not an oversight:
 
-## Can I connect a custom domain to my Lovable project?
+- Everything currently in it is a publishable/anon-level value or a
+  non-secret feature flag. There is no service-role key, database password,
+  or other secret in it. (Anything genuinely secret, like the Supabase
+  management API token used for schema inspection, must never go in this
+  file or be committed — see CLAUDE.md.)
+- Vite inlines `VITE_*` variables into the built bundle at build time, and
+  this repo has no visible mechanism (CI secrets, a Lovable-specific config
+  file) that supplies those variables another way — the committed `.env` is,
+  as far as this repo shows, the only source for them. `VITE_ENABLE_SIMTOOLS`
+  is one of them: it's actively read in four places
+  (`src/main.tsx`, `src/components/Layout.tsx`,
+  `src/components/home/ThisWeekPanel.tsx`, `src/devtools/SimConsole.tsx`) to
+  decide whether an admin-only debug console ships in the build at all.
+  Untracking `.env` could silently turn that off (or on) the next time
+  Lovable publishes, and there was no way to confirm from this repo alone
+  whether Lovable's Publish build reads this file or injects its own
+  environment configuration instead.
+- Because that couldn't be confirmed, `.env` stays tracked until someone
+  checks Lovable's project settings directly and can show the build gets its
+  environment variables from somewhere else. If that's confirmed, `.env` can
+  be untracked and moved to a local, gitignored file plus the usual
+  per-environment secrets setup.
 
-Yes, you can!
+If a real secret ever needs to live in an environment variable for this
+project, it must not go in this file — it needs a different, gitignored
+mechanism first.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## How database changes actually ship
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+`npx supabase db push` **does not work** on this project. Lovable owns
+migrations and names files `<timestamp>-<uuid>.sql` (hyphen); the Supabase
+CLI requires `<timestamp>_name.sql` (underscore) and skips the hyphenated
+files, so the CLI's migration history never reconciles and `db push` fails.
+
+To ship a migration, either:
+
+- paste its SQL into the Supabase dashboard **SQL Editor**, written
+  idempotently (`IF NOT EXISTS` / `CREATE OR REPLACE`, column adds before the
+  functions that reference them), or
+- land it on `main` for Lovable to pick up.
+
+See CLAUDE.md ("Applying migrations") for the full detail, including why the
+claude.ai/code sandbox specifically can't run CLI migration commands.
+
+## Edge functions
+
+Edge functions live in `supabase/functions/`. Per-function JWT verification is
+configured in `supabase/config.toml`. See CLAUDE.md ("Edge functions") for the
+current function list and which ones are public.
+
+## Tests, typecheck, lint, build
+
+```sh
+npm run check
+```
+
+Runs typecheck, lint, tests, and a production build in sequence — the same
+checks CI runs on every pull request. Run it before committing.
+
+## Where to go next
+
+- **`CLAUDE.md`** (repo root) — the load-bearing operational facts for working
+  in this repo: the migration/`db push` situation, current data-model
+  terminology (Organization / Group / Location), design-system conventions
+  (icon sizes, color tokens, `text-2xs`). Read this before making changes.
+- **`docs/README.md`** — the docs index: what's current, what's historical,
+  and where to find the spec for any given ticket.
+- **`docs/system-overview.md`** — the product tour: who uses it, the weekly
+  loop, how content is structured.
+- **`docs/dev/assessment-2026-08-18.md`** — the current engineering
+  assessment: known issues, the backlog, and why things look the way they do.

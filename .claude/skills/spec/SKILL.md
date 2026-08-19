@@ -44,7 +44,10 @@ before building.
 
 ## Rules
 
-- Runs on the session model (Opus-class). Do not delegate to a subagent.
+- Runs on the session model (Fable 5, set in `.claude/settings.json`). Do not
+  delegate the spec itself to a subagent. If the spec needs research first,
+  delegate that to `kit-reviewer` (Opus 4.8) or `kit-scout` (Haiku) and write the
+  spec yourself.
 - Never start building. The spec is the deliverable.
 - For tiny lane: the spec can be inline in the ticket description instead of a
   separate file. Still stop for approval.

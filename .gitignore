@@ -32,4 +32,3 @@ scripts/demo-seed/.env
 
 # Claude Code local worktree copies (large, machine-local; not for git)
 .claude/worktrees/
-.preview-sedation/

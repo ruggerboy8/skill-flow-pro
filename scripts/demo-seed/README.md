@@ -30,9 +30,18 @@ spec (DEMO-1a is ticket 1 of 3; this script is the whole of that ticket).
 6. Reshapes the copied confidence scores per domain per location so the
    4-domain org view has visible highs and lows instead of whatever the
    single source location happened to produce.
-7. Guarantees demo-staff has an uncompleted current-week assignment.
-8. Is idempotent, and supports `--refresh` to re-point the "current week" to
-   whenever it's actually run.
+7. Guarantees demo-staff has an uncompleted, `status = 'locked'`
+   current-week assignment (locked because every app read path filters on
+   it -- see "Design decisions" below), hard-failing the run with a clear
+   message if that can't be arranged rather than warning and continuing.
+8. Chooses the demo-staff/demo-coach/demo-admin personas deterministically
+   by suitability (role present, most recent activity for the participant),
+   not by arbitrary sort order -- see "Persona selection" below.
+9. Is idempotent and resumable (a partial previous run is detected and
+   continued, not duplicated -- see "Resuming an interrupted seed" below),
+   and supports `--refresh` to re-point the "current week" to whenever it's
+   actually run, including keeping the legacy cycle/week-in-cycle position
+   unchanged.
 
 ## Setup
 
@@ -68,10 +77,59 @@ written, plus counts of what would be created.
 npx tsx scripts/demo-seed/seed.ts --source-location=<alcan-location-uuid>
 ```
 
-Re-running that same command later, once the org already exists, is a
-no-op (it prints "nothing to do" and exits) -- it will not duplicate rows.
-`--source-location` is only read the first time; once the demo org exists
-it's ignored.
+Re-running that same command later, once the org already exists and looks
+fully seeded, is a no-op (it prints "nothing to do" and exits) -- it will
+not duplicate rows. `--source-location` is only read when there is
+something left to do (first seed, or resuming a partial one); once the
+demo org is fully seeded it's ignored.
+
+### Resuming an interrupted seed
+
+If `seed.ts` dies partway through the first seed (network blip, a
+suitability hard-failure after some rows already landed, Ctrl-C, whatever),
+the demo org is left in a partial state: the `organizations` row exists,
+but staff/assignments/scores may be incomplete. Re-running the exact same
+command picks this up automatically:
+
+```bash
+npx tsx scripts/demo-seed/seed.ts --source-location=<alcan-location-uuid>
+```
+
+On startup, the script checks whether the existing demo org looks complete
+(at least 3 locations, at least 3 staff, at least 1 weekly_assignments row).
+If not, it logs "looks incomplete -- resuming the copy" and runs the same
+copy logic again, except every step is get-or-create instead of
+insert-only:
+
+- **Org / group / locations**: looked up by slug first (already was
+  idempotent).
+- **Auth users**: one pagination sweep of `auth.users` up front, so a
+  duplicate-email error can't happen even if a crashed attempt already
+  created the auth user for someone whose `staff` row never landed.
+- **Staff**: looked up by the cast member's demo email; if found, its
+  structural fields are refreshed from source and it's reused (never
+  re-inserted, never given a second auth user).
+- **weekly_assignments**: looked up by its natural key
+  (org, location, role, week, display_order); if found, reused (and forced
+  back to `status = 'locked'` if it somehow wasn't).
+- **weekly_scores**: looked up by `(staff_id, assignment_id)` before
+  building the insert batch; already-present pairs are left alone, not
+  re-inserted (there is no DB-level unique constraint on that pair, so this
+  check happens in the script, not via `onConflict`).
+
+This only works because the shift used to re-point copied weeks
+(`shiftDays`) is anchored to the demo org's own `created_at` timestamp, not
+wall-clock "now" -- so every resumed attempt at the same partial seed
+recomputes the exact same target weeks as the first attempt, and the
+natural-key lookups above actually find the earlier attempt's rows instead
+of creating new ones with a slightly different `week_start_date`. (Once the
+org is fully seeded, `--refresh` -- not another `seed.ts` run -- is what
+moves it to the real current week; see below.)
+
+Resuming with a *different* `--source-location` than the original attempt
+is possible but not something this script defends against -- it would mix
+data from two locations into one partial org. Stick with the same location
+until the first seed finishes.
 
 ### Refreshing before a recording session
 
@@ -87,13 +145,50 @@ npx tsx scripts/demo-seed/seed.ts --refresh              # apply it
 `weekly_scores.week_of` (and their timestamp fields) by the same number of
 days, so the week that was "current" at copy time lands on this week's
 Monday. It's a parallel shift, not a rescale -- week-to-week spacing and
-ordering are preserved. It also re-clears demo-staff's (now current) week
-so Clip 1 still has something uncompleted to rate, and re-syncs the 3 login
-passwords from `.env` (so rotating a password and re-running with
-`--refresh` takes effect).
+ordering are preserved. It also shifts every demo location's
+`program_start_date` by that same number of days, so the legacy
+cycle/week-in-cycle position (see `lib/refreshWeek.ts#weekInCycle`) stays
+exactly where the seed originally put it -- without this, only the week
+values would move while the program start date stood still, and the
+location would eventually drift into "week 1 of a cycle" (some legacy code
+treats that as "just onboarded") no matter how mid-program it started.
+`--refresh` also re-clears demo-staff's (now current) week so Clip 1 still
+has something uncompleted to rate, and re-syncs the 3 login passwords from
+`.env` (so rotating a password and re-running with `--refresh` takes
+effect).
+
+`--refresh` only runs against an already-*complete* demo org. If the org
+still looks partially seeded, `--refresh` is ignored in favor of resuming
+the copy first (see above); re-run `--refresh` afterward.
 
 There's also `npm run demo:seed -- --refresh` if you'd rather not type
 `npx tsx` every time.
+
+## Persona selection
+
+Which three copied staff members become the demo-staff (participant),
+demo-coach, and demo-admin logins is not arbitrary. `lib/anonymize.ts`
+picks them by suitability, in this order:
+
+1. **demo-staff (participant)**: must have a `role_id` and at least one
+   `weekly_scores` row of their own; among those, whoever's most recently
+   active (`week_of`) wins. Clip 1 needs this person to plausibly land a
+   real current-week assignment after the copy, so someone with no role or
+   no history at all is a bad bet. If nobody in the source roster
+   qualifies, the script **hard-fails** with a clear message rather than
+   picking someone unsuitable -- a warning was not enough here, since Clip
+   1 depends entirely on this choice.
+2. **demo-coach**: excluding whoever was already picked as demo-staff,
+   prefers a source staff member who was already a real coach
+   (`is_coach`) and has a role; falls back to anyone with a role; falls
+   back to whoever is left.
+3. **demo-admin**: excluding both of the above, prefers anyone with a
+   role; falls back to whoever is left.
+
+Every remaining source staff member is then matched to the remaining
+(non-login) cast members, sorted by id, same as before. Selection is
+deterministic: the same source roster always picks the same three people
+for the same three logins, run after run.
 
 ## Why every cast member gets an auth user, not just the 3 named logins
 
@@ -111,6 +206,19 @@ auth users."
 
 ## Design decisions worth knowing about
 
+- **Every copied `weekly_assignments` row is forced to `status = 'locked'`,
+  regardless of the source row's status.** QA caught this as the release
+  blocker: every read path in the app filters on `status = 'locked'`
+  (`src/lib/locationState.ts`, `useWeeklyAssignments`, `ConfidenceWizard`,
+  `PerformanceWizard`, `MonthView`, `GlobalAssignmentBuilder`,
+  `TeamWeeklyFocus`), so a copied `'draft'` row would sit in the table but
+  render as if it did not exist -- silently breaking both the "weeks of
+  history" Clip 2/3 need and Clip 1's uncompleted-current-week guarantee.
+  This is forced for every copied week, not just the current one: a demo
+  where history doesn't render is just as broken on camera as one where the
+  current week doesn't. `status` was removed from
+  `WEEKLY_ASSIGNMENTS_COPY_ALLOWLIST` entirely -- it is never read from the
+  source row.
 - **Staff are spread across all 3 demo locations, round-robin.** The spec
   says "copies one Alcan location's staff roster... into the demo org" but
   Clip 3 needs "3 locations... visible highs and lows." Splitting the one
@@ -203,7 +311,9 @@ tested with Vitest and runnable without a database:
 
 - `lib/anonymize.test.ts` -- the anonymization mapping (deterministic,
   proven to never leak a source name/email), the round-robin location
-  distribution, and the login-role flag overrides.
+  distribution, the login-role flag overrides, and the persona-suitability
+  selectors (`selectParticipant`/`selectCoach`/`selectAdmin`, including the
+  participant hard-failure case).
 - `lib/columnAllowlist.test.ts` -- `pickAllowedColumns`, plus a standing
   regression guard (`assertNoFreeTextLeak`) run against the actual
   allowlists this script uses.
@@ -212,10 +322,14 @@ tested with Vitest and runnable without a database:
   submission).
 - `lib/refreshWeek.test.ts` -- the `--refresh` day-shift math, following
   the same host-timezone-independence discipline as `src/lib/dateUtils.test.ts`
-  (COR-1): the same input must give the same answer under any host TZ.
+  (COR-1): the same input must give the same answer under any host TZ. Also
+  `weekInCycle` and the proof that shifting `week_start_date` and
+  `program_start_date` by the same amount leaves cycle position invariant
+  (and that shifting only one of them, the pre-fix bug, does not).
 - `lib/rowBuilders.test.ts` -- the weekly_assignments / weekly_scores row
-  shaping (source stamping, `assign:` prefixing, `backfill_historical`
-  tagging, the current-week score clear).
+  shaping (source stamping, forced `status = 'locked'` regardless of
+  source, `assign:` prefixing, `backfill_historical` tagging, the
+  current-week score clear).
 
 ```bash
 npx vitest run scripts/demo-seed
@@ -241,11 +355,13 @@ only type-checks `src/`) to catch type errors the project's own relaxed
   problem to solve when picking the location for the real seed, not
   something this script tries to fix by substituting a different Pro Move
   than what the real history says. Flagging for DEMO-1c's dry run.
-- **The Clip 1 "uncompleted current week" guarantee is verified, not
-  bulletproof.** The script warns loudly (but does not fail) if it can't
-  confirm a current-week `weekly_assignments` row exists for demo-staff's
-  specific role after the copy + shift. This should be visible in the run
-  output; if it fires, pick a different source location or role mix.
+- **The Clip 1 "uncompleted current week" guarantee now hard-fails
+  instead of warning** (QA-flagged blocker, fixed): the script throws with
+  a clear message, stopping the run, if it can't confirm a current-week
+  `weekly_assignments` row exists (and is `status = 'locked'`) for
+  demo-staff's specific role after the copy + shift. If it fires, the
+  message says so plainly; pick a different source location, or note that
+  whatever was already written is safe to leave (re-running resumes).
 - **No teardown/delete path.** Per the spec, this is out of scope for
   DEMO-1a ("Teardown is possible later because org-owned rows are exempt
   from the platform delete guard"). If a fresh copy is ever needed, the

@@ -38,6 +38,11 @@ came up blank for the coach.
    submitted eval should not silently write to it.)
 5. If the coach navigates to a different eval before the conversion finishes,
    the late results are not painted onto the new screen (QA finding, fixed).
+6. The save itself is conditional (Codex review finding, fixed): a split is
+   written only if the eval is still a draft and the row still has the exact
+   same note with no Glow/Grow. If anything changed meanwhile (submitted,
+   edited in the classic editor, converted in another tab), nothing is written
+   and the screen resyncs from the row.
 
 Live data check on 2026-08-19: two recent drafts by one evaluator with 12 and 5
 legacy notes, plus two July submitted evals in the same shape. The drafts

@@ -252,10 +252,67 @@ export interface LegacyConversionResult {
   converted: { domainId: number; competencyId: number; glow: string | null; grow: string | null }[];
   /** Items where the split failed; the caller should surface the legacy note for manual Polish. */
   failed: { domainId: number; competencyId: number; legacyNote: string; error: string }[];
+  /**
+   * Items the split finished for, but the row had moved on in the meantime
+   * (note edited elsewhere, glow/grow already set, or the eval no longer a
+   * draft). Nothing was written; the caller should not touch the screen for
+   * these.
+   */
+  skipped: { domainId: number; competencyId: number; reason: string }[];
 }
 
 type SeparateFn = typeof separateFeedback;
-type SaveFn = typeof saveCaptureItem;
+
+/**
+ * Persist a legacy split ONLY if the row is still exactly as it was when the
+ * split started and the eval is still a draft. The split is asynchronous and
+ * the page is interactive meanwhile, so the coach may have submitted, edited
+ * the note in the classic editor, or converted it from another tab. A stale
+ * split must never overwrite any of that.
+ *
+ * Returns "saved" or "skipped". The freshness check is a re-read followed by a
+ * conditional update keyed on the original note text, so a note edited between
+ * the read and the write still fails the update (zero rows) and is skipped.
+ */
+export async function saveLegacySplit(
+  evalId: string,
+  competencyId: number,
+  originalNote: string,
+  glow: string | null,
+  grow: string | null,
+): Promise<"saved" | "skipped"> {
+  const { data: evalRow, error: evalError } = await supabase
+    .from("evaluations")
+    .select("status")
+    .eq("id", evalId)
+    .maybeSingle();
+  if (evalError) throw new Error(evalError.message);
+  if (!evalRow || (evalRow as { status: string }).status !== "draft") return "skipped";
+
+  const { data: item, error: itemError } = await supabase
+    .from("evaluation_items")
+    .select("observer_note, observer_glow, observer_grow")
+    .eq("evaluation_id", evalId)
+    .eq("competency_id", competencyId)
+    .maybeSingle();
+  if (itemError) throw new Error(itemError.message);
+  if (!item) return "skipped";
+  const current = item as { observer_note: string | null; observer_glow?: string | null; observer_grow?: string | null };
+  if (legacyNoteOf(current) !== originalNote.trim()) return "skipped";
+
+  const { data: updated, error: updateError } = await supabase
+    .from("evaluation_items")
+    // Cast: observer_glow/observer_grow are not yet in generated types.
+    .update({ observer_glow: glow, observer_grow: grow } as never)
+    .eq("evaluation_id", evalId)
+    .eq("competency_id", competencyId)
+    .eq("observer_note", current.observer_note as string)
+    .select("competency_id");
+  if (updateError) throw new Error(updateError.message);
+  return updated && updated.length > 0 ? "saved" : "skipped";
+}
+
+type SaveSplitFn = typeof saveLegacySplit;
 
 /**
  * Split every legacy note in the eval into Glow/Grow and persist the result.
@@ -271,17 +328,17 @@ type SaveFn = typeof saveCaptureItem;
  */
 export async function convertLegacyNotes(
   data: Pick<CaptureData, "evalId" | "domains">,
-  deps: { separate?: SeparateFn; save?: SaveFn; concurrency?: number } = {},
+  deps: { separate?: SeparateFn; saveSplit?: SaveSplitFn; concurrency?: number } = {},
 ): Promise<LegacyConversionResult> {
   const separate = deps.separate ?? separateFeedback;
-  const save = deps.save ?? saveCaptureItem;
+  const saveSplit = deps.saveSplit ?? saveLegacySplit;
   const requested = deps.concurrency;
   const concurrency = typeof requested === "number" && Number.isFinite(requested) && requested >= 1
     ? Math.floor(requested)
     : 4;
 
   const items = findLegacyNoteItems(data);
-  const result: LegacyConversionResult = { converted: [], failed: [] };
+  const result: LegacyConversionResult = { converted: [], failed: [], skipped: [] };
   if (items.length === 0) return result;
 
   let cursor = 0;
@@ -306,8 +363,12 @@ export async function convertLegacyNotes(
         }
         // observer_note is intentionally NOT rewritten here: the original
         // wording stays on the row as the source of truth for this conversion.
-        await save(data.evalId, comp.competencyId, { observer_glow: glow, observer_grow: grow });
-        result.converted.push({ domainId, competencyId: comp.competencyId, glow, grow });
+        const outcome = await saveSplit(data.evalId, comp.competencyId, legacyNote, glow, grow);
+        if (outcome === "saved") {
+          result.converted.push({ domainId, competencyId: comp.competencyId, glow, grow });
+        } else {
+          result.skipped.push({ domainId, competencyId: comp.competencyId, reason: "row changed before the split finished" });
+        }
       } catch (e) {
         result.failed.push({
           domainId,

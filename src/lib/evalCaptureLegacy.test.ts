@@ -5,11 +5,13 @@
  * dependencies, so no network or Supabase is involved.
  */
 import { describe, it, expect, vi } from "vitest";
+import { queueTable, getTableCalls } from "@/test/supabaseMock";
 
 import {
   legacyNoteOf,
   findLegacyNoteItems,
   convertLegacyNotes,
+  saveLegacySplit,
   type CaptureCompetency,
   type CaptureData,
 } from "@/lib/evalCaptureData";
@@ -68,7 +70,7 @@ describe("findLegacyNoteItems", () => {
 describe("convertLegacyNotes", () => {
   it("splits each legacy note, saves glow/grow only, and leaves observer_note alone", async () => {
     const separate = vi.fn(async ({ text }: { text: string }) => ({ glow: `G:${text}`, grow: `R:${text}` }));
-    const save = vi.fn(async (_evalId: string, _competencyId: number, _patch: Record<string, unknown>) => {});
+    const saveSplit = vi.fn(async (..._args: unknown[]) => "saved" as const);
     const d = data([
       { domainId: 1, domainName: "Clinical", summary: null, competencies: [
         comp({ competencyId: 10, legacyNote: "one", name: "Rapport", proMoves: ["Smile"] }),
@@ -76,18 +78,33 @@ describe("convertLegacyNotes", () => {
         comp({ competencyId: 12, legacyNote: "two" }),
       ] },
     ]);
-    const res = await convertLegacyNotes(d, { separate, save, concurrency: 2 });
+    const res = await convertLegacyNotes(d, { separate, saveSplit, concurrency: 2 });
     expect(res.failed).toEqual([]);
+    expect(res.skipped).toEqual([]);
     expect(res.converted.map((c) => c.competencyId).sort()).toEqual([10, 12]);
     expect(separate).toHaveBeenCalledTimes(2);
     expect(separate).toHaveBeenCalledWith(expect.objectContaining({
       text: "one",
       competency: expect.objectContaining({ name: "Rapport", proMoves: ["Smile"] }),
     }));
-    expect(save).toHaveBeenCalledTimes(2);
-    const patch = save.mock.calls.find((c) => c[1] === 10)![2];
-    expect(patch).toEqual({ observer_glow: "G:one", observer_grow: "R:one" });
-    expect(patch).not.toHaveProperty("observer_note");
+    expect(saveSplit).toHaveBeenCalledTimes(2);
+    // Saved with the ORIGINAL note as the freshness key, glow/grow only.
+    expect(saveSplit).toHaveBeenCalledWith("eval-1", 10, "one", "G:one", "R:one");
+  });
+
+  it("reports skipped (and not converted) when the row changed before the split finished", async () => {
+    const separate = vi.fn(async () => ({ glow: "g", grow: "r" }));
+    const saveSplit = vi.fn(async (_e: string, competencyId: number) => (competencyId === 10 ? "skipped" as const : "saved" as const));
+    const d = data([
+      { domainId: 1, domainName: "Clinical", summary: null, competencies: [
+        comp({ competencyId: 10, legacyNote: "edited meanwhile" }),
+        comp({ competencyId: 11, legacyNote: "fine" }),
+      ] },
+    ]);
+    const res = await convertLegacyNotes(d, { separate, saveSplit, concurrency: 1 });
+    expect(res.converted.map((c) => c.competencyId)).toEqual([11]);
+    expect(res.skipped.map((s) => s.competencyId)).toEqual([10]);
+    expect(res.failed).toEqual([]);
   });
 
   it("reports a failure (and does not save) when the split throws or returns nothing", async () => {
@@ -96,7 +113,7 @@ describe("convertLegacyNotes", () => {
       if (text === "empty") return { glow: null, grow: "  " };
       return { glow: "ok", grow: null };
     });
-    const save = vi.fn(async () => {});
+    const saveSplit = vi.fn(async () => "saved" as const);
     const d = data([
       { domainId: 3, domainName: "Cultural", summary: null, competencies: [
         comp({ competencyId: 30, legacyNote: "boom" }),
@@ -104,27 +121,27 @@ describe("convertLegacyNotes", () => {
         comp({ competencyId: 32, legacyNote: "fine" }),
       ] },
     ]);
-    const res = await convertLegacyNotes(d, { separate, save, concurrency: 1 });
+    const res = await convertLegacyNotes(d, { separate, saveSplit, concurrency: 1 });
     expect(res.converted.map((c) => c.competencyId)).toEqual([32]);
     expect(res.failed.map((f) => [f.competencyId, f.legacyNote])).toEqual([[30, "boom"], [31, "empty"]]);
     expect(res.failed[0].error).toMatch(/edge function down/);
-    expect(save).toHaveBeenCalledTimes(1);
+    expect(saveSplit).toHaveBeenCalledTimes(1);
   });
 
   it("normalizes empty-string glow/grow from the splitter to null before saving", async () => {
     const separate = vi.fn(async () => ({ glow: "Kept calm with a nervous patient.", grow: "" }));
-    const save = vi.fn(async (_evalId: string, _competencyId: number, _patch: Record<string, unknown>) => {});
+    const saveSplit = vi.fn(async (..._args: unknown[]) => "saved" as const);
     const res = await convertLegacyNotes(data([
       { domainId: 1, domainName: "Clinical", summary: null, competencies: [comp({ competencyId: 5, legacyNote: "n" })] },
-    ]), { separate, save });
+    ]), { separate, saveSplit });
     expect(res.failed).toEqual([]);
-    expect(save.mock.calls[0][2]).toEqual({ observer_glow: "Kept calm with a nervous patient.", observer_grow: null });
+    expect(saveSplit).toHaveBeenCalledWith("eval-1", 5, "n", "Kept calm with a nervous patient.", null);
     expect(res.converted[0]).toMatchObject({ glow: "Kept calm with a nervous patient.", grow: null });
   });
 
   it("still processes every item when concurrency is not a usable number (QA finding)", async () => {
     const separate = vi.fn(async () => ({ glow: "g", grow: "r" }));
-    const save = vi.fn(async () => {});
+    const saveSplit = vi.fn(async () => "saved" as const);
     const d = data([
       { domainId: 1, domainName: "Clinical", summary: null, competencies: [
         comp({ competencyId: 10, legacyNote: "one" }),
@@ -133,7 +150,7 @@ describe("convertLegacyNotes", () => {
     ]);
     for (const bad of [Number("abc"), 0, -3, Infinity]) {
       separate.mockClear();
-      const res = await convertLegacyNotes(d, { separate, save, concurrency: bad });
+      const res = await convertLegacyNotes(d, { separate, saveSplit, concurrency: bad });
       expect(separate).toHaveBeenCalledTimes(2);
       expect(res.converted.length + res.failed.length).toBe(2);
     }
@@ -141,12 +158,55 @@ describe("convertLegacyNotes", () => {
 
   it("does nothing when there are no legacy notes", async () => {
     const separate = vi.fn();
-    const save = vi.fn();
+    const saveSplit = vi.fn();
     const res = await convertLegacyNotes(data([
       { domainId: 1, domainName: "Clinical", summary: null, competencies: [comp({ competencyId: 1, glow: "g" })] },
-    ]), { separate, save });
-    expect(res).toEqual({ converted: [], failed: [] });
+    ]), { separate, saveSplit });
+    expect(res).toEqual({ converted: [], failed: [], skipped: [] });
     expect(separate).not.toHaveBeenCalled();
-    expect(save).not.toHaveBeenCalled();
+    expect(saveSplit).not.toHaveBeenCalled();
+  });
+});
+
+describe("saveLegacySplit (conditional write)", () => {
+  const draftEval = { data: { status: "draft" }, error: null };
+  const legacyRow = { data: { observer_note: "old note", observer_glow: null, observer_grow: null }, error: null };
+
+  it("writes glow/grow keyed on the original note when the row is untouched and the eval is a draft", async () => {
+    queueTable("evaluations", draftEval);
+    queueTable("evaluation_items", legacyRow);
+    queueTable("evaluation_items", { data: [{ competency_id: 7 }], error: null });
+    const out = await saveLegacySplit("eval-1", 7, "old note", "G", "R");
+    expect(out).toBe("saved");
+    const update = getTableCalls("evaluation_items").find((c) => c.method === "update")!;
+    expect(update.payload).toEqual({ observer_glow: "G", observer_grow: "R" });
+    expect(update.filters).toContainEqual({ op: "eq", args: ["observer_note", "old note"] });
+    expect(update.filters).toContainEqual({ op: "eq", args: ["evaluation_id", "eval-1"] });
+    expect(update.filters).toContainEqual({ op: "eq", args: ["competency_id", 7] });
+  });
+
+  it("skips without writing when the eval is no longer a draft", async () => {
+    queueTable("evaluations", { data: { status: "submitted" }, error: null });
+    const out = await saveLegacySplit("eval-1", 7, "old note", "G", "R");
+    expect(out).toBe("skipped");
+    expect(getTableCalls("evaluation_items")).toEqual([]);
+  });
+
+  it("skips without writing when the note was edited or already split meanwhile", async () => {
+    queueTable("evaluations", draftEval);
+    queueTable("evaluation_items", { data: { observer_note: "edited in classic editor", observer_glow: null, observer_grow: null }, error: null });
+    expect(await saveLegacySplit("eval-1", 7, "old note", "G", "R")).toBe("skipped");
+    expect(getTableCalls("evaluation_items").filter((c) => c.method === "update")).toEqual([]);
+
+    queueTable("evaluations", draftEval);
+    queueTable("evaluation_items", { data: { observer_note: "old note", observer_glow: "already", observer_grow: null }, error: null });
+    expect(await saveLegacySplit("eval-1", 7, "old note", "G", "R")).toBe("skipped");
+  });
+
+  it("skips when the conditional update matches zero rows (note changed between read and write)", async () => {
+    queueTable("evaluations", draftEval);
+    queueTable("evaluation_items", legacyRow);
+    queueTable("evaluation_items", { data: [], error: null });
+    expect(await saveLegacySplit("eval-1", 7, "old note", "G", "R")).toBe("skipped");
   });
 });

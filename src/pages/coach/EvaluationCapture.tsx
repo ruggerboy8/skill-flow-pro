@@ -144,12 +144,19 @@ export default function EvaluationCapture() {
     // evalId inside convertLegacyNotes; this guards the on-screen state.
     const stillOnThisEval = () => activeEvalRef.current === loaded.evalId;
     try {
-      const { converted, failed } = await convertLegacyNotes(loaded);
+      const { converted, failed, skipped } = await convertLegacyNotes(loaded);
       if (!stillOnThisEval()) return;
       for (const c of converted) {
         patchCompetency(c.domainId, c.competencyId, { glow: c.glow, grow: c.grow, legacyNote: null });
       }
       surfaceLegacyNotesInDrafts(failed);
+      if (skipped.length > 0) {
+        // The row moved on while we were splitting (edited elsewhere, submitted,
+        // or converted in another tab). Nothing was written for those; resync
+        // the screen to whatever is actually on the row now.
+        await reload();
+        if (!stillOnThisEval()) return;
+      }
       if (converted.length > 0 && failed.length === 0) {
         toast({
           title: `Converted ${converted.length} note${converted.length === 1 ? "" : "s"} from the classic form`,

@@ -124,8 +124,8 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
         observedAt: undefined
       });
 
-      // Navigate to evaluation hub
-      navigate(`/coach/${staffId}/eval/${result.evaluation.id}`);
+      // Open the new capture flow (matches the open/edit buttons below)
+      navigate(`/coach/${staffId}/eval/${result.evaluation.id}/capture`);
     } catch (error) {
       console.error('Failed to create evaluation:', error);
       toast({

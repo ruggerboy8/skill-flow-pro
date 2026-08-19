@@ -14,6 +14,8 @@ import {
   saveCaptureItem,
   separateFeedback,
   buildObserverNote,
+  convertLegacyNotes,
+  findLegacyNoteItems,
   type CaptureData,
   type CaptureCompetency,
 } from "@/lib/evalCaptureData";
@@ -58,6 +60,7 @@ export default function EvaluationCapture() {
   const [openProMoves, setOpenProMoves] = useState<Set<number>>(new Set());
   const [drafts, setDrafts] = useState<Record<number, string>>({});
   const [polishingId, setPolishingId] = useState<number | null>(null);
+  const [convertingLegacy, setConvertingLegacy] = useState(0);
   const [showIntro, setShowIntro] = useState(() => {
     try { return localStorage.getItem(INTRO_KEY) !== "1"; } catch { return true; }
   });
@@ -84,7 +87,16 @@ export default function EvaluationCapture() {
       setLoading(true);
       try {
         const result = await loadCaptureData(evalId);
-        if (!cancelled) setData(result);
+        if (cancelled) return;
+        setData(result);
+        setLoading(false);
+        // Legacy notes: evals started in the classic form carry one combined
+        // note per competency that this screen cannot show. Split them into
+        // Glow/Grow now (original note kept on the row), so the coach picks up
+        // exactly where they left off instead of facing blank boxes.
+        if (result && findLegacyNoteItems(result).length > 0) {
+          await convertLegacyNotesInPlace(result);
+        }
       } catch (e) {
         if (!cancelled) {
           toast({ title: "Could not load evaluation", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
@@ -94,7 +106,49 @@ export default function EvaluationCapture() {
       }
     })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evalId, toast]);
+
+  async function convertLegacyNotesInPlace(loaded: CaptureData) {
+    const pending = findLegacyNoteItems(loaded).length;
+    setConvertingLegacy(pending);
+    try {
+      const { converted, failed } = await convertLegacyNotes(loaded);
+      for (const c of converted) {
+        patchCompetency(c.domainId, c.competencyId, { glow: c.glow, grow: c.grow, legacyNote: null });
+      }
+      if (failed.length > 0) {
+        // Surface the unsplit note in the feedback box so the coach can Polish
+        // it by hand. Never overwrite something the coach already typed.
+        setDrafts((prev) => {
+          const next = { ...prev };
+          for (const f of failed) {
+            if (!next[f.competencyId]?.trim()) next[f.competencyId] = f.legacyNote;
+          }
+          return next;
+        });
+      }
+      if (converted.length > 0 && failed.length === 0) {
+        toast({
+          title: `Converted ${converted.length} note${converted.length === 1 ? "" : "s"} from the classic form`,
+          description: "Each one is now a Glow and a Grow below. Tweak if you like.",
+        });
+      } else if (converted.length > 0) {
+        toast({
+          title: `Converted ${converted.length} of ${converted.length + failed.length} notes from the classic form`,
+          description: `${failed.length} could not be split automatically. They are in the feedback box; tap Polish to split them.`,
+        });
+      } else {
+        toast({
+          title: "Could not split notes from the classic form",
+          description: "Your original notes are in the feedback box. Tap Polish on each to split them.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setConvertingLegacy(0);
+    }
+  }
 
   // Crash resilience for the raw (pre-Polish) feedback textarea, which otherwise
   // lives only in React state. Restore any saved drafts once when the eval opens,
@@ -290,6 +344,12 @@ export default function EvaluationCapture() {
             <span className="inline-flex h-1.5 w-1.5 rounded-full" style={{ background: allDone ? "hsl(var(--status-complete))" : richColor }} aria-hidden />
             {allDone ? <span className="text-foreground font-medium">All competencies scored</span>
               : <span>{totalRated} of {totalCompetencies} competencies scored</span>}
+            {convertingLegacy > 0 && (
+              <span className="inline-flex items-center gap-1.5" aria-live="polite">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                Converting {convertingLegacy} note{convertingLegacy === 1 ? "" : "s"} from the classic form
+              </span>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">

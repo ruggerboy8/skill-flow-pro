@@ -284,15 +284,18 @@ export async function convertLegacyNotes(
       const { domainId, competency: comp } = items[cursor++];
       const legacyNote = comp.legacyNote as string;
       try {
-        const { glow, grow } = await separate({
+        const split = await separate({
           competency: { name: comp.name, description: comp.description, proMoves: comp.proMoves },
           text: legacyNote,
           existingGlow: null,
           existingGrow: null,
         });
+        // Normalize empties to null, matching what the capture form itself saves.
+        const glow = split.glow?.trim() ? split.glow : null;
+        const grow = split.grow?.trim() ? split.grow : null;
         // A split that returns nothing at all would silently hide the note
         // behind empty glow/grow. Treat it as a failure so the note stays visible.
-        if (!glow?.trim() && !grow?.trim()) {
+        if (!glow && !grow) {
           throw new Error("The split returned no glow or grow.");
         }
         // observer_note is intentionally NOT rewritten here: the original

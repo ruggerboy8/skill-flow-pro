@@ -111,6 +111,17 @@ describe("convertLegacyNotes", () => {
     expect(save).toHaveBeenCalledTimes(1);
   });
 
+  it("normalizes empty-string glow/grow from the splitter to null before saving", async () => {
+    const separate = vi.fn(async () => ({ glow: "Kept calm with a nervous patient.", grow: "" }));
+    const save = vi.fn(async (_evalId: string, _competencyId: number, _patch: Record<string, unknown>) => {});
+    const res = await convertLegacyNotes(data([
+      { domainId: 1, domainName: "Clinical", summary: null, competencies: [comp({ competencyId: 5, legacyNote: "n" })] },
+    ]), { separate, save });
+    expect(res.failed).toEqual([]);
+    expect(save.mock.calls[0][2]).toEqual({ observer_glow: "Kept calm with a nervous patient.", observer_grow: null });
+    expect(res.converted[0]).toMatchObject({ glow: "Kept calm with a nervous patient.", grow: null });
+  });
+
   it("does nothing when there are no legacy notes", async () => {
     const separate = vi.fn();
     const save = vi.fn();

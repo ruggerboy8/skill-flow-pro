@@ -38,8 +38,10 @@ After `/qa` passes (ticket is at `stage:ready-to-review`).
    Adjust the checklist if there's a DB change (add the apply step and its
    ordering relative to deploy).
 
-5. **Move the ticket** to `stage:ready-to-review`. John moves it to
-   `stage:merged` and `stage:published` himself.
+5. **Move the ticket** to `stage:ready-to-review`. John merges on GitHub;
+   `/status` then syncs the board to `stage:merged` from GitHub state (see
+   the status skill, step 5). John marks `stage:published` himself after
+   Lovable Publish.
 
 ## Rules
 

@@ -54,10 +54,12 @@ is usually claiming to be fresher than it is.
 1. **`docs/system-overview.md`**: what the product is, who uses it, the weekly
    loop. The single best entry point, and current.
 2. **`CLAUDE.md`** (repo root, not under `docs/`): the load-bearing operational
-   facts live only here: how migrations really ship, that `supabase db push` does
-   not work, the current Organization / Group / Location terminology, the design
-   tokens. A newcomer who skips this file will get stuck in ways nothing in
-   `docs/` warns them about.
+   facts live only here: how migrations really ship (the Supabase dashboard SQL
+   editor, or land it on `main` for Lovable), why `supabase db push` is still
+   unproven and not the documented path (see ticket DOC-2), the current
+   Organization / Group / Location terminology, the design tokens. A newcomer
+   who skips this file will get stuck in ways nothing in `docs/` warns them
+   about.
 3. **`docs/dev/assessment-2026-08-18.md`**: the first real engineering review of
    this codebase, and the honest current state: the security exposure, the
    backlog, and why the defects look the way they do. Current.

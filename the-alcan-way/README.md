@@ -59,6 +59,12 @@ whole experience is one pinned stage scrubbed by scroll.
   offer, parent relaxes) run end to end on placeholder blocks.
 - **M3+** — see the build plan roadmap.
 
+## License
+
+This sub-project is proprietary, same as the parent repo (see `../LICENSE`).
+It depends on GSAP under GreenSock's Standard "No Charge" license, not an
+open-source license. See `../THIRD-PARTY-LICENSES.md` for details.
+
 ## Dev-only helpers
 
 When running `npm run dev`, the following are exposed on `window` for testing

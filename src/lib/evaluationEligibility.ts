@@ -26,15 +26,32 @@ export function getPeriodStartDate(period: EvaluationPeriod): Date {
 }
 
 /**
+ * Parse a date-only string ("yyyy-MM-dd", what the `staff.hire_date` Postgres
+ * date column actually returns) as a plain calendar date, not a UTC instant.
+ *
+ * `new Date("2026-04-01")` is parsed by the JS spec as UTC midnight, while
+ * `getPeriodStartDate` builds `periodStart` with the local-time constructor
+ * (`new Date(year, month, day)`). Comparing those two flips eligibility on
+ * the exact boundary day depending on the viewer's timezone offset from UTC.
+ * Building both sides with the same local-time constructor removes that
+ * mismatch: the comparison is between two plain calendar dates, independent
+ * of the viewer's timezone.
+ */
+function parseDateOnlyString(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/**
  * Check if a staff member is eligible for evaluation based on hire date.
  * Eligibility rule: hired BEFORE the start of the evaluation period.
- * 
+ *
  * Example: For Q2 2026, staff hired before April 1, 2026 are eligible.
  */
 export function isEligibleByHireDate(hireDate: Date | string, period: EvaluationPeriod): boolean {
   const periodStart = getPeriodStartDate(period);
-  const hire = typeof hireDate === 'string' ? new Date(hireDate) : hireDate;
-  
+  const hire = typeof hireDate === 'string' ? parseDateOnlyString(hireDate) : hireDate;
+
   // Eligible if hired BEFORE the period starts
   return hire < periodStart;
 }

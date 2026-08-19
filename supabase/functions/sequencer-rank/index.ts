@@ -514,7 +514,9 @@ serve(async (req) => {
       lastSeen: lastSelected.find(ls => ls.proMoveId === m.id)?.weekStart || null,
       weeksSinceSeen: m.weeksSince,
       confidenceN: confidenceHistory.filter(h => h.proMoveId === m.id).reduce((sum, h) => sum + h.n, 0),
-      status: classifyConfidence(m.C, confidenceHistory.filter(h => h.proMoveId === m.id)).status,
+      // COR-6: classify on confEB (EB confidence, LOW is bad), not C (collective
+      // weakness, HIGH is bad). Passing C inverted every badge.
+      status: classifyConfidence(m.confEB, confidenceHistory.filter(h => h.proMoveId === m.id)).status,
       lowConfShare: m.lowConfShare,
       avgConfLast: m.avgConfLast,
       lastPracticedWeeks: m.weeksSince,
@@ -553,7 +555,9 @@ serve(async (req) => {
         lastSeen: lastSelected.find(ls => ls.proMoveId === m.id)?.weekStart || null,
         weeksSinceSeen: m.weeksSince,
         confidenceN: confidenceHistory.filter(h => h.proMoveId === m.id).reduce((sum, h) => sum + h.n, 0),
-        status: classifyConfidence(m.C, confidenceHistory.filter(h => h.proMoveId === m.id)).status,
+        // COR-6: classify on confEB (EB confidence, LOW is bad), not C (collective
+        // weakness, HIGH is bad). Passing C inverted every badge.
+        status: classifyConfidence(m.confEB, confidenceHistory.filter(h => h.proMoveId === m.id)).status,
         lowConfShare: m.lowConfShare,
         avgConfLast: m.avgConfLast,
         lastPracticedWeeks: m.weeksSince,

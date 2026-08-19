@@ -22,6 +22,7 @@ import {
   computeRecency,
   computeWeeksSince,
   scoreCandidate,
+  scoreCandidateWithAdvancedState,
   type CandidateMove,
   type ConfidencePoint,
   type ScoringConfig,
@@ -511,5 +512,87 @@ describe('classifyConfidence', () => {
     expect(r.status).toBe('ok');
     expect(r.n2w).toBe(0);
     expect(r.recentMeans).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// COR-6: the confidence badge must read the EB confidence, not the weakness
+// score. `classifyConfidence` treats LOW as bad; `C` treats HIGH as bad, so
+// feeding it `C` inverted every badge the sequencer showed.
+// ---------------------------------------------------------------------------
+
+describe('COR-6: confEB drives the confidence badge', () => {
+  /**
+   * `confEB` is on the normalized 0..1 confidence scale (a raw 1-4 rating
+   * mapped by (score - 1) / 3), shrunk toward `config.ebPrior` by
+   * `config.ebK`. These literals are computed by hand from that formula, not
+   * read back from the implementation.
+   */
+  it('returns the EB-shrunk confidence mean, not the raw sample mean', () => {
+    // One weekly point, avg 0.45, n = 12.
+    // (0.70 * 20 + 0.45 * 12) / (20 + 12) = 19.4 / 32 = 0.60625
+    const scored = scoreCandidate(
+      MOVE,
+      REF,
+      makeInputs({ confidenceHistory: points([0.45], 12) })
+    );
+    expect(scored.confEB).toBeCloseTo(0.60625, 12);
+
+    // The weakness score moves the opposite way, which is the whole bug.
+    expect(scored.C).toBeGreaterThan(0.30);
+    expect(scored.confEB).toBeGreaterThan(scored.C);
+  });
+
+  it('falls back to the prior when a move has no confidence history at all', () => {
+    const scored = scoreCandidate(MOVE, REF, makeInputs());
+    expect(scored.confEB).toBe(BASE_CONFIG.ebPrior);
+    expect(classifyConfidence(scored.confEB, []).status).toBe('ok');
+  });
+
+  it('carries confEB through the preview-week re-score unchanged', () => {
+    const inputs = makeInputs({ confidenceHistory: points([0.45], 12) });
+    const base = scoreCandidate(MOVE, REF, inputs);
+    const preview = scoreCandidateWithAdvancedState(MOVE, '2026-08-24', [], inputs);
+    expect(preview.confEB).toBe(base.confEB);
+  });
+
+  it('flags a move the team is NOT confident in as critical', () => {
+    // 10 weeks of everyone answering 1 of 4 (normalized 0.0), 6 responses a
+    // week. confEB = (0.70 * 20 + 0 * 60) / (20 + 60) = 14 / 80 = 0.175, and
+    // the last two weeks carry 12 responses, clearing the 10-sample gate.
+    const history = points(Array(10).fill(0.0), 6);
+    const scored = scoreCandidate(
+      MOVE,
+      REF,
+      makeInputs({
+        confidenceHistory: history,
+        individualLowCounts: new Map([[1, { lowCount: 60, totalCount: 60 }]]),
+      })
+    );
+    expect(scored.confEB).toBeCloseTo(0.175, 12);
+    expect(classifyConfidence(scored.confEB, history).status).toBe('critical');
+
+    // Before the fix this same move only reached "watch", and then only via the
+    // very-low-recent-week escape hatch, never via the confidence threshold.
+    expect(classifyConfidence(scored.C, history).status).toBe('watch');
+  });
+
+  it('leaves a move the team IS confident in alone', () => {
+    // 10 weeks of everyone answering 4 of 4 (normalized 1.0), 6 responses a
+    // week, and no low individual ratings at all.
+    const history = points(Array(10).fill(1.0), 6);
+    const scored = scoreCandidate(
+      MOVE,
+      REF,
+      makeInputs({
+        confidenceHistory: history,
+        individualLowCounts: new Map([[1, { lowCount: 0, totalCount: 60 }]]),
+      })
+    );
+    expect(scored.confEB).toBeCloseTo(0.925, 12);
+    expect(classifyConfidence(scored.confEB, history).status).toBe('ok');
+
+    // Before the fix this best-understood move was the one screaming CRITICAL.
+    expect(classifyConfidence(scored.C, history).status).toBe('critical');
   });
 });

@@ -358,8 +358,8 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
       const orgNameMap = new Map(allOrgs.map(o => [o.id, o.name]));
 
       // Accumulate rows across all selected orgs
-      let allPrimaryRows: Record<string, string>[] = [];
-      let allCompetencyRows: Record<string, string>[] = [];
+      const allPrimaryRows: Record<string, string>[] = [];
+      const allCompetencyRows: Record<string, string>[] = [];
 
       for (const orgId of selectedOrgIds) {
         const orgName = orgNameMap.get(orgId) || '';
@@ -385,7 +385,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
         if (staff.length === 0) continue;
 
         // 2. Build submission metrics for this org
-        let submissionByStaff = new Map<string, StaffSubmission>();
+        const submissionByStaff = new Map<string, StaffSubmission>();
 
         if (config.includeCompletionRate || config.includeOnTimeRate) {
           // Resolve the participation window from the chosen period. The start

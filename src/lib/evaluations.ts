@@ -311,7 +311,7 @@ export async function getEvaluationsForStaff(staffId: string) {
  */
 export async function getEvaluation(evalId: string): Promise<EvaluationWithItems | null> {
   // First get the evaluation and basic items
-  let { data, error } = await supabase
+  const { data: fetched, error } = await supabase
     .from('evaluations')
     .select(`
       *,
@@ -319,6 +319,7 @@ export async function getEvaluation(evalId: string): Promise<EvaluationWithItems
     `)
     .eq('id', evalId)
     .maybeSingle();
+  let data = fetched;
 
   if (error) {
     throw new Error(`Failed to fetch evaluation: ${error.message}`);
@@ -792,7 +793,7 @@ export function getQuarterWindow(now: Date, timezone: string): QuarterWindow {
   
   // Determine quarter based on month
   let targetQuarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
-  let targetYear = year;
+  const targetYear = year;
   
   if (month >= 1 && month <= 3) {
     targetQuarter = 'Q1';

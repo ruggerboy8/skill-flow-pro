@@ -44,7 +44,7 @@ export default function StatsEvaluations() {
 
         // Get visibility status for each evaluation
         const evalIds = [...new Set((data ?? []).map(r => r.eval_id))];
-        let visibilityMap = new Map<string, boolean>();
+        const visibilityMap = new Map<string, boolean>();
         
         if (evalIds.length > 0) {
           const { data: evalData } = await supabase

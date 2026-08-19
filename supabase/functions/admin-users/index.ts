@@ -749,7 +749,7 @@ serve(async (req: Request) => {
         
         // Side-effects: Clear weekly tasks if becoming non-participant
         let deletedScores = 0;
-        let deletedSelections = 0;
+        const deletedSelections = 0;
         
         if (!config.is_participant && currentStaff.is_participant) {
           console.log(`Clearing weekly tasks for staff ${currentStaff.id} (becoming non-participant)`);

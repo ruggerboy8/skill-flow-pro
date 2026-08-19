@@ -90,20 +90,17 @@ mechanism first.
 
 ## How database changes actually ship
 
-`npx supabase db push` **does not work** on this project. Lovable owns
-migrations and names files `<timestamp>-<uuid>.sql` (hyphen); the Supabase
-CLI requires `<timestamp>_name.sql` (underscore) and skips the hyphenated
-files, so the CLI's migration history never reconciles and `db push` fails.
+The known-good path is one of these two:
 
-To ship a migration, either:
-
-- paste its SQL into the Supabase dashboard **SQL Editor**, written
-  idempotently (`IF NOT EXISTS` / `CREATE OR REPLACE`, column adds before the
-  functions that reference them), or
+- paste the migration's SQL into the Supabase dashboard **SQL Editor**,
+  written idempotently (`IF NOT EXISTS` / `CREATE OR REPLACE`, column adds
+  before the functions that reference them), or
 - land it on `main` for Lovable to pick up.
 
-See CLAUDE.md ("Applying migrations") for the full detail, including why the
-claude.ai/code sandbox specifically can't run CLI migration commands.
+`npx supabase db push` is **not trusted and unproven** on this project as of
+this writing. Do not run it against the live project without reading CLAUDE.md
+("Applying migrations") first — that section holds the current reasoning and
+status and is the source of truth, not this README.
 
 ## Edge functions
 

@@ -88,7 +88,7 @@ export function HistoryStrip({ roleId, orgId, onHistoryLoaded }: HistoryStripPro
 
     // Check which are locked (have scores)
     const assignmentIds = rows.map(r => r.id);
-    let lockedIds = new Set<string>();
+    const lockedIds = new Set<string>();
     if (assignmentIds.length > 0) {
       const { data: scores } = await supabase
         .from('weekly_scores')

@@ -101,7 +101,7 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
         .filter(a => !a.self_select && a.action_id)
         .map(a => a.action_id!);
       
-      let actionMap = new Map<number, string>();
+      const actionMap = new Map<number, string>();
       if (actionIds.length > 0) {
         const { data: moves } = await supabase
           .from('pro_moves')
@@ -118,7 +118,7 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
         .filter(a => a.competency_id)
         .map(a => a.competency_id!);
       
-      let competencyMap = new Map<number, string>();
+      const competencyMap = new Map<number, string>();
       if (competencyIds.length > 0) {
         const { data: comps } = await supabase
           .from('competencies')

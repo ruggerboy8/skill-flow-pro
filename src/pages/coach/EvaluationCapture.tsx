@@ -491,7 +491,11 @@ export default function EvaluationCapture() {
                           e.stopPropagation();
                           setOpenProMoves((prev) => {
                             const next = new Set(prev);
-                            next.has(comp.competencyId) ? next.delete(comp.competencyId) : next.add(comp.competencyId);
+                            if (next.has(comp.competencyId)) {
+                              next.delete(comp.competencyId);
+                            } else {
+                              next.add(comp.competencyId);
+                            }
                             return next;
                           });
                         }}

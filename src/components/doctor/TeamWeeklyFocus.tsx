@@ -53,7 +53,7 @@ function useAllRoleAssignments(orgId: string | undefined) {
       if (!orgId) return result;
 
       // 1. Get locked org-scoped assignments for all 3 roles, exclude self_select
-      let q = supabase
+      const q = supabase
         .from('weekly_assignments')
         .select('id, action_id, display_order, role_id, self_select')
         .in('role_id', [1, 2, 3])

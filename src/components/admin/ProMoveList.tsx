@@ -172,7 +172,7 @@ export function ProMoveList({
         }
       ]));
 
-      let formattedData = data?.map(item => ({
+      const formattedData = data?.map(item => ({
         action_id: item.action_id,
         action_statement: item.action_statement,
         description: item.description,

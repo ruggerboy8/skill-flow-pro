@@ -128,7 +128,7 @@ export function AdminUsersTab() {
   const loadRolesAndLocations = async () => {
     try {
       // Build scoped queries when the caller is an org admin (not platform admin)
-      let locQuery = supabase
+      const locQuery = supabase
         .from("locations")
         .select("id, name, group_id, practice_group:practice_groups!locations_org_fkey(name, organization_id)")
         .eq("active", true)

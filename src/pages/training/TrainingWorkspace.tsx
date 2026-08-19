@@ -316,7 +316,11 @@ function AddIssueDialog({ open, onOpenChange, locations, onSave }: { open: boole
   const [locs, setLocs] = useState<Set<string>>(new Set());
   const [srcs, setSrcs] = useState<Set<SourceType>>(new Set());
   useEffect(() => { if (open) { setTitle(''); setDetail(''); setIsGlobal(false); setLocs(new Set()); setSrcs(new Set()); } }, [open]);
-  const toggle = <T,>(set: Set<T>, v: T, upd: (s: Set<T>) => void) => { const n = new Set(set); n.has(v) ? n.delete(v) : n.add(v); upd(n); };
+  const toggle = <T,>(set: Set<T>, v: T, upd: (s: Set<T>) => void) => {
+    const n = new Set(set);
+    if (n.has(v)) { n.delete(v); } else { n.add(v); }
+    upd(n);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -480,7 +484,7 @@ function IngestDialog({ open, onOpenChange, locations, onAdd, onDone }: {
                     <div className="mt-2 flex flex-wrap gap-1">
                       <button onClick={() => { c.isGlobal = !c.isGlobal; bump(); }} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${c.isGlobal ? 'border-transparent bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>Global</button>
                       {!c.isGlobal && locations.map((l) => (
-                        <button key={l.id} onClick={() => { c.locationIds.has(l.id) ? c.locationIds.delete(l.id) : c.locationIds.add(l.id); bump(); }} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${c.locationIds.has(l.id) ? 'border-transparent bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{l.name}</button>
+                        <button key={l.id} onClick={() => { if (c.locationIds.has(l.id)) { c.locationIds.delete(l.id); } else { c.locationIds.add(l.id); } bump(); }} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${c.locationIds.has(l.id) ? 'border-transparent bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{l.name}</button>
                       ))}
                     </div>
                   </div>

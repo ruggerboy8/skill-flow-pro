@@ -1,5 +1,5 @@
 // Every word on screen, as data, never baked into art. Mirrors
-// docs/features/the-alcan-way-copy.md (the human source of truth). Alcan voice,
+// docs/archive/features/the-alcan-way-copy.md (the human source of truth). Alcan voice,
 // no em dashes. Keys are referenced from scenes.ts.
 
 export const COPY: Record<string, string> = {

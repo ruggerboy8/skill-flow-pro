@@ -217,7 +217,7 @@ all eight `dangerouslySetInnerHTML` uses in feature code wrap
 the June audit's worst findings are genuinely fixed and live.
 
 **Why the existing security audit missed all of this.**
-`docs/audits/security-rls-audit.md` reviewed only migrations, RLS policies and
+`docs/archive/audits/security-rls-audit.md` reviewed only migrations, RLS policies and
 edge functions. Views, RLS-disabled tables and SECURITY DEFINER grants were never
 in its shape, so **its own regression script would pass cleanly today while
 anonymous callers read every tenant's data.** The lesson worth keeping: RLS is
@@ -249,7 +249,7 @@ January, then silently reverted three times by later migrations that rebuilt tho
 views, most recently on the same day as the isolation audit itself. Any fix here
 needs a guard, or it will come undone a fourth time.
 
-**On `docs/multi-tenant-isolation-audit.md`:** six of its ten remediations are
+**On `docs/archive/audits/multi-tenant-isolation-audit.md`:** six of its ten remediations are
 still live and correct. It is stale in that it audited only tables and edge
 functions, its own remediation wave reintroduced a hole, its `admin-users` entry
 is too narrow, and its "masquerade hardening" argument is defeated by SEC-3.
@@ -407,7 +407,7 @@ documentation in this repo? **Today, no.**
 | `roadmap.md` claims to be updated every session, 5+ months stale | high | yes | DOC-3 |
 | `architecture.md` stale banner undersells how wrong it is | high | yes | DOC-3 |
 | `kit-log.md` specified by the kit instructions but never created | medium | no | (fixed in this PR) |
-| `docs/audits/` mixes trustworthy and stale docs with no consistent banners | medium | yes | DOC-3 |
+| `docs/archive/audits/` mixes trustworthy and stale docs with no consistent banners | medium | yes | DOC-3 |
 | `.env` committed and not gitignored | low | yes | DOC-1 |
 | `the-alcan-way/` dormant, no deploy path, unreferenced from the app | medium | no | CLN-5 |
 | Key-person risk concentrated in CLAUDE.md | high | yes | DOC-1, DOC-3 |
@@ -522,7 +522,7 @@ updaterUserId at `:229`), `supabase/functions/polish-note/index.ts`,
 `:624`, `:1023`, `:1097`; missing from `:533`, `:970`, `:992`, `:1181`. Gate `:68-80`.
 PII logging `:41`, `:54`, `:110`, `:1017`, `:1197`.
 
-**SEC-7** `docs/audits/security-rls-audit.md:142`; commits `8ef83ac0`, `f8d25bdd`,
+**SEC-7** `docs/archive/audits/security-rls-audit.md:142`; commits `8ef83ac0`, `f8d25bdd`,
 `d86d4934`, `1d67e693`, `b130d7c5`.
 
 **COR-1** `src/hooks/useWeeklyAssignments.tsx:75`, `WeekBuilderPanel.tsx`,
@@ -585,9 +585,9 @@ more. Monday implementations: `src/lib/submissionPolicy.ts:109` (canonical),
 **DSN-4** `src/components/ui/StatusBadge.tsx` and the hand-rolled versions listed in DSN-3.
 
 **DOC-1** `README.md`, `.env`, `.gitignore`.
-**DOC-2** `docs/architecture.md:25-26` vs CLAUDE.md "Applying migrations".
-**DOC-3** `docs/roadmap.md`, `docs/architecture.md:138`, `docs/data-model.md`,
-`docs/glossary.md`, `docs/audits/*`, `docs/enterprise-blockers.md`, `docs/phase2-qa.md`.
+**DOC-2** `docs/archive/architecture.md:25-26` vs CLAUDE.md "Applying migrations".
+**DOC-3** `docs/archive/roadmap.md`, `docs/archive/architecture.md:138`, `docs/archive/data-model.md`,
+`docs/archive/glossary.md`, `docs/archive/audits/*`, `docs/archive/enterprise-blockers.md`, `docs/archive/phase2-qa.md`.
 
 **CLN-1** `src/pages/admin/EvalResults.tsx`, `src/components/admin/eval-results/*`,
 `src/index.backup.css`, `src/components/ui/button.backup.tsx`, `card.backup.tsx`,

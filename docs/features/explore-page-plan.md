@@ -1,7 +1,7 @@
 # The Explore Page (plan)
 
 **Status:** v1, 2026-08-13. Direction set by John after reviewing the
-three exploration concepts (`docs/prototypes/my-role-exploration-concepts.html`).
+three exploration concepts (`docs/archive/prototypes/my-role-exploration-concepts.html`).
 Companions: `mobile-design-principles.md` (addenda), `mobile-build-plan.md`,
 `the-alcan-way-beat-map.md` (journey content source of truth).
 
@@ -31,7 +31,7 @@ placeholder relationship for later:
    `the-alcan-way/` prototype (scroll-driven, pixel-art, GSAP/Lenis,
    M1+M2 built) was designed for a desktop browser scroll; the mobile
    expression is probably **swipe-through**, and is being concepted by a
-   design agent now (`docs/prototypes/alcan-way-explore-concepts.html`
+   design agent now (`docs/archive/prototypes/alcan-way-explore-concepts.html`
    when it lands).
 3. **Ask (later).** The Shelves concept is banked, not discarded: its
    search-first, curated-rows thinking maps to the future Ask surface

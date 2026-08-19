@@ -74,5 +74,5 @@ the same save path the capture flow already uses.
 
 ## Docs the builder must read
 
-`docs/features/evaluation-*.md`, the hollow-evals guard note (memory), CLAUDE.md
+`docs/archive/features/evaluation-*.md`, the hollow-evals guard note (memory), CLAUDE.md
 design conventions.

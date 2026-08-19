@@ -2,7 +2,7 @@
 // given location and moment in time, "what week and cycle is it right now?"
 //
 // Some vocabulary, for anyone reading this without the Supabase/date-fns
-// context (see docs/glossary.md for the full definitions):
+// context (see docs/archive/glossary.md for the full definitions):
 //   - A "cycle" is a block of weeks (this location uses 6-week cycles).
 //   - "Week in cycle" is the position within that block: 1 through 6, then
 //     it wraps back to 1 for the next cycle.

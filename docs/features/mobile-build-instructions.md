@@ -5,7 +5,7 @@ mobile shell work. It is written to be executed by a coding agent with no
 access to the design conversation. Companions: `mobile-build-plan.md`
 (phasing), `mobile-design-principles.md` (rationale + 5 addenda of
 decisions), `pwa-push-notifications.md` (the already-built PWA layer),
-and the agreed prototype `docs/prototypes/mobile-shell-prototype.html`
+and the agreed prototype `docs/archive/prototypes/mobile-shell-prototype.html`
 (open it in a browser; it is the visual spec).
 
 **Working method:** execute sections in the sequence at the bottom. Each

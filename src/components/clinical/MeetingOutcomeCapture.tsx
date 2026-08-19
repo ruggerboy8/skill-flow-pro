@@ -38,7 +38,8 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   const { data: myStaff } = useQuery({
     queryKey: ['staff-profile-for-ownership'],
     queryFn: async () => {
-      const { data } = await supabase.from('staff').select('id').eq('user_id', (await supabase.auth.getUser()).data.user?.id!).single();
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      const { data } = await supabase.from('staff').select('id').eq('user_id', userId as string).single();
       return data;
     },
   });

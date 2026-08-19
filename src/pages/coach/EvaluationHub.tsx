@@ -1642,7 +1642,7 @@ export function EvaluationHub() {
                   <div className="flex space-x-2 flex-wrap gap-y-2">
                     {/* N/A Button */}
                     <button
-                      onClick={(e) => { e.stopPropagation(); !isReadOnly && handleObserverNAChange(item.competency_id, !item.observer_is_na); }}
+                      onClick={(e) => { e.stopPropagation(); if (!isReadOnly) handleObserverNAChange(item.competency_id, !item.observer_is_na); }}
                       disabled={isReadOnly || saving}
                       className={cn(
                         "px-3 py-2 rounded-md text-sm font-medium border transition-colors",
@@ -1657,7 +1657,7 @@ export function EvaluationHub() {
                     {SCORE_OPTIONS.map((option) => (
                       <button
                         key={option.value}
-                        onClick={(e) => { e.stopPropagation(); !isReadOnly && handleObserverScoreChange(item.competency_id, option.value); }}
+                        onClick={(e) => { e.stopPropagation(); if (!isReadOnly) handleObserverScoreChange(item.competency_id, option.value); }}
                         disabled={isReadOnly || saving}
                         className={cn(
                           "px-3 py-2 rounded-md text-sm font-medium border transition-colors",

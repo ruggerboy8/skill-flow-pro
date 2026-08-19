@@ -65,17 +65,18 @@ warm-up rep for the merge-then-Publish rhythm.
 
 ## Phase 2: the Motion board
 
-**Already created (2026-08-18):** Motion workspace **RGC**
-(`ZZsR0WU1WQ9PtV1hODNL4`), project **"Skill Flow Pro: Dev Board"**
+**Already created (2026-08-18):** Motion workspace **Coding Projects**
+(`ZZsR0WU1WQ9PtV1hODNL4`), project **"MyProMoves Dev Board"**
 (`pr_ByxCRJw1KBQLo81NmxJxV2`), seeded with four tickets (phases 1, 2+3,
-4, 5). RGC has only default statuses (Backlog / Todo / Completed /
+4, 5). The workspace has only default statuses (Backlog / Todo / Completed /
 Canceled), so **stage is tracked by label**. Gotcha learned: the Motion
 MCP fails task creation with unknown labels, so the labels must be
 created in the Motion app first (stage:backlog, stage:spec-approved,
 stage:building, stage:qa, stage:ready-to-review, stage:merged,
 stage:published; lane:tiny, lane:medium, lane:cross-cutting, lane:bug),
-then the seed tickets relabeled. Until then, stage lives on a
-`Stage:` line in each description.
+then the seed tickets relabeled. **Done and verified 2026-08-18:** all
+eleven labels exist and the MCP sets them on update, so stage is tracked
+by label. The `Stage:` line in descriptions is now redundant.
 
 Create (via the Motion MCP) a project for this repo's dev work. Statuses
 should map to the pipeline: **Backlog → Spec Approved → Building → QA →

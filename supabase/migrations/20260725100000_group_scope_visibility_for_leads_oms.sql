@@ -1,5 +1,5 @@
 -- Leads & OMs see their PRACTICE GROUP's participants, not the whole org.
--- Simplification roadmap 1.6 (docs/simplification-roadmap.md), owner decision 2026-07-25:
+-- Simplification roadmap 1.6 (docs/archive/simplification-roadmap.md), owner decision 2026-07-25:
 -- "a Sprout Lead RDA sees all Sprout participants" (roaming-staff friendly).
 --
 -- Two parts, both idempotent:

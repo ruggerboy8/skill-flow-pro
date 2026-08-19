@@ -30,7 +30,7 @@ Nine passes, each a separate reviewer with its own brief:
    repo and in client code.
 2. **Multi-tenant isolation** - whether the Organization to Group to Location to
    Staff scoping actually holds in queries and policies. Refreshes
-   `docs/multi-tenant-isolation-audit.md`, which predates recent work.
+   `docs/archive/audits/multi-tenant-isolation-audit.md`, which predates recent work.
 3. **Data model and migrations** - drift between the live schema and what the
    code expects, destructive patterns, and whether the framework-history and
    DDL-lags-deploy rules are being honored. **Bounded approach:** the live schema
@@ -56,7 +56,7 @@ Nine passes, each a separate reviewer with its own brief:
    compatibility across the dependency tree. This is the pass with the highest
    due-diligence weight relative to its cost.
 9. **Documentation, operability, and `the-alcan-way/`** - which docs are stale
-   (CLAUDE.md already flags `docs/audits/` and `docs/architecture.md`), whether a
+   (CLAUDE.md already flags `docs/archive/audits/` and `docs/archive/architecture.md`), whether a
    new engineer could set up and run this project from the docs alone, and a
    review of the standalone `the-alcan-way/` sub-project.
 
@@ -163,7 +163,7 @@ Not applicable. This produces no user-facing change and touches no runtime code.
   the live schema; they never write to it.
 - Editing CLAUDE.md, which the guard hook blocks by design.
 - Line-by-line review of all 606 migration files. See pass 3.
-- Re-litigating decisions already locked in `docs/simplification-roadmap.md`.
+- Re-litigating decisions already locked in `docs/archive/simplification-roadmap.md`.
 
 ## DB impact
 
@@ -176,15 +176,15 @@ Pulled from `.claude/skills/_shared/doc-routing.md`, routed per pass:
 | Pass | Docs |
 |------|------|
 | All passes | `docs/system-overview.md`, CLAUDE.md conventions, no em dashes |
-| 1 Security | `docs/audits/security-rls-audit.md`, `supabase/config.toml` |
-| 2 Isolation | `docs/enterprise-architecture.md`, `docs/multi-tenant-isolation-audit.md` |
-| 3 Data model | `docs/data-model.md`, CLAUDE.md "Framework content is versioned" and "Applying migrations", DB-DDL-lags-deploy memory |
-| 4 Tests | `docs/glossary.md`, `docs/features/evaluation-*.md`, hollow-evals guard |
-| 5 Dead code | `docs/improvement-backlog.md`, `docs/audits/code-quality-audit.md` |
-| 6 Design system | CLAUDE.md design system conventions, `docs/features/mobile-design-principles.md`, `docs/audits/ux-accessibility-audit.md` |
-| 7 Performance | `docs/data-model.md`, `docs/architecture.md` |
+| 1 Security | `docs/archive/audits/security-rls-audit.md`, `supabase/config.toml` |
+| 2 Isolation | `docs/enterprise-architecture.md`, `docs/archive/audits/multi-tenant-isolation-audit.md` |
+| 3 Data model | `docs/archive/data-model.md`, CLAUDE.md "Framework content is versioned" and "Applying migrations", DB-DDL-lags-deploy memory |
+| 4 Tests | `docs/archive/glossary.md`, `docs/archive/features/evaluation-*.md`, hollow-evals guard |
+| 5 Dead code | `docs/archive/improvement-backlog.md`, `docs/archive/audits/code-quality-audit.md` |
+| 6 Design system | CLAUDE.md design system conventions, `docs/features/mobile-design-principles.md`, `docs/archive/audits/ux-accessibility-audit.md` |
+| 7 Performance | `docs/archive/data-model.md`, `docs/archive/architecture.md` |
 | 8 Dependencies | `package.json`, lockfile |
-| 9 Docs | `docs/architecture.md`, `docs/audits/`, `docs/roadmap.md`, `the-alcan-way/` |
+| 9 Docs | `docs/archive/architecture.md`, `docs/archive/audits/`, `docs/archive/roadmap.md`, `the-alcan-way/` |
 
 ## Ticket breakdown
 

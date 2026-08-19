@@ -10,7 +10,7 @@ applies unchanged**: gating via `useMobileShell()`, the do-not-touch list,
 no new DB objects, verbatim copy, 44px targets, press feedback, lucide
 icons only, design tokens only.
 
-**Visual spec:** open `docs/prototypes/my-role-exploration-concepts.html`
+**Visual spec:** open `docs/archive/prototypes/my-role-exploration-concepts.html`
 in a browser and study **Concept B, "The Craft Atlas"** (the middle
 section). That is the agreed design for this build: domain bands holding
 level-painted competency tiles, an area page pairing the coach's context
@@ -161,6 +161,6 @@ right by REUSING, not duplicating:
 One local commit per section (A through E), messages prefixed
 "Explore atlas: ". `npm run build` green after each. NEVER push; never
 run supabase commands or touch any database; touch nothing under
-docs/prototypes/. Final report: per-section commits, the acceptance
+docs/archive/prototypes/. Final report: per-section commits, the acceptance
 checklist with pass/fail/not-verifiable per item, any TODO(build-review)
 left, and any place the visual spec was ambiguous and what you chose.

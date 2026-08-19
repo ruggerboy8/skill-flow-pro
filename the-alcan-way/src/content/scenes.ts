@@ -2,7 +2,7 @@
 // (0..1). Each scene is a beat that lives in a room; the engine crossfades and
 // dollies between rooms. Characters are placed in viewport space (x = % across,
 // pose drives the placeholder). Overlay windows are GLOBAL progress and sit
-// inside their scene's window. Mirrors docs/features/the-alcan-way-copy.md and
+// inside their scene's window. Mirrors docs/archive/features/the-alcan-way-copy.md and
 // the v2 beat list in the-alcan-way-beat-map.md.
 
 import type { RoomId } from './stage'

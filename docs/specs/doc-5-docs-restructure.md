@@ -15,7 +15,7 @@ subagents that read a routed subset of docs to decide what to do.
 
 The reason this is not cosmetic: **docs are an input to agent behavior.** A wrong
 doc does not sit there harmlessly. It misroutes decisions. The clearest case found
-so far is `docs/progress.md`, which says "Read this at the start of every new
+so far is `docs/archive/progress.md`, which says "Read this at the start of every new
 session," is five months stale, and prescribes the retired Lovable workflow. It is
 a document that instructs an agent to trust it and then hands over an obsolete
 process.

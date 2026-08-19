@@ -1,0 +1,117 @@
+> **Archived 2026-08-19 (DOC-5).** This is a historical record, accurate about the past, and is not a description of how the system works today. Do not treat it as current. For the present state see docs/README.md.
+
+# Improvement Backlog & Cleanup Candidates
+
+*A living doc for known weirdness, simplification opportunities, and legacy cleanup — separate
+from the formal [roadmap.md](roadmap.md) work queue. Things land here first as candidates, get
+discussed, then graduate to the roadmap when we decide to act. Started 2026-06-22.*
+
+**Status legend:** 🟡 candidate (not yet decided) · 🟢 agreed, queued · 🔵 in progress · ✅ done
+
+> **Current focus (2026-06-22):** building **NF4 — facilitator presentation** (#1, target: usable
+> by Ariana this week) then **NF6 — HR offboarding export** (#2). Specs in
+> [docs/features/](features/). The **evaluation rework** (see
+> [audits/evaluation-flow-analysis.md](audits/evaluation-flow-analysis.md) + EX1–EX4) is **parked
+> next** — do not resurface until the two features above are done.
+
+---
+
+## A. Legacy retirement candidates
+
+These are connected remnants of the old **fixed 18-week onboarding curriculum**, from when staff
+joined in cohorts and progressed in lockstep. Today staff just join and do the currently-assigned
+Pro Moves, so this whole cluster is conceptually obsolete. Removal is intertwined, so treat them
+together and proceed carefully — some are still load-bearing in code.
+
+| # | Item | Notes | Status |
+|---|---|---|---|
+| A1 | **Cycle / week-in-cycle concept** | ✅ **RETIRED 2026-07-24** (roadmap 2.4 slices A-D). The cycle-referencing RPCs are dropped or rewritten; `weekly_scores.site_action_id` backfilled for all eras makes history self-describing. Residual cycle math in `locationState` week labels only. | ✅ |
+| A2 | **`weekly_focus` table** | ✅ **ARCHIVED 2026-07-24** as `zzz_archived_weekly_focus` (rename-in-place; `weekly_plan` and `site_cycle_state` likewise). All readers removed or rewritten first. | ✅ |
+| A3 | **Rollover** | ✅ **RETIRED 2026-07-24.** `v2/rollover.ts` deleted, ThisWeekPanel call removed, `sequencer-rollover` edge function deleted from prod. | ✅ |
+| A4 | **Self-select** | ✅ **REMOVED 2026-07-24.** Tables dropped (`weekly_self_select`, backlog v1+v2), code paths stripped. Decision recorded: staff never self-select. | ✅ |
+
+## B. Model simplification
+
+| # | Item | Notes | Status |
+|---|---|---|---|
+| B1 | **Consolidate "Coach" into the capability model** | With flexible capability toggles, "coach" as a distinct role/permission may be redundant — a coach is really "has scope over staff + can review submissions/evals." Evaluate removing the dedicated role/flag. Keep **Office Manager** (participant + location visibility), **Regional**, **Doctor**, **Clinical Director**, **Org/Super Admin** as-is. | 🟡 |
+| B2 | **Retire the dual permission systems** | Old `is_*` flags on `staff` (what `useUserRole` reads today) vs. the newer `user_capabilities` table. Pick one source of truth and migrate. High-value, touches auth everywhere. | 🟡 |
+
+## C. Multi-tenancy: Alcan-specific features
+
+As we move from "Alcan's internal tool" to multi-tenant SaaS, some features are **Alcan-only** and
+should be gated or removed so they don't confuse other organizations. We need a clean, reusable way
+to mark a feature as org-scoped (feature flag per org, or capability, etc.).
+
+| # | Item | Notes | Status |
+|---|---|---|---|
+| C1 | ~~**Coach baseline assessments**~~ **RESOLVED 2026-07-24: not a removal candidate.** `coach_baseline_assessments` turned out to be the doctor track's observed baseline (clinical director assesses a doctor), actively used by Dr. Alex and Dr. Casey. It stays. See [utilization-snapshot-2026-07-24.md](utilization-snapshot-2026-07-24.md) §5. | ✅ |
+| C2 | **General mechanism for Alcan-only / org-specific features** | Decide the pattern (per-org feature flags?) before we accumulate more one-offs. | 🟡 |
+
+## D. Role display names (multi-tenant)
+
+| # | Item | Notes | Status |
+|---|---|---|---|
+| D1 | **Per-org role labels everywhere** | Canonical roles (DFI, RDA = "dental assistant", Office Manager) with org-specific display overrides (UK → "Dental Nurse"). Ensure every surface resolves the org label via `resolve_role_display_name()` rather than raw `roles.role_name`. | 🟡 |
+
+## E. Known-buggy / to-build features
+
+| # | Item | Notes | Status |
+|---|---|---|---|
+| E1 | **Evaluations** | Coach does eval items + audio recording + reporting; org admins run the release flow. Known to have bugs. A feature John + Claude plan to work on together. | 🟡 |
+| E2 | **Timezone hard-coding** | `lib/centralTime.ts` defaults to `America/Chicago`. Blocker for UK launch; location-level timezone should replace it. (Also in roadmap TIER 1.) | 🟡 |
+
+## F. John's brain dump — known weirdness & opportunities
+
+*From John, 2026-06-22. Split into improvements to existing features vs. net-new features. Not
+exhaustive; cross-referenced to audit findings and other backlog items where they overlap.*
+
+### F.1 — Existing features to improve
+
+| # | Area | What's wrong / desired | Status |
+|---|---|---|---|
+| EX1 | **Evaluation feedback capture** | Flow is clunky; hard for evaluators to know how to give feedback. Too much cognitive load tracking *which competency* they're addressing (the competency-vs-Pro-Move mental model is the friction). **Ideal:** evaluator records ONE long free-form brain-dump of observations; the system auto-slots it into the right competency/Pro Move, prioritizing places where they flag specific Pro Moves to work on. (Ties to E1, NF2-AI.) | 🟡 |
+| EX2 | **Evaluation audio recording** | The current recording implementation is very clunky / not smooth. | 🟡 |
+| EX3 | **Evaluations "Delivery" / release tab** | Built so central office controls *when* a staff member receives an eval, separate from coach submission. Visually poorly composed; the coach-submit → admin-release flow has awkwardness. Likely needs a clearer internal policy for how release works. (Ties to RLS eval-visibility fix.) | 🟡 |
+| EX4 | **Feedback delivery to staff** | What the staff member receives isn't automatically joyful / positive / complete. Want to dial in both how we solicit feedback from coaches and how we translate it into something good for the user. | 🟡 |
+| EX5 | **Clinical tab — coaching session setup** | Clinical director (Alex) about to use it regularly; built with an incomplete picture of how it'd work. Review and tighten. | 🟡 |
+| EX6 | **Learning-content management** | Needs improvement for the original Alcan content AND for the new org-tenant model — how learning content is owned/managed per organization. | 🟡 |
+| EX7 | **Org-level Pro Move editing** | The editing experience regressed when we limited orgs to visibility-only; the earlier editing experience was better. Revisit access/location/UX of editing Pro Moves at the org level. (Ties to data-model org override tables.) | 🟡 |
+| EX8 | **Coach dashboard size** | Getting large (unsure if a real problem). Staff-detail pages are good. Builder tab is now good (drag-drop + recommendations) — *no action needed.* | 🟡 |
+
+### F.2 — New features
+
+| # | Feature | Notes | Status |
+|---|---|---|---|
+| NF1 | **Automated reminders + org-admin notification settings** | Replace manual button-press reminders with a scheduled (cron) job. Give org admins control over how/when their people get notifications & email reminders. (Builds on `coach-remind` / `reminder_*` tables.) | 🟡 |
+| NF2 | **AI insights** | Leverage the growing data (some of this is already documented elsewhere). | 🟡 |
+| NF3 | **Staff free-response reflections** | Let staff record free-text reflections on Pro Moves or their general experience. Triangulate evaluations ↔ staff sentiment ↔ doctor coaching to generate far more insight. (Pairs with NF2.) | 🟡 |
+| NF4 | **Native meeting presentation / facilitation** | Move the Mon/Thu(or Fri) Pro Move meeting deck out of Canva into the app. Must: auto-generate a get-to-know-you question the presenter can click through until satisfied; show the week's Pro Moves for a selected position (RDA / DFI); be visually appealing for facilitation; pull up resources/scripting attached to those Pro Moves. **Scoped → [features/facilitator-presentation.md](features/facilitator-presentation.md).** | 🔵 |
+| NF5 | **Staff-facing patient-journey summary** | A scrollable summary of what the patient journey should entail; adopt "patient journey" language more broadly. John has a prototype from another Claude session to show. | 🟡 |
+| NF6 | **User status management / HR integration** | Use the Deputy integration to detect new staff & their positions and provision more automatically. On termination: when a fired user is deleted, roll up all their relevant data and send it to HR for retention *before* deletion. (Ties to GDPR erasure/retention — roadmap S1.) **Scoped → [features/hr-offboarding-export.md](features/hr-offboarding-export.md).** | 🔵 |
+
+## G. Navigation, information architecture & usability
+
+*Added 2026-07-20. The app grew feature-by-feature and fast; navigation that made
+sense at each step no longer coheres as a whole. This is its own workstream, not a
+guilt item. See also the management-model gap register (`docs/management-model.md`)
+where this sits next to "Ariyana's fragmented coaching surface" — same root cause,
+different corner of the app.*
+
+| # | Item | Notes | Status |
+|---|---|---|---|
+| G1 | **Usability & navigability audit** | Commission a structured audit of routing, navigation entry points, and page/tab structure. Find orphaned routes, buried-but-important surfaces, duplicated/overlapping pages, and flows that don't match how people actually work. Concrete tell: the Pro Move library (with its CSV download) lives behind the **Platform Console**, non-obvious even to John. **Audit → [audits/usability-navigation-audit.md](audits/usability-navigation-audit.md); sequenced plan → [navigation-remediation-plan.md](navigation-remediation-plan.md).** | 🔵 |
+| G2 | **Simplify the permission structure** | The newer **granular capability model** (`user_capabilities` + `coach_scopes`) is the better mental model and should become the single source of truth over the old role-based `is_*` flags. Consolidate. (Same target as B2/B1; G-framing is the usability angle: fewer concepts, clearer access.) | 🟡 |
+| G3 | **Things that just don't make sense as designed** | Catch-all the audit populates: surfaces/controls whose current design is confusing or vestigial, to be triaged into fixes. | 🔵 |
+
+---
+
+## Change management for active users
+
+The app has **active users right now.** Most changes should be designed to be self-explanatory and
+need no announcement. But when a change alters an existing workflow in a way users will notice, we
+should produce a short **"how it used to work → how it works now"** note for affected users.
+
+**Practice:** when we scope a change, explicitly decide *"does this need a user-facing change note?"*
+If yes, we draft it alongside the change. (We can keep such notes in a `docs/changes/` folder when
+the first one is needed.)

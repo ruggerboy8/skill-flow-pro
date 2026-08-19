@@ -2,7 +2,7 @@
 
 **Status:** v1, 2026-08-14. Concept document, agreed direction with John;
 this precedes any prototype. Supersedes the three earlier interaction
-concepts (`docs/prototypes/alcan-way-explore-concepts.html`), which are
+concepts (`docs/archive/prototypes/alcan-way-explore-concepts.html`), which are
 kept as reference; The Floor's station-link idea and The Table Read's
 say-it-aloud survive inside this frame. Content source of truth remains
 `the-alcan-way-beat-map.md`. Placement: the second pillar of the Explore

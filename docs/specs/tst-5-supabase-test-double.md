@@ -135,7 +135,7 @@ None. This ticket exists specifically to avoid needing a database.
 ## Docs the builder must read
 
 - `docs/system-overview.md` for the weekly loop `locationState.ts` implements
-- `docs/glossary.md` for cycle, week-in-cycle, check-in and check-out
+- `docs/archive/glossary.md` for cycle, week-in-cycle, check-in and check-out
 - `CLAUDE.md` design system and writing conventions, no em dashes
 - `.claude/skills/_shared/model-tiering.md` for which agent does what
 

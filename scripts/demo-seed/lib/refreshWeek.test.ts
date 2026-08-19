@@ -4,7 +4,13 @@
 // the same calendar-date helpers.
 
 import { describe, it, expect } from 'vitest';
-import { computeWeekShiftDays, shiftDateString, daysBetweenDateStrings, repointWeeks } from './refreshWeek';
+import {
+  computeWeekShiftDays,
+  shiftDateString,
+  daysBetweenDateStrings,
+  repointWeeks,
+  weekInCycle,
+} from './refreshWeek';
 
 const CHICAGO = 'America/Chicago';
 const LONDON = 'Europe/London';
@@ -115,5 +121,74 @@ describe('end-to-end: compute then repoint lands the "current" week exactly on t
       (_r, w) => ({ week_start_date: w }),
     );
     expect(shifted[0].week_start_date).toBe('2026-08-31');
+  });
+});
+
+describe('weekInCycle', () => {
+  it('week 1 of cycle 1 is the program start date itself', () => {
+    expect(weekInCycle('2026-01-05', '2026-01-05', 6)).toEqual({ cycle: 1, weekInCycle: 1 });
+  });
+
+  it('advances week-in-cycle within the first cycle', () => {
+    expect(weekInCycle('2026-01-05', '2026-01-12', 6)).toEqual({ cycle: 1, weekInCycle: 2 });
+    expect(weekInCycle('2026-01-05', '2026-02-02', 6)).toEqual({ cycle: 1, weekInCycle: 5 });
+  });
+
+  it('rolls into cycle 2 at week-in-cycle 1 after cycleLengthWeeks weeks', () => {
+    expect(weekInCycle('2026-01-05', '2026-02-16', 6)).toEqual({ cycle: 2, weekInCycle: 1 });
+  });
+
+  it('matches the mid-program anchor the seed script uses (15 weeks elapsed, 6-week cycles = cycle 3, week 4)', () => {
+    const programStart = '2026-01-05';
+    const currentWeek = shiftDateString(programStart, 15 * 7);
+    expect(weekInCycle(programStart, currentWeek, 6)).toEqual({ cycle: 3, weekInCycle: 4 });
+  });
+});
+
+describe('--refresh preserves cycle position (Issue 3): shifting week_start_date and ' +
+  'program_start_date by the same amount leaves weekInCycle unchanged', () => {
+  const programStart = '2026-01-05';
+  const cycleLengthWeeks = 6;
+
+  it('is invariant for a variety of shifts, including shifts that are not whole cycles', () => {
+    const currentWeek = shiftDateString(programStart, 15 * 7); // cycle 3, week 4
+    const before = weekInCycle(programStart, currentWeek, cycleLengthWeeks);
+
+    for (const shiftWeeks of [1, 2, 3, 4, 5, 6, 7, 13, 26, 52]) {
+      const shiftDays = shiftWeeks * 7;
+      const shiftedProgramStart = shiftDateString(programStart, shiftDays);
+      const shiftedCurrentWeek = shiftDateString(currentWeek, shiftDays);
+      const after = weekInCycle(shiftedProgramStart, shiftedCurrentWeek, cycleLengthWeeks);
+      expect(after).toEqual(before);
+    }
+  });
+
+  it('demonstrates the Issue 3 bug: shifting week_start_date without also shifting program_start_date breaks cycle position', () => {
+    // This is the Issue 3 regression: --refresh used to shift week_start_date
+    // but never program_start_date. Demonstrating the drift here documents
+    // why shifting both together (tested above) is required.
+    const currentWeek = shiftDateString(programStart, 15 * 7); // cycle 3, week 4
+    const before = weekInCycle(programStart, currentWeek, cycleLengthWeeks);
+
+    const shiftDays = 7 * 7; // 7 weeks forward
+    const shiftedCurrentWeekOnly = shiftDateString(currentWeek, shiftDays);
+    const afterBuggyRefresh = weekInCycle(programStart, shiftedCurrentWeekOnly, cycleLengthWeeks);
+
+    expect(afterBuggyRefresh).not.toEqual(before);
+  });
+
+  it('a realistic multi-refresh scenario (several weeks apart) keeps landing at the same week-in-cycle', () => {
+    const currentWeek = shiftDateString(programStart, 15 * 7);
+    const before = weekInCycle(programStart, currentWeek, cycleLengthWeeks);
+
+    // Simulate three separate --refresh runs, each some weeks after the last.
+    let runningProgramStart = programStart;
+    let runningCurrentWeek = currentWeek;
+    for (const gapWeeks of [3, 9, 1]) {
+      const shiftDays = gapWeeks * 7;
+      runningProgramStart = shiftDateString(runningProgramStart, shiftDays);
+      runningCurrentWeek = shiftDateString(runningCurrentWeek, shiftDays);
+      expect(weekInCycle(runningProgramStart, runningCurrentWeek, cycleLengthWeeks)).toEqual(before);
+    }
   });
 });

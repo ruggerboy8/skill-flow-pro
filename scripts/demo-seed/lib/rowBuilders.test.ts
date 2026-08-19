@@ -15,7 +15,6 @@ describe('buildDemoAssignmentDraft', () => {
     display_order: 1,
     action_id: 501,
     competency_id: 12,
-    status: 'locked',
     self_select: false,
   };
 
@@ -32,6 +31,25 @@ describe('buildDemoAssignmentDraft', () => {
   it('always stamps source as demo-seed, regardless of the original source value', () => {
     const draft = buildDemoAssignmentDraft(source, 'org-bluebird', 'loc-bluebird-1');
     expect(draft.source).toBe('demo-seed');
+  });
+
+  it('always forces status to locked, since SourceAssignmentRow does not even carry a status field', () => {
+    // The type itself proves the point: buildDemoAssignmentDraft has no
+    // source status to read from, so there is no way for a draft/other
+    // status to leak through. This is the fix for the bug where a copied
+    // 'draft' row was invisible to every app read path (they all filter
+    // on status = 'locked': locationState.ts, useWeeklyAssignments,
+    // ConfidenceWizard, PerformanceWizard, MonthView,
+    // GlobalAssignmentBuilder, TeamWeeklyFocus).
+    const draft = buildDemoAssignmentDraft(source, 'org-bluebird', 'loc-bluebird-1');
+    expect(draft.status).toBe('locked');
+  });
+
+  it('forces status locked for every demo location the source row is replicated to', () => {
+    const a = buildDemoAssignmentDraft(source, 'org-bluebird', 'loc-1');
+    const b = buildDemoAssignmentDraft(source, 'org-bluebird', 'loc-2');
+    const c = buildDemoAssignmentDraft(source, 'org-bluebird', 'loc-3');
+    expect([a.status, b.status, c.status]).toEqual(['locked', 'locked', 'locked']);
   });
 
   it('produces one independent draft per demo location for the same source row', () => {

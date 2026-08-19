@@ -21,7 +21,6 @@ export interface SourceAssignmentRow {
   display_order: number;
   action_id: number | null;
   competency_id: number | null;
-  status: string;
   self_select: boolean;
 }
 
@@ -49,6 +48,21 @@ export interface DemoAssignmentDraft {
  * `source` is always overwritten to `'demo-seed'` regardless of what the
  * original row said (e.g. `'sequencer'`, `'onboarding'`), so demo rows are
  * always identifiable as seed-authored if inspected directly.
+ *
+ * `status` is always forced to `'locked'`, regardless of what the source
+ * row's status was. Decision (QA-flagged, DEMO-1a follow-up): every read
+ * path in the app filters `weekly_assignments` on `status = 'locked'`
+ * (src/lib/locationState.ts, useWeeklyAssignments, ConfidenceWizard,
+ * PerformanceWizard, MonthView, GlobalAssignmentBuilder, TeamWeeklyFocus --
+ * all of them). A copied row sitting at `'draft'` or any other source
+ * status would exist in the table but be invisible everywhere in the app,
+ * which defeats the point of copying "weeks of history" for Clip 2/3 and
+ * silently breaks Clip 1's current-week guarantee. This is forced for ALL
+ * copied weeks, not just the current one: historical accuracy of a
+ * long-retired draft status has no value here, and a demo where only the
+ * current week renders but the history doesn't would look broken on
+ * camera. `status` is therefore not in WEEKLY_ASSIGNMENTS_COPY_ALLOWLIST --
+ * it is never read from the source row at all.
  */
 export function buildDemoAssignmentDraft(
   source: SourceAssignmentRow,
@@ -64,7 +78,7 @@ export function buildDemoAssignmentDraft(
     display_order: copied.display_order ?? source.display_order,
     action_id: copied.action_id ?? null,
     competency_id: copied.competency_id ?? null,
-    status: copied.status ?? 'locked',
+    status: 'locked',
     source: 'demo-seed',
     self_select: copied.self_select ?? false,
   };

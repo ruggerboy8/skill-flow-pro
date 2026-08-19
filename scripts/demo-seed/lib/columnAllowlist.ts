@@ -57,10 +57,13 @@ export const STAFF_FREE_TEXT_COLUMNS = [
 // ---------------------------------------------------------------------------
 
 /**
- * `source` is deliberately not in this list: the seed script always stamps
- * every copied row's `source` as `'demo-seed'` (see
- * lib/rowBuilders.ts#buildDemoAssignmentDraft), it never carries the
- * original value (e.g. `'sequencer'`, `'onboarding'`) through.
+ * `source` and `status` are deliberately not in this list. The seed script
+ * always stamps every copied row's `source` as `'demo-seed'` (never the
+ * original value, e.g. `'sequencer'`, `'onboarding'`) and always forces
+ * `status` to `'locked'` (never the original value, e.g. `'draft'`) --
+ * every app read path filters `weekly_assignments` on `status = 'locked'`,
+ * so a copied `'draft'` row would silently render as if it didn't exist.
+ * See lib/rowBuilders.ts#buildDemoAssignmentDraft.
  */
 export const WEEKLY_ASSIGNMENTS_COPY_ALLOWLIST = [
   'role_id',
@@ -68,7 +71,6 @@ export const WEEKLY_ASSIGNMENTS_COPY_ALLOWLIST = [
   'display_order',
   'action_id',
   'competency_id',
-  'status',
   'self_select',
 ] as const;
 

@@ -58,6 +58,38 @@ export interface WeekDated {
   weekStartDate: string;
 }
 
+export interface CyclePosition {
+  cycle: number;
+  weekInCycle: number;
+}
+
+/**
+ * The legacy cycle/week-in-cycle position for a given week, matching the
+ * integer-division formula already used in SQL elsewhere in this app (see
+ * migration 20251124234635, the weekly_focus cleanup):
+ *
+ *   cycle        = floor(weeksElapsed / cycleLengthWeeks) + 1
+ *   weekInCycle  = (weeksElapsed mod cycleLengthWeeks) + 1
+ *
+ * `programStartDate` and `weekStartDate` are both "yyyy-MM-dd" Mondays.
+ * Used only to prove --refresh preserves cycle position (see
+ * refreshWeek.test.ts) -- the cycle/week-in-cycle concept itself is legacy
+ * and mostly dormant (see docs/glossary.md), but `locations` still has
+ * NOT NULL `program_start_date` / `cycle_length_weeks` columns, and some
+ * legacy code still reads them, so drifting a demo location into "week 1"
+ * (which some legacy code treats as "just onboarded") is worth avoiding.
+ */
+export function weekInCycle(
+  programStartDate: string,
+  weekStartDate: string,
+  cycleLengthWeeks: number,
+): CyclePosition {
+  const weeksElapsed = daysBetweenDateStrings(programStartDate, weekStartDate) / 7;
+  const cycle = Math.floor(weeksElapsed / cycleLengthWeeks) + 1;
+  const weekInCycleIndex = ((weeksElapsed % cycleLengthWeeks) + cycleLengthWeeks) % cycleLengthWeeks;
+  return { cycle, weekInCycle: weekInCycleIndex + 1 };
+}
+
 /**
  * Applies `computeWeekShiftDays` to a whole batch of rows that each carry a
  * "yyyy-MM-dd" week field, via the caller-supplied accessor/setter so it

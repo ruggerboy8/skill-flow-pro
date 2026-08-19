@@ -28,6 +28,13 @@ Supabase CLI's local scratch folder, if it exists). The worktrees themselves
 are untouched, only excluded from linting. Other agents still use that
 directory normally.
 
+The same gap existed in `vitest.config.ts`. With no exclude list, vitest was
+also picking up test files inside `.claude/worktrees/`. On a machine with
+agent worktrees present the suite jumped from around 117 tests to 747.
+Added `exclude: ['**/node_modules/**', '**/dist/**', '**/.claude/**']` under
+`test` in `vitest.config.ts` so the same fix applies to test runs, not just
+lint runs.
+
 ### 2. Tuned which rules block a PR and which just warn
 
 The debt was concentrated in a few rules. Each one got a deliberate decision,

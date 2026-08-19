@@ -70,7 +70,7 @@ export function getRoleType(roleId: number | null | undefined): RoleType {
 }
 
 /**
- * Resolve RoleType from a role's archetype_code. This is the multi-tenant-safe
+ * Resolve RoleType from a role's archetype_code. This is the multi-org-safe
  * way — any role mapped to e.g. `dental_assistant` archetype gets the RDA
  * competency blueprint regardless of the underlying role_id.
  */

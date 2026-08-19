@@ -256,7 +256,7 @@ export default function CoachDashboardV2({
   }, [weekOfString]);
 
   // Unique filter options
-  const organizationOptions = useMemo(() => {
+  const groupOptions = useMemo(() => {
     const orgs = Array.from(new Set(summaries.map(s => s.group_name))).sort();
     return orgs.map(org => ({ value: org, label: org }));
   }, [summaries]);
@@ -540,7 +540,7 @@ export default function CoachDashboardV2({
             {!hideOrgLocationFilters && (
               <>
                 <MultiSelect
-                  options={organizationOptions}
+                  options={groupOptions}
                   selected={selectedOrganizations}
                   onChange={setSelectedOrganizations}
                   placeholder="All Groups"

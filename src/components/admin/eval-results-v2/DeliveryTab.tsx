@@ -66,7 +66,7 @@ export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
   const setOrgFilter = (v: string) => updateParam('org', v);
   const setStatusFilter = (v: string) => updateParam('status', v);
 
-  const organizations = useMemo(() => {
+  const groups = useMemo(() => {
     const orgMap = new Map<string, string>();
     locations.forEach(loc => orgMap.set(loc.organizationId, loc.organizationName));
     return Array.from(orgMap.entries()).sort((a, b) => a[1].localeCompare(b[1]));
@@ -134,7 +134,7 @@ export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Groups</SelectItem>
-            {organizations.map(([id, name]) => (
+            {groups.map(([id, name]) => (
               <SelectItem key={id} value={id}>{name}</SelectItem>
             ))}
           </SelectContent>

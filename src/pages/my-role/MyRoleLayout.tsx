@@ -35,7 +35,7 @@ export default function MyRoleLayout() {
     return null;
   }
 
-  // Determine role subtitle from archetype (multi-tenant safe).
+  // Determine role subtitle from archetype (multi-org safe).
   const archetype = (staffProfile as any)?.roles?.archetype_code as string | null | undefined;
   const roleLabel = (staffProfile as any)?.roles?.role_name as string | null | undefined;
   const roleSubtitle =

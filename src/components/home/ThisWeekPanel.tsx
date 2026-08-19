@@ -10,9 +10,7 @@ import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { CT_TZ } from '@/lib/centralTime';
 import { getWeekAnchors } from '@/v2/time';
-import { isV2 } from '@/lib/featureFlags';
 import { useNow } from '@/providers/NowProvider';
 import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
 import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
@@ -178,34 +176,18 @@ export default function ThisWeekPanel() {
       setLocationWeekContext({ ...locationTimeContext, cycleNumber, weekInCycle });
       
       // Calculate week of date using location timezone
-      if (isV2) {
-        const locationAnchors = await getWeekAnchors(effectiveNow, locationTimeContext.timezone);
-        const mondayStr = formatInTimeZone(locationAnchors.mondayZ, locationTimeContext.timezone, 'yyyy-MM-dd');
-        setWeekOfDate(formatInTimeZone(locationAnchors.mondayZ, locationTimeContext.timezone, 'MMM d, yyyy'));
-        
-        // Check if this week is exempt
-        const { data: excused } = await supabase
-          .from('excused_weeks')
-          .select('reason')
-          .eq('week_start_date', mondayStr)
-          .maybeSingle();
-        
-        setIsExempt(!!excused);
-      } else {
-        const { getWeekAnchors: v1GetWeekAnchors } = await import('@/lib/centralTime');
-        const { mondayZ } = v1GetWeekAnchors(effectiveNow, CT_TZ);
-        const mondayStr = formatInTimeZone(mondayZ, CT_TZ, 'yyyy-MM-dd');
-        setWeekOfDate(formatInTimeZone(mondayZ, CT_TZ, 'MMM d, yyyy'));
-        
-        // Check if this week is exempt
-        const { data: excused } = await supabase
-          .from('excused_weeks')
-          .select('reason')
-          .eq('week_start_date', mondayStr)
-          .maybeSingle();
-        
-        setIsExempt(!!excused);
-      }
+      const locationAnchors = await getWeekAnchors(effectiveNow, locationTimeContext.timezone);
+      const mondayStr = formatInTimeZone(locationAnchors.mondayZ, locationTimeContext.timezone, 'yyyy-MM-dd');
+      setWeekOfDate(formatInTimeZone(locationAnchors.mondayZ, locationTimeContext.timezone, 'MMM d, yyyy'));
+
+      // Check if this week is exempt
+      const { data: excused } = await supabase
+        .from('excused_weeks')
+        .select('reason')
+        .eq('week_start_date', mondayStr)
+        .maybeSingle();
+
+      setIsExempt(!!excused);
       
       // Compute current week state with simulation overrides (location-based unified)
       // Pass staff.id for masquerade support - avoids re-fetching by user_id

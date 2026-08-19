@@ -61,7 +61,7 @@ export function useEvalDeliveryProgress(
       if (!callerOrgId) return [];
 
       // Scope to the caller's organization. Super admins are also scoped to their
-      // own org here — cross-tenant viewing belongs in the Platform Console, not
+      // own org here — cross-organization viewing belongs in the Platform Console, not
       // the org-level Evaluation Delivery page.
       const { data: groups, error: groupsError } = await supabase
         .from('practice_groups')

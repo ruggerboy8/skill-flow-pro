@@ -168,7 +168,7 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
 
       // Always scope to the caller's current organization. For super admins this is
       // their home org unless they're masquerading — in which case callerOrgId
-      // reflects the impersonated org. This prevents cross-tenant bleed in the picker.
+      // reflects the impersonated org. This prevents cross-organization bleed in the picker.
       if (callerOrgId) {
         query = query.eq('organization_id', callerOrgId);
       } else if (!isSuperAdmin) {

@@ -1,21 +1,18 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  RECENCY_HORIZON,
+  classifyConfidence,
+  compareScoredMoves,
+  scoreCandidate,
+  scoreCandidateWithAdvancedState,
+  type ScoringInputs,
+} from '../_shared/sequencerScoring.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-// Collective Weakness constants
-const LOW_CUTOFF = 2; // 1-4 scale: ≤2 is "low confidence"
-const MIN_SAMPLES = 12; // Minimum staff-weeks to trust signals
-const BETA_PRIOR_A = 3; // Beta prior for low-rate EB
-const BETA_PRIOR_B = 3;
-
-// Recency constants
-const RECENCY_HORIZON = 16; // Fixed horizon
-const TRICKLE_LONG = 24; // Long-tail bonus threshold
-const TRICKLE_WEIGHT = 0.20; // Long-tail contribution weight
 
 interface RankRequest {
   roleId: 1 | 2;
@@ -86,10 +83,6 @@ serve(async (req) => {
         B: weights.B / sum,
       };
     }
-
-    // Primary reason thresholds
-    const LOW_CONF_THRESHOLD = 0.30;
-    const STALE_WEEKS = 6;
 
     const config = {
       weights,
@@ -218,27 +211,7 @@ serve(async (req) => {
 
     logs.push(`Found ${eligibleFinal.length} eligible moves`);
 
-    // Helper: classify confidence status
-    const classifyConfidence = (
-      confEB: number,
-      recent: { avg: number; n: number }[]
-    ): { status: 'critical'|'watch'|'ok'; severity?: number; n2w?: number; recentMeans?: number[] } => {
-      const lastTwo = recent.slice(-2);
-      const n2w = lastTwo.reduce((s,r)=>s+(r?.n||0), 0);
-      const recentMeans = lastTwo.map(r => r?.avg ?? 0);
-
-      const isCritical = confEB <= 0.20 && n2w >= 10;
-      if (isCritical) {
-        const severity = Math.max(0, Math.min(1, (0.25 - confEB) / 0.25));
-        return { status: 'critical', severity, n2w, recentMeans };
-      }
-
-      const anyVeryLow = lastTwo.some(r => (r?.avg ?? 1) <= 0.20 && (r?.n ?? 0) >= 5);
-      const isWatch = confEB <= 0.30 || anyVeryLow;
-      if (isWatch) return { status: 'watch', n2w, recentMeans };
-
-      return { status: 'ok', n2w, recentMeans };
-    };
+    // Helper: classify confidence status lives in ../_shared/sequencerScoring.ts
 
     // 2. Fetch confidence history (lookback weeks).
     // weekly_scores.site_action_id is now backfilled for ALL eras (2026-07-25
@@ -412,153 +385,23 @@ serve(async (req) => {
       logs.push(`Sample move for introspection: ${eligibleFinal[0].name} (id=${eligibleFinal[0].id})`);
     }
 
-    // Import and run engine (inline for now since we can't import from src/)
-    // We'll compute directly here
-    const inputs = {
-      eligibleMoves: eligibleFinal,
+    // Pure scoring inputs for the shared module (see ../_shared/sequencerScoring.ts).
+    // All the math lives there so it can be unit tested outside Deno.
+    const scoringInputs: ScoringInputs = {
       confidenceHistory,
+      individualLowCounts,
       evals,
       lastSelected,
       domainCoverage,
-      effectiveDate,
-      timezone,
-    };
-
-    // Score function
-    const scoreCandidate = (move: any, referenceDate: string) => {
-    // C (Collective Weakness) - combines tail pain + mean deficit
-    const confData = confidenceHistory.filter(h => h.proMoveId === move.id);
-    let smoothedConf = config.ebPrior;
-    let p_low = 0.5; // Default to neutral
-    let C = 0.5; // Default to neutral
-    let avgConfLast: number | null = null;
-    let lowConfShare: number | null = null;
-
-    if (confData.length > 0) {
-      // PHASE 1 FIX: Add safety guard for trimming to prevent NaN
-      const trimCount = Math.floor(confData.length * config.trimPct);
-      // Safety: ensure at least 1 element remains after trimming
-      const safeTrimCount = Math.min(trimCount, Math.floor((confData.length - 1) / 2));
-      const sorted = confData.map(d => d.avg).sort((a, b) => a - b);
-      const trimmed = sorted.slice(safeTrimCount, sorted.length - safeTrimCount);
-      
-      // Fallback if trimmed is empty (shouldn't happen with safeTrimCount, but guard anyway)
-      const sampleMean = trimmed.length > 0 
-        ? trimmed.reduce((sum, v) => sum + v, 0) / trimmed.length
-        : sorted.reduce((sum, v) => sum + v, 0) / sorted.length;
-      const totalN = confData.reduce((sum, d) => sum + d.n, 0);
-      
-      // EB smoothed mean
-      smoothedConf = (config.ebPrior * config.ebK + sampleMean * totalN) / (config.ebK + totalN);
-      
-      // Use full lookback window average for UI (convert 0-1 back to 1-4 scale)
-      avgConfLast = sampleMean * 3 + 1; // Convert 0-1 to 1-4 scale
-      
-      // Calculate low-tail rate using individual confidence scores
-      const individualCounts = individualLowCounts.get(move.id) || { lowCount: 0, totalCount: 0 };
-      
-      // Beta EB: (a + low_count) / (a + b + total_count)
-      p_low = (BETA_PRIOR_A + individualCounts.lowCount) / (BETA_PRIOR_A + BETA_PRIOR_B + individualCounts.totalCount);
-      lowConfShare = p_low; // Store for UI
-      
-      // Collective Weakness: 60% tail pain + 40% mean deficit
-      const mean_deficit = 1 - smoothedConf;
-      C = 0.6 * p_low + 0.4 * mean_deficit;
-      
-      // Sample-size adjustment: shrink toward neutral if n < MIN_SAMPLES
-      if (totalN < MIN_SAMPLES) {
-        const lambda = Math.max(0, Math.min(1, totalN / MIN_SAMPLES));
-        C = lambda * C + (1 - lambda) * 0.5;
-      }
-    }
-
-    // R (Recency) - Linear post-cooldown + long-trickle tail
-    const lastSeenRecord = lastSelected.find(ls => ls.proMoveId === move.id);
-    const weeksSince = lastSeenRecord
-      ? Math.floor((new Date(referenceDate).getTime() - new Date(lastSeenRecord.weekStart).getTime()) / (7 * 24 * 60 * 60 * 1000))
-      : 999;
-
-    const horizon = config.recencyHorizonWeeks === 0 ? 12 : config.recencyHorizonWeeks;
-    const cooldown = config.cooldownWeeks;
-
-    // Base recency (linear post-cooldown)
-    let R = weeksSince <= cooldown ? 0
-          : weeksSince >= horizon  ? 1
-          : (weeksSince - cooldown) / (horizon - cooldown);
-
-    // Long-trickle tail (ancient moves get a small bonus)
-    const R_long = Math.min(weeksSince / TRICKLE_LONG, 1) * TRICKLE_WEIGHT;
-    R = Math.min(R + R_long, 1); // Cap at 1
-
-    // PHASE 2: Retest logic removed - hardcode to disabled
-    const retestDue = false;
-
-      // E (Eval) - Deficit with capped contribution
-      const evalRecord = evals.find((e: { competencyId: number; score?: number }) => e.competencyId === move.competencyId);
-      const evalScore01 = evalRecord?.score; // 0..1 (1=good, undefined=no data)
-      const E_raw = evalScore01 == null ? 0 : Math.max(0, 1 - evalScore01); // deficit
-      const eContrib = Math.min(E_raw * weights.E, config.evalCap); // cap contribution
-
-      // D (Domain)
-      const domainRecord = domainCoverage.find(dc => dc.domainId === move.domainId);
-      const appearances = domainRecord ? domainRecord.appearances : 0;
-      const D = 1 - Math.min(appearances / 8, 1);
-
-    // T (Retest Boost) - PHASE 2: Hardcoded to 0 (logic removed)
-    const T = 0;
-
-    // Determine primary reason (server-side)
-    let primaryReasonCode: 'LOW_CONF' | 'RETEST' | 'NEVER' | 'STALE' | 'TIE' = 'TIE';
-    let primaryReasonValue: number | null = null;
-
-    // PHASE 2: Removed RETEST check since retestDue is always false
-    if (lowConfShare !== null && lowConfShare >= LOW_CONF_THRESHOLD) {
-      primaryReasonCode = 'LOW_CONF';
-      primaryReasonValue = lowConfShare;
-    } else if (weeksSince === 999) {
-      primaryReasonCode = 'NEVER';
-    } else if (weeksSince >= STALE_WEEKS) {
-      primaryReasonCode = 'STALE';
-      primaryReasonValue = weeksSince;
-    }
-
-      // B (Curriculum Priority) — tiebreaker from AI-generated importance score
-      const B = move.curriculumPriority != null ? Number(move.curriculumPriority) : 0.50;
-
-      const final = (C * weights.C) + (R * weights.R) + (D * weights.D) + eContrib + T + (B * weights.B);
-
-      const components = [
-        { key: 'C', value: C * weights.C },
-        { key: 'R', value: R * weights.R },
-        { key: 'E', value: eContrib },
-        { key: 'D', value: D * weights.D },
-        { key: 'T', value: T },
-        { key: 'B', value: B * weights.B },
-      ];
-      components.sort((a, b) => b.value - a.value);
-      const drivers = components.slice(0, 2).map(c => c.key);
-
-    return {
-      C, R, E: E_raw, D, B, eContrib, final, drivers, weeksSince, T,
-      lowConfShare, avgConfLast, retestDue,
-      primaryReasonCode, primaryReasonValue
-    };
+      weights,
+      config,
     };
 
     // Compute Next
-    const scored = eligibleFinal.map(move => ({ ...move, ...scoreCandidate(move, effectiveDate) }));
-    
+    const scored = eligibleFinal.map(move => ({ ...move, ...scoreCandidate(move, effectiveDate, scoringInputs) }));
+
     // Enhanced deterministic tie-breaks: finalScore → lowConfShare → lastPracticedWeeks desc → actionId asc
-    scored.sort((a, b) => {
-      // 1. Final score desc
-      if (Math.abs(b.final - a.final) >= 0.0001) return b.final - a.final;
-      // 2. Low confidence share desc (higher = more problematic)
-      if ((b.lowConfShare || 0) !== (a.lowConfShare || 0)) return (b.lowConfShare || 0) - (a.lowConfShare || 0);
-      // 3. Weeks since practiced desc (longer = higher priority)
-      if (a.weeksSince !== b.weeksSince) return b.weeksSince - a.weeksSince;
-      // 4. ID asc (deterministic)
-      return a.id - b.id;
-    });
+    scored.sort(compareScoredMoves);
 
     // Log sample breakdown
     if (scored.length > 0) {
@@ -617,35 +460,11 @@ serve(async (req) => {
       .concat(nextPicks.map(p => ({ proMoveId: p.id, weekStart: effectiveDate })));
 
     // Score all moves for preview
-    const scoreWithAdvanced = (move: any) => {
-      const advancedRecord = advancedLastSelected.find(ls => ls.proMoveId === move.id);
-      const weeksSince = advancedRecord
-        ? Math.floor((new Date(previewDateStr).getTime() - new Date(advancedRecord.weekStart).getTime()) / (7 * 24 * 60 * 60 * 1000))
-        : 999;
-
-      const base = scoreCandidate(move, previewDateStr);
-      
-      // Recalculate R with advanced state
-      const horizon = config.recencyHorizonWeeks === 0 ? 12 : config.recencyHorizonWeeks;
-      const cooldown = config.cooldownWeeks;
-      let R = weeksSince <= cooldown ? 0
-            : weeksSince >= horizon  ? 1
-            : (weeksSince - cooldown) / (horizon - cooldown);
-      const R_long = Math.min(weeksSince / TRICKLE_LONG, 1) * TRICKLE_WEIGHT;
-      R = Math.min(R + R_long, 1);
-
-      const final = (base.C * weights.C) + (R * weights.R) + (base.D * weights.D) + base.eContrib + base.T + (base.B * weights.B);
-
-      return { ...base, R, final, weeksSince };
-    };
-
-    const previewScored = eligibleFinal.map(move => ({ ...move, ...scoreWithAdvanced(move) }));
-    previewScored.sort((a, b) => {
-      if (Math.abs(b.final - a.final) >= 0.0001) return b.final - a.final;
-      if ((b.lowConfShare || 0) !== (a.lowConfShare || 0)) return (b.lowConfShare || 0) - (a.lowConfShare || 0);
-      if (a.weeksSince !== b.weeksSince) return b.weeksSince - a.weeksSince;
-      return a.id - b.id;
-    });
+    const previewScored = eligibleFinal.map(move => ({
+      ...move,
+      ...scoreCandidateWithAdvancedState(move, previewDateStr, advancedLastSelected, scoringInputs),
+    }));
+    previewScored.sort(compareScoredMoves);
 
     const previewEligible = previewScored.filter(m => m.weeksSince >= config.cooldownWeeks);
     const previewPicks = [];

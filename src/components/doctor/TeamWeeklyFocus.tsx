@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { LearnerLearnDrawer } from '@/components/learner/LearnerLearnDrawer';
 import { useUserRole } from '@/hooks/useUserRole';
+import { getChicagoMonday } from '@/lib/plannerUtils';
 
 const ROLES = [
   { id: 1, label: 'DFI' },
@@ -23,14 +24,12 @@ interface SimpleAssignment {
   display_order: number;
 }
 
+// Timezone-safe: was computing "this Monday" from the browser's local date
+// and then converting to UTC before taking the date portion, which shifts
+// the result a day early for anyone in a negative-UTC timezone (Central
+// time). Delegates to the canonical Monday resolver instead.
 function getThisMonday(): string {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() + diff);
-  monday.setHours(0, 0, 0, 0);
-  return monday.toISOString().split('T')[0];
+  return getChicagoMonday();
 }
 
 function WeekOfHeader() {

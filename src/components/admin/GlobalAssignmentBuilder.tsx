@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { useUserRole } from '@/hooks/useUserRole';
+import { getNextMondayChicago } from '@/lib/plannerUtils';
 import { SlotCanvas } from './SlotCanvas';
 
 interface Role {
@@ -55,14 +56,11 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
     }
   }, [selectedRole, weekStartDate]);
 
-  const getNextMonday = () => {
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    const daysToMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
-    const nextMon = new Date(now);
-    nextMon.setDate(now.getDate() + daysToMonday);
-    return nextMon.toISOString().split('T')[0];
-  };
+  // Timezone-safe: was computing "next Monday" from the browser's local
+  // date and then converting to UTC before taking the date portion, which
+  // shifts the result a day early for anyone in a negative-UTC timezone
+  // (Central time). Delegates to the canonical Monday resolver instead.
+  const getNextMonday = () => getNextMondayChicago();
 
   const loadRoles = async () => {
     const { data } = await supabase

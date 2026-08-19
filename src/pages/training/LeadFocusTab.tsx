@@ -11,22 +11,23 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { toast } from '@/hooks/use-toast';
 import { ChevronLeft, ChevronRight, LayoutList, CalendarDays, Sparkles, Loader2, Plus, X, Shield } from 'lucide-react';
+import { CT_TZ } from '@/lib/centralTime';
+import { addDaysToDateString, mondaysInMonth as mondaysInMonthTz } from '@/lib/dateUtils';
 
 // ── date helpers (local; Monday-keyed like the planner) ──────────────────────
+// `parse` is display-only (toLocaleDateString), so it's fine to read the
+// browser's own local calendar fields. `addDays`/`firstOfMonth`/
+// `mondaysInMonth` feed week/month keys back into state and queries, so they
+// go through the timezone-explicit helpers instead of a round trip through
+// toISOString(), which shifted results a day early for anyone in a
+// negative-UTC timezone (Central time).
 const parse = (s: string) => new Date(s + 'T12:00:00');
 const fmtShort = (s: string) => parse(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const fmtWeek = (s: string) => 'Week of ' + fmtShort(s);
 const fmtMonth = (s: string) => parse(s).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-const addDays = (s: string, n: number) => { const d = parse(s); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0]; };
-const firstOfMonth = (s: string) => { const d = parse(s); return new Date(d.getFullYear(), d.getMonth(), 1, 12).toISOString().split('T')[0]; };
-function mondaysInMonth(anchor: string): string[] {
-  const d = parse(anchor); const month = d.getMonth();
-  const cur = new Date(d.getFullYear(), month, 1, 12);
-  while (cur.getDay() !== 1) cur.setDate(cur.getDate() + 1);
-  const out: string[] = [];
-  while (cur.getMonth() === month) { out.push(cur.toISOString().split('T')[0]); cur.setDate(cur.getDate() + 7); }
-  return out;
-}
+const addDays = (s: string, n: number) => addDaysToDateString(s, n, CT_TZ);
+const firstOfMonth = (s: string) => `${s.slice(0, 7)}-01`;
+const mondaysInMonth = (anchor: string): string[] => mondaysInMonthTz(anchor, CT_TZ);
 
 interface BuilderItem { key: string; text: string; sourceId: string | null; sourceTitle: string | null; polishing?: boolean; aiPolished?: boolean }
 

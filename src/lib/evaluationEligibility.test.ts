@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   getPeriodStartDate,
   isEligibleByHireDate,
@@ -53,16 +53,48 @@ describe('isEligibleByHireDate', () => {
   });
 
   it('accepts an ISO string hire date and correctly classifies dates well clear of the boundary', () => {
-    // Deliberately a few days clear of April 1 on each side, not the exact
-    // boundary day: a date-only ISO string ("2026-04-01", which is what the
-    // `staff.hire_date` column actually returns) is parsed as UTC midnight,
-    // so on the exact boundary day the result can flip depending on the
-    // browser's local timezone offset. That is a pre-existing quirk in
-    // isEligibleByHireDate, not something this test suite fixes — flagged
-    // separately, not patched here. See the Date-object boundary tests
-    // above for the unambiguous day-before/day-of/day-after coverage.
     expect(isEligibleByHireDate('2026-03-25', q2_2026)).toBe(true);
     expect(isEligibleByHireDate('2026-04-08', q2_2026)).toBe(false);
+  });
+
+  describe('date-only string on the exact boundary (COR-1)', () => {
+    // `staff.hire_date` comes back from Postgres as a date-only string
+    // ("2026-04-01"). new Date("2026-04-01") parses that as UTC midnight,
+    // while periodStart is built with the local-time constructor, so on the
+    // exact boundary day the old code's answer flipped depending on the
+    // viewer's timezone offset from UTC. isEligibleByHireDate now parses
+    // date-only strings as a plain calendar date instead, so the result no
+    // longer depends on the viewer's timezone. These tests pin the correct
+    // answer and also prove it under two different viewer timezones.
+    const originalTz = process.env.TZ;
+
+    afterEach(() => {
+      if (originalTz === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = originalTz;
+      }
+    });
+
+    it('hired exactly on the period start date is NOT eligible, viewed from UTC-12', () => {
+      process.env.TZ = 'Etc/GMT+12'; // POSIX-style: this is UTC-12
+      expect(isEligibleByHireDate('2026-04-01', q2_2026)).toBe(false);
+    });
+
+    it('hired exactly on the period start date is NOT eligible, viewed from UTC+14', () => {
+      process.env.TZ = 'Pacific/Kiritimati'; // UTC+14
+      expect(isEligibleByHireDate('2026-04-01', q2_2026)).toBe(false);
+    });
+
+    it('hired the day before the boundary is eligible, viewed from UTC-12', () => {
+      process.env.TZ = 'Etc/GMT+12';
+      expect(isEligibleByHireDate('2026-03-31', q2_2026)).toBe(true);
+    });
+
+    it('hired the day before the boundary is eligible, viewed from UTC+14', () => {
+      process.env.TZ = 'Pacific/Kiritimati';
+      expect(isEligibleByHireDate('2026-03-31', q2_2026)).toBe(true);
+    });
   });
 });
 

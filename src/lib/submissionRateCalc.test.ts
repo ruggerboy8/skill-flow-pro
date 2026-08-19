@@ -1,3 +1,8 @@
+// The calculateCutoffDate suite below must pass under any host TZ (the
+// machine/CI runner running it), not just America/Chicago or UTC. CI runs
+// it under TZ=UTC, TZ=America/Chicago, TZ=Pacific/Kiritimati, and
+// TZ=America/Los_Angeles. See COR-1.
+
 import { describe, it, expect } from 'vitest';
 import { calculateSubmissionStats, calculateCutoffDate, type SubmissionWindow } from './submissionRateCalc';
 
@@ -102,5 +107,18 @@ describe('calculateCutoffDate', () => {
     expect(threeWeeks).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(sixWeeks).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(new Date(sixWeeks!).getTime()).toBeLessThan(new Date(threeWeeks!).getTime());
+  });
+
+  it('is timezone-safe: does not shift a day early for a negative-UTC viewer (COR-1)', () => {
+    // Midnight Central time, 6 hours ahead in UTC. toISOString().split('T')[0]
+    // on this instant would have read back the previous calendar day.
+    const now = new Date('2026-08-12T05:00:00Z'); // Wed Aug 12 00:00 CDT
+    expect(calculateCutoffDate('3weeks', now)).toBe('2026-07-22');
+    expect(calculateCutoffDate('6weeks', now)).toBe('2026-07-01');
+  });
+
+  it('is DST-safe across a spring-forward transition', () => {
+    const now = new Date('2026-03-15T12:00:00Z'); // after the Mar 8 transition
+    expect(calculateCutoffDate('3weeks', now)).toBe('2026-02-22');
   });
 });

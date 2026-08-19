@@ -135,7 +135,12 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
         slug: slug,
         group_id: formData.group_id === "none" ? null : (formData.group_id || null),
         timezone: formData.timezone,
-        program_start_date: formData.program_start_date.toISOString().split('T')[0],
+        // Timezone-safe: toISOString() converts the calendar-picker Date to
+        // UTC before taking the date portion, which can shift the selected
+        // day for anyone in a negative-UTC timezone (Central time). format()
+        // reads the Date's own local calendar fields instead, matching what
+        // the picker showed the admin.
+        program_start_date: format(formData.program_start_date, 'yyyy-MM-dd'),
         cycle_length_weeks: formData.cycle_length_weeks,
         active: true,
         onboarding_active: false,

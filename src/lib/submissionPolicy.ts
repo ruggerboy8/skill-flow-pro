@@ -11,8 +11,8 @@
  *  - There is no separate grace period.
  */
 
-import { addDays } from 'date-fns';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+import { addCalendarDays } from './calendarDate';
 
 // ---------------------------------------------------------------------------
 // Offset config — Phase 2: replace with DB-driven per-location values
@@ -106,21 +106,41 @@ export interface SubmissionPolicy {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function resolveMonday(now: Date, tz: string): Date {
+/**
+ * Canonical "what is the Monday of this week" resolver. Pure, with an
+ * injectable `now`/`tz`, so every other Monday calculation in the app
+ * should delegate to this one instead of reimplementing it.
+ *
+ * Returns the UTC instant for local midnight on the Monday of the week
+ * containing `now`, as observed in `tz`.
+ *
+ * Does day arithmetic on the calendar-date string (via `addCalendarDays`),
+ * not on the `Date` instant: date-fns' `addDays` mutates an instant using
+ * the HOST runtime's own local timezone, which silently corrupts the
+ * result whenever the host's DST transitions don't line up with `tz`'s.
+ * See calendarDate.ts and COR-1.
+ */
+export function resolveMonday(now: Date, tz: string): Date {
   const isoDow = Number(formatInTimeZone(now, tz, 'i')); // 1=Mon..7=Sun
-  const todayMidnightUtc = fromZonedTime(
-    `${formatInTimeZone(now, tz, 'yyyy-MM-dd')}T00:00:00`,
-    tz,
-  );
-  return addDays(todayMidnightUtc, -(isoDow - 1)); // Monday 00:00 as UTC instant
+  const todayStr = formatInTimeZone(now, tz, 'yyyy-MM-dd');
+  const mondayStr = addCalendarDays(todayStr, -(isoDow - 1));
+  return fromZonedTime(`${mondayStr}T00:00:00`, tz); // Monday 00:00 as UTC instant
+}
+
+/**
+ * The upcoming Monday, strictly after `now`'s week: if `now` falls on a
+ * Monday, this is next week's Monday, not today. Built on `resolveMonday`.
+ */
+export function resolveNextMonday(now: Date, tz: string): Date {
+  const mondayStr = formatInTimeZone(resolveMonday(now, tz), tz, 'yyyy-MM-dd');
+  const nextMondayStr = addCalendarDays(mondayStr, 7);
+  return fromZonedTime(`${nextMondayStr}T00:00:00`, tz);
 }
 
 function resolveOffset(mondayZ: Date, offset: PolicyOffset, tz: string): Date {
-  const targetDay = addDays(mondayZ, offset.dayOffset);
-  return fromZonedTime(
-    `${formatInTimeZone(targetDay, tz, 'yyyy-MM-dd')}T${offset.time}`,
-    tz,
-  );
+  const mondayStr = formatInTimeZone(mondayZ, tz, 'yyyy-MM-dd');
+  const targetStr = addCalendarDays(mondayStr, offset.dayOffset);
+  return fromZonedTime(`${targetStr}T${offset.time}`, tz);
 }
 
 // ---------------------------------------------------------------------------

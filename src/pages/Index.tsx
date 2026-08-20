@@ -5,6 +5,7 @@ import ThisWeekPanel from '@/components/home/ThisWeekPanel';
 import { RecentWinBanner } from '@/components/home/RecentWinBanner';
 import { EvalReadyCard } from '@/components/home/EvalReadyCard';
 import { CurrentFocusCard } from '@/components/home/CurrentFocusCard';
+import { FocusMoveValueCard } from '@/components/home/FocusMoveValueCard';
 import { LeadFocusHomeCard } from '@/components/home/LeadFocusHomeCard';
 import { LeadMeetingRequestCard } from '@/components/home/LeadMeetingRequestCard';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -55,6 +56,13 @@ export default function Index() {
   // Mobile shell: ProMoves first, CTA beneath — see
   // docs/features/mobile-build-instructions.md section C. Entirely separate
   // branch so the desktop return below stays byte-identical.
+  //
+  // Card order follows HOME_FEED_ORDER (src/lib/homeFeedOrder.ts), the single
+  // documented ranking rule for this feed (MOB-3). ThisWeekPanel (the ritual
+  // hero + CTA) is pinned first in every week-state; everything below it is a
+  // ranked, conditionally-present card. Each block below is tagged with its
+  // HOME_FEED_ORDER id so a future card (MOB-5 recognition, broadcast comms)
+  // can be inserted at the right rank instead of by trial and error.
   if (isMobileShell) {
     const firstName = staffProfile?.name?.split(' ')[0] || 'there';
     const dateEyebrow = format(new Date(), 'EEEE, MMM d');
@@ -69,8 +77,10 @@ export default function Index() {
             <h1 className="text-[22px] font-bold tracking-tight mt-0.5">Hi, {firstName}</h1>
           </div>
 
+          {/* rank: ritual-hero — pinned first, always */}
           <ThisWeekPanel />
 
+          {/* rank: backfill-alert */}
           {hasActiveBackfill && (
             <Alert className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
               <Wrench className="h-4 w-4 text-blue-600" />
@@ -89,15 +99,24 @@ export default function Index() {
             </Alert>
           )}
 
+          {/* rank: eval-ready */}
           <EvalReadyCard />
 
+          {/* rank: recent-win */}
           <RecentWinBanner />
 
+          {/* rank: current-focus */}
           <CurrentFocusCard />
 
-          {/* Leads: Ariyana's weekly focus + scheduling, at the bottom on mobile.
-              The card wraps in a pressable that navigates to /team (section F);
-              LeadFocusHomeCard itself is untouched. */}
+          {/* rank: focus-value (MOB-3) — the value card: script/audio if the
+              focus move has one, else its description, else its action
+              statement. Never an empty shell; absent when no focus is chosen. */}
+          <FocusMoveValueCard />
+
+          {/* rank: lead-focus, lead-meeting-request — Ariyana's weekly focus +
+              scheduling, at the bottom on mobile. The card wraps in a
+              pressable that navigates to /team (section F); LeadFocusHomeCard
+              itself is untouched. */}
           {staffProfile?.is_lead && (
             <>
               <div
@@ -119,13 +138,15 @@ export default function Index() {
             </>
           )}
 
-          {/* Deadline disclaimer — existing copy, unchanged */}
+          {/* Deadline disclaimer — coaching-voice rewrite (MOB-3). Not a feed
+              card (it's a persistent footer note, not ranked), so it isn't in
+              HOME_FEED_ORDER. */}
           <div className="rounded-none border-y border-border bg-muted/50 p-3 text-center">
             <p className="text-sm text-muted-foreground">
-              ProMove scores are due on the same day as your Check In/Out meeting.
+              Pro Moves are due the same day as your Check In/Out meeting.
             </p>
             <p className="text-xs text-muted-foreground/80 mt-1">
-              Scores submitted any other time are marked late.
+              Submit after that and it's marked late. Your coach sees it, so they know to check in with you.
             </p>
           </div>
         </div>

@@ -9,17 +9,17 @@ interface FetchParams {
 
 export async function fetchAlcanInputsForRole(params: FetchParams): Promise<OrgInputs> {
   const { role, effectiveDate, timezone, cutoff } = params;
-
+  
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
+  
   // Fetch eligible moves
   const movesRes = await fetch(
     `${supabaseUrl}/rest/v1/pro_moves?role_id=eq.${role}&active=eq.true&select=action_id,action_statement,competency_id,competencies(domain_id)`,
     { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
   );
   const movesData = await movesRes.json();
-
+  
   const eligibleMoves = movesData.map((m: any) => ({
     id: m.action_id,
     name: m.action_statement,
@@ -47,7 +47,7 @@ export async function fetchAlcanInputsForRole(params: FetchParams): Promise<OrgI
     }
   );
   const confData = await confRes.json();
-
+  
   const confidenceHistory = (confData || []).map((c: any) => ({
     proMoveId: c.pro_move_id,
     weekStart: c.week_start,
@@ -72,7 +72,7 @@ export async function fetchAlcanInputsForRole(params: FetchParams): Promise<OrgI
     }
   );
   const evalData = await evalRes.json();
-
+  
   const evals = (evalData || []).map((e: any) => ({
     staffId: e.staff_id,
     competencyId: e.competency_id,
@@ -98,7 +98,7 @@ export async function fetchAlcanInputsForRole(params: FetchParams): Promise<OrgI
     }
   );
   const lastData = await lastRes.json();
-
+  
   const lastSelected = (lastData || []).map((l: any) => ({
     proMoveId: l.pro_move_id,
     weekStart: l.week_start,
@@ -123,7 +123,7 @@ export async function fetchAlcanInputsForRole(params: FetchParams): Promise<OrgI
     }
   );
   const domainData = await domainRes.json();
-
+  
   const domainCoverage8w = (domainData || []).map((d: any) => ({
     domainId: d.domain_id,
     weeksCounted: d.weeks_counted,

@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     // Recompute preview (N+1)
     const timezone = 'America/Chicago';
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: timezone }));
-
+    
     // Next Monday
     const dayOfWeek = now.getDay();
     const daysToNextMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
@@ -99,9 +99,9 @@ Deno.serve(async (req) => {
       .single();
 
     if (!lockedPlan) {
-      return new Response('No locked plan found for this week', {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      return new Response('No locked plan found for this week', { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
 
@@ -129,10 +129,10 @@ Deno.serve(async (req) => {
 
     // Upsert preview
     const serviceClient = createClient(
-      supabaseUrl,
+      supabaseUrl, 
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
-
+    
     await serviceClient
       .from('alcan_weekly_plan')
       .upsert({

@@ -20,11 +20,11 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { runDate } = await req.json().catch(() => ({}));
-
+    
     // Compute in America/Chicago timezone
     const timezone = 'America/Chicago';
     const now = new Date(runDate || new Date().toLocaleString('en-US', { timeZone: timezone }));
-
+    
     // Get this Monday (week_start)
     const dayOfWeek = now.getDay();
     const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -32,12 +32,12 @@ Deno.serve(async (req) => {
     monday.setDate(now.getDate() + daysToMonday);
     monday.setHours(0, 0, 0, 0);
     const weekStart = monday.toISOString().split('T')[0];
-
+    
     // Next Monday (preview)
     const nextMonday = new Date(monday);
     nextMonday.setDate(monday.getDate() + 7);
     const previewWeekStart = nextMonday.toISOString().split('T')[0];
-
+    
     // Cutoff: exclude current week (up to last Sunday 23:59:59 CT)
     const cutoff = new Date(monday);
     cutoff.setDate(monday.getDate() - 1);
@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     // Process both roles
     for (const roleId of [1, 2] as const) {
       console.log(`Computing plans for role ${roleId}`);
-
+      
       // Fetch Alcan-wide inputs (no org filter, with cutoff)
       const inputs: OrgInputs = await fetchAlcanInputsForRole({
         role: roleId,
@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
 
       // Compute N (this week, locked)
       const locked = computeWeek(inputs, defaultEngineConfig, weekStart);
-
+      
       // Upsert locked plan
       const { error: lockedError } = await supabase
         .from('alcan_weekly_plan')
@@ -87,16 +87,16 @@ Deno.serve(async (req) => {
 
       // Compute N+1 (preview, draft)
       const previewInputs = advanceInputsForPreview(inputs, locked);
-
+      
       // Load manager priorities for preview
       const { data: priorities } = await supabase
         .from('manager_priorities')
         .select('action_id, weight')
         .eq('role_id', roleId);
-
+      
       const priorityMap = new Map((priorities || []).map(p => [p.action_id, p.weight]));
       const previewInputsWithPriorities = { ...previewInputs, managerPriorities: priorityMap };
-
+      
       const preview = computeWeek(previewInputsWithPriorities, defaultEngineConfig, previewWeekStart);
 
       // Upsert preview plan

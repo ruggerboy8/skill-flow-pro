@@ -190,8 +190,8 @@ Deno.serve(async (req) => {
 
     console.log(`Processed rollover for ${processedCount} staff members`);
 
-    return new Response(JSON.stringify({
-      message: `Processed rollover for ${processedCount} staff members across ${locationsToProcess.length} locations`
+    return new Response(JSON.stringify({ 
+      message: `Processed rollover for ${processedCount} staff members across ${locationsToProcess.length} locations` 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

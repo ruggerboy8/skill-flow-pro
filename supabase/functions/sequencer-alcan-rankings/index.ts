@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
           const confSample = inputs.confidenceHistory.find(c => c.proMoveId === m.id);
           const avg = confSample?.avg01 ?? 0.7;
           const finalScore = 1 - avg;
-
+          
           return {
             proMoveId: m.id,
             name: m.name,

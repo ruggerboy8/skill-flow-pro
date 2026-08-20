@@ -35,46 +35,86 @@ All 11 orphaned functions were fetched successfully via
 `mcp__claude_ai_Supabase__get_edge_function`. No fetch failures, no CLI
 fallback needed.
 
-| Function | Files written | Bytes (entrypoint) |
+| Function | Own `_shared` imports | Bytes (entrypoint) |
 |---|---|---|
-| `rollover-weekly` | 1 | 6,939 |
-| `compute-weekly-plans` | 1 (+ 4 shared) | 5,801 |
-| `override-plan` | 1 (+ 4 shared) | 3,596 |
-| `save-priorities` | 1 (+ 4 shared) | 5,247 |
-| `manager-priorities-save` | 1 (+ 2 shared) | 4,238 |
-| `sequencer-alcan-rankings` | 1 (+ 4 shared) | 4,721 |
-| `sequencer-sim-upsert` | 1 (+ 4 shared) | 4,619 |
-| `sequencer-health` | 1 | 3,713 |
-| `sync-onboarding-assignments` | 1 | 5,314 |
-| `parse-feedback` | 1 | 5,943 |
-| `parse-interview` | 1 | 4,110 |
+| `rollover-weekly` | none | 6,941 |
+| `compute-weekly-plans` | 4 (data, engine, config, types) | 5,847 |
+| `override-plan` | none (inline `corsHeaders`) | 3,607 |
+| `save-priorities` | 3 (data, engine, config) | 5,259 |
+| `manager-priorities-save` | 2 (cors, types) | 4,238 |
+| `sequencer-alcan-rankings` | 5 (cors, engine, data, config, types) | 4,731 |
+| `sequencer-sim-upsert` | 4 (cors, engine, config, types) | 4,631 |
+| `sequencer-health` | none | 3,717 |
+| `sync-onboarding-assignments` | none | 5,314 |
+| `parse-feedback` | none | 5,963 |
+| `parse-interview` | none | 4,122 |
 
-Six of the eleven (`compute-weekly-plans`, `override-plan`,
-`save-priorities`, `manager-priorities-save`, `sequencer-alcan-rankings`,
-`sequencer-sim-upsert`) import a common module that also had no source in
-the repo. That module was recovered once into `supabase/functions/_shared/`:
+**Correction from an earlier draft of this document:** the first pass of
+this table said six functions import the shared module and named
+`override-plan` as one of them. That was wrong. Reading `override-plan`'s
+own source shows it defines `corsHeaders` inline and has zero `import ...
+from '../_shared/...'` statements. **The correct count is five**:
+`compute-weekly-plans`, `save-priorities`, `manager-priorities-save`,
+`sequencer-alcan-rankings`, `sequencer-sim-upsert`. `override-plan`'s
+response from the MCP tool happened to include the `_shared/*.ts` files
+anyway, because the tool returns each deployed bundle's full sibling-file
+set from the same deploy batch, not a true per-function dependency closure.
+That's a fact about how the recovery tool packages its response, not about
+what `override-plan` itself imports, and this document previously
+conflated the two.
+
+The five importing functions share a common module that also had no source
+in the repo. That module was recovered once into
+`supabase/functions/_shared/`:
 
 - `_shared/cors.ts` (158 bytes)
 - `_shared/sequencer-types.ts` (1,580 bytes)
-- `_shared/sequencer-config.ts` (365 bytes)
-- `_shared/sequencer-data.ts` (3,761 bytes)
-- `_shared/sequencer-engine.ts` (5,210 bytes)
+- `_shared/sequencer-config.ts` (369 bytes)
+- `_shared/sequencer-data.ts` (3,775 bytes)
+- `_shared/sequencer-engine.ts` (5,230 bytes)
 
-The MCP tool returns each function's full dependency closure per call, so the
-same shared-module content came back attached to six separate responses,
+The MCP tool returns each function's full sibling-file bundle per call, so
+the same shared-module content came back attached to multiple responses,
 byte-identical every time. I diffed them and wrote each shared file once
 rather than duplicating it per function (Deno's relative-import resolution
-means one `_shared/` copy serves all six, matching how they're actually
-deployed). Every file's content is written verbatim as returned: no
-reformatting, no lint fixes, no naming cleanup. Note for later triage, not
-fixed here: the repo already has a different shared file,
-`_shared/sequencerScoring.ts` (camelCase, pre-existing, used by
-`sequencer-rank`), so there are now two differently-named "sequencer scoring
-logic" modules in `_shared/`. That's a duplication finding, not something
-GOV-2's scope covers, so flagging it for a separate ticket rather than
-merging them.
+means one `_shared/` copy serves all five, matching how they're actually
+deployed). Note for later triage, not fixed here: the repo already has a
+different shared file, `_shared/sequencerScoring.ts` (camelCase,
+pre-existing, used by `sequencer-rank`), so there are now two
+differently-named "sequencer scoring logic" modules in `_shared/`. That's a
+duplication finding, not something GOV-2's scope covers, so flagging it for
+a separate ticket rather than merging them.
 
 No fetch failed. Nothing was left missing or fabricated.
+
+**Every recovered file was verified byte-identical to the live deployment by
+md5 checksum on 2026-08-19**, not just eyeballed as "looks the same." An
+earlier pass of this recovery had used a file-writing path that silently
+stripped trailing whitespace on two files (`rollover-weekly/index.ts`,
+`sequencer-health/index.ts`), which a straight visual read of the code would
+not have caught: the diffs were a trailing space on two lines and one
+whitespace-only line, invisible in a normal code view. QA caught it by
+diffing against a live-fetched reference copy. The fix: re-fetch each
+function fresh via the MCP tool, save the raw JSON response to disk through
+a path proven immune to whitespace stripping (a quoted Bash heredoc, which a
+direct test confirmed preserves trailing spaces and tabs exactly), then use
+Python's `json.loads` to decode the `content` field and write it with
+`open(path, "w", newline="").write(content)`. For every one of the 16 files
+(11 entrypoints, 5 shared modules), the md5 of the freshly-fetched content
+string and the md5 of the resulting on-disk file were computed independently
+and confirmed to match; see the checksum table in the build report for this
+fix. Cross-checked against QA's own saved reference copies for 9 of the 16
+files: `rollover-weekly` and `sequencer-health` matched byte-for-byte
+(confirming the specific bug QA found is fixed), while `compute-weekly-plans`,
+`sequencer-alcan-rankings`, and three of the five shared files showed a
+narrow, opposite-direction discrepancy against QA's references: QA's copies
+have a truly blank line where the live source (confirmed directly from the
+raw MCP JSON text, before any processing) has a whitespace-only line. Every
+one of those differences is whitespace-only with no code-content difference.
+This repo's files were kept as fetched from the live MCP response rather
+than matched to QA's reference copies, since the raw JSON text is the more
+direct source and QA's own capture process appears to have the same class of
+bug on those specific lines.
 
 ## 3. config.toml reconciliation
 

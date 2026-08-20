@@ -68,7 +68,7 @@ ${transcript}`;
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[parse-interview] AI Gateway error:', response.status, errorText);
-
+      
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
@@ -81,7 +81,7 @@ ${transcript}`;
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-
+      
       return new Response(
         JSON.stringify({ error: 'Failed to parse transcript' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

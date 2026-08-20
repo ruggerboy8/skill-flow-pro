@@ -50,7 +50,7 @@ serve(async (req) => {
     const nowLocal = toZonedTime(new Date(), orgTz);
     const currentMondayLocal = startOfWeek(nowLocal, { weekStartsOn: 1 });
     const nextMondayLocal = addWeeks(currentMondayLocal, 1);
-
+    
     const currentMonday = format(currentMondayLocal, 'yyyy-MM-dd');
     const nextMonday = format(nextMondayLocal, 'yyyy-MM-dd');
 

@@ -10,12 +10,12 @@ export function computeWeek(
 
   // Build eligibility map (recency)
   const lastSelectedMap = new Map(inputs.lastSelected.map(ls => [ls.proMoveId, ls.weekStart]));
-
+  
   // Score all eligible moves
   for (const move of inputs.eligibleMoves) {
     const lastWeek = lastSelectedMap.get(move.id);
     const weeksSince = lastWeek ? weeksBetween(lastWeek, weekStart) : 999;
-
+    
     if (weeksSince < config.cooldownWeeks) {
       logs.push(`Cooldown: ${move.name} (last seen ${weeksSince}w ago)`);
       continue;
@@ -72,7 +72,7 @@ export function computeWeek(
 
   for (const candidate of candidates) {
     if (picked.length >= 3) break;
-
+    
     if (picked.length < config.diversityMinDomainsPerWeek - 1 || usedDomains.has(candidate.domainId) || usedDomains.size >= config.diversityMinDomainsPerWeek) {
       picked.push(candidate);
       usedDomains.add(candidate.domainId);
@@ -130,24 +130,24 @@ export function advanceInputsForPreview(inputs: OrgInputs, next: WeekPlan): OrgI
 
 export function computeTwoWeeks(inputs: OrgInputs, config: EngineConfig) {
   const logs: string[] = [];
-
+  
   // Compute next week
   const nextMondayDate = new Date(inputs.effectiveDate);
   nextMondayDate.setDate(nextMondayDate.getDate() + ((1 + 7 - nextMondayDate.getDay()) % 7));
   const nextWeekStart = nextMondayDate.toISOString().split('T')[0];
-
+  
   const next = computeWeek(inputs, config, nextWeekStart);
   logs.push(...next.logs);
-
+  
   // Advance state and compute preview
   const previewInputs = advanceInputsForPreview(inputs, next);
   const previewMondayDate = new Date(nextMondayDate);
   previewMondayDate.setDate(previewMondayDate.getDate() + 7);
   const previewWeekStart = previewMondayDate.toISOString().split('T')[0];
-
+  
   const preview = computeWeek(previewInputs, config, previewWeekStart);
   logs.push(...preview.logs);
-
+  
   return { next, preview, logs };
 }
 

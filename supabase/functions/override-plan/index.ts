@@ -15,12 +15,12 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
-
+    
     // Check auth with anon key
     const anonClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: authHeader } },
     });
-
+    
     const { data: { user } } = await anonClient.auth.getUser();
     if (!user) {
       return new Response('Unauthorized', { status: 401, headers: corsHeaders });
@@ -34,9 +34,9 @@ Deno.serve(async (req) => {
       .single();
 
     if (!staff?.is_super_admin) {
-      return new Response('Forbidden: Super admin required', {
-        status: 403,
-        headers: corsHeaders
+      return new Response('Forbidden: Super admin required', { 
+        status: 403, 
+        headers: corsHeaders 
       });
     }
 

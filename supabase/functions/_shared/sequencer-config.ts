@@ -5,7 +5,7 @@ export const defaultEngineConfig: EngineConfig = {
   coverageWindowWeeks: 4,
   diversityMinDomainsPerWeek: 2,
   recencyHorizonWeeks: 0,
-
+  
   weights: {
     C: 0.60,
     R: 0.15,
@@ -13,7 +13,7 @@ export const defaultEngineConfig: EngineConfig = {
     D: 0.05,
     M: 0.05,
   },
-
+  
   ebPrior: 0.70,
   ebK: 20,
   trimPct: 0.05,

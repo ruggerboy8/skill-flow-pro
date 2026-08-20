@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     // Ensure inputs have required fields
     const timezone = inputs.timezone || 'America/Chicago';
     const effectiveDate = inputs.effectiveDate || new Date().toISOString().split('T')[0];
-
+    
     const normalizedInputs: OrgInputs = {
       ...inputs,
       timezone,
@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
         const confSample = inputs.confidenceHistory.find(c => c.proMoveId === m.id);
         const avg = confSample?.avg01 ?? 0.7;
         const finalScore = 1 - avg; // Simplified for now
-
+        
         return {
           proMoveId: m.id,
           name: m.name,

@@ -20,7 +20,7 @@ serve(async (req) => {
     }
 
     const { transcript, staffName } = await req.json();
-
+    
     if (!transcript) {
       console.error('[parse-feedback] No transcript provided');
       return new Response(
@@ -105,7 +105,7 @@ ${transcript}
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[parse-feedback] AI Gateway error:', response.status, errorText);
-
+      
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
@@ -118,7 +118,7 @@ ${transcript}
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-
+      
       return new Response(
         JSON.stringify({ error: `AI processing failed: ${response.status}` }),
         { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -127,7 +127,7 @@ ${transcript}
 
     const data = await response.json();
     const formattedFeedback = data.choices?.[0]?.message?.content || '';
-
+    
     console.log('[parse-feedback] Formatting successful, output length:', formattedFeedback.length);
 
     return new Response(

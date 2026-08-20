@@ -260,9 +260,10 @@ export default function Layout() {
         <header className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-card flex-none">
           <div className="flex items-center gap-2 min-w-0">
             <img src={alcanLogo} alt="Alcan" className="h-6 object-contain dark:invert flex-none" />
-            <span className="text-2xs font-bold uppercase tracking-widest text-muted-foreground truncate">
-              Pro Moves
-            </span>
+            {/* Org logo + product wordmark side by side (the sister-brand
+                pairing from the brand brief). min-w-0 on the parent lets the
+                wordmark shrink on narrow phones. */}
+            <ProMovesLogo className="text-sm shrink min-w-0" />
           </div>
           {/* Former "More" tab's contents (Profile, Sign out, My evaluations,
               Practice log, lead Team) plus a role-aware management section for

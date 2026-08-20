@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => ({
       // activates. docs/features/pwa-push-notifications.md
       injectRegister: null,
       registerType: 'prompt',
-      includeAssets: ['apple-touch-icon.png', 'brand/alcan-icon.svg'],
+      includeAssets: ['apple-touch-icon.png', 'favicon-32.png', 'brand/promoves-p-icon.svg', 'brand/promoves-wordmark.svg'],
       manifest: {
         name: 'Pro Moves',
         short_name: 'Pro Moves',

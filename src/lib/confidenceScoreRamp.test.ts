@@ -27,12 +27,22 @@ describe('scoreBucket', () => {
     expect(scoreBucket(4.0)).toBe(4);
     expect(scoreBucket(4.5)).toBe(4);
   });
+
+  it('returns undefined (not bucket 4) for non-finite input (DASH-1a QA fix)', () => {
+    expect(scoreBucket(NaN)).toBeUndefined();
+    expect(scoreBucket(Infinity)).toBeUndefined();
+    expect(scoreBucket(-Infinity)).toBeUndefined();
+  });
 });
 
 describe('scoreBucketTokens', () => {
   it('maps each bucket to its matching --score-N tokens', () => {
     expect(scoreBucketTokens(1)).toEqual({ text: 'hsl(var(--score-1))', bg: 'hsl(var(--score-1-bg))' });
     expect(scoreBucketTokens(4)).toEqual({ text: 'hsl(var(--score-4))', bg: 'hsl(var(--score-4-bg))' });
+  });
+
+  it('falls back to the muted no-data treatment for an undefined bucket', () => {
+    expect(scoreBucketTokens(undefined)).toEqual({ text: 'hsl(var(--muted-foreground))', bg: 'transparent' });
   });
 });
 
@@ -52,5 +62,11 @@ describe('isTrailingCell', () => {
   it('is false when the cell is at or above the group average', () => {
     expect(isTrailingCell(2.5, 2.5)).toBe(false);
     expect(isTrailingCell(3.0, 2.5)).toBe(false);
+  });
+
+  it('safely returns false for non-finite input instead of manufacturing a signal (DASH-1a QA fix)', () => {
+    expect(isTrailingCell(NaN, 2.5)).toBe(false);
+    expect(isTrailingCell(2.0, NaN)).toBe(false);
+    expect(isTrailingCell(Infinity, Infinity)).toBe(false);
   });
 });

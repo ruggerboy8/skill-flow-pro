@@ -63,9 +63,19 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				brand: {
+					// Legacy numeric scale, still used by Button/ProMovesLogo/LandingPage.
+					// Left as-is (DSN-3 sweep territory), not part of DSN-5a's scope.
 					50: '#fdfefe',
 					600: '#124570',
-					900: '#080809'
+					900: '#080809',
+					// DSN-5a: the six locked brand colors, sourced from
+					// promoves-brand/exports/README.md via the --brand-* CSS vars.
+					navy: 'hsl(var(--brand-navy))',
+					blue: 'hsl(var(--brand-blue))',
+					signal: 'hsl(var(--brand-signal))',
+					bone: 'hsl(var(--brand-bone))',
+					charcoal: 'hsl(var(--brand-charcoal))',
+					gray: 'hsl(var(--brand-gray))'
 				},
 				slatebrand: {
 					400: '#949aa1',
@@ -97,6 +107,13 @@ export default {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
+			},
+			// DSN-5a: brand motion contract (run-once, no bounce). Duration
+			// steps live only as CSS vars for now (--duration-quick/standard/brand
+			// in src/index.css); add a transitionDuration section here if a
+			// later ticket needs them as Tailwind utilities.
+			transitionTimingFunction: {
+				brand: 'var(--ease-brand)'
 			},
 		keyframes: {
 			'accordion-down': {

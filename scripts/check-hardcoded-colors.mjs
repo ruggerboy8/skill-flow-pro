@@ -35,13 +35,15 @@ const PALETTE_FAMILIES = [
   'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose',
 ];
 
-// Matches e.g. bg-emerald-100, text-red-800, border-blue-950, dark:bg-red-100,
+// Matches hardcoded palette shades behind any color-bearing utility prefix:
+// bg-emerald-100, text-red-800, border-blue-950, ring-amber-500, from-amber-950,
+// to-violet-600, via-emerald-950, dark:bg-red-100,
 // hover:text-emerald-600, bg-red-100/50 (opacity suffix allowed). Does NOT
 // match bg-primary, text-muted-foreground, border-2, text-2xs, bg-brand-navy,
 // bg-domain-clinical, text-score-1, etc, because those either aren't in
 // PALETTE_FAMILIES or aren't followed by a plain numeric shade.
 const COLOR_CLASS_RE = new RegExp(
-  `(?:^|[\\s"'\`{])((?:[a-z-]+:)*(?:bg|text|border)-(?:${PALETTE_FAMILIES.join('|')})-(?:50|100|200|300|400|500|600|700|800|900|950))(?:/\\d{1,3})?(?=[\\s"'\`}]|$)`,
+  `(?:^|[\\s"'\`{])((?:[a-z-]+:)*(?:bg|text|border|ring|from|to|via|fill|stroke|divide|outline|shadow|placeholder|caret|accent|decoration)-(?:${PALETTE_FAMILIES.join('|')})-(?:50|100|200|300|400|500|600|700|800|900|950))(?:/\\d{1,3})?(?=[\\s"'\`}]|$)`,
   'g'
 );
 

@@ -143,13 +143,18 @@ list or aren't followed by a bare numeric shade.
 | `src/components/dashboard/EvalCadenceWidget.tsx` | 0 | 0 | Already fully migrated by DSN-4 (commit `e9b6d41a`, on `main` before this slice started) — nothing left to do. The ticket's original "28 instances" estimate predates that work. |
 | `tailwind.config.ts` | — | — | Removed the legacy `brand.50`/`brand.600`/`brand.900` numeric keys — zero consumers remained after the above. Left `slatebrand.400`/`slatebrand.600` alone (also zero consumers, but out of this ticket's named scope — worth a small separate cleanup ticket). |
 
-Baseline: 808 → 755 hardcoded classes across `src/` (the drop is exactly
-the 30 + 23 from `Index.tsx` and `EvaluationHub.tsx`; the Button/logo/
-landing changes don't move this number since `brand-*` was never counted).
+Baseline: 808 → 755 → 775 hardcoded classes across `src/`. The drop to 755
+is exactly the 30 + 23 from `Index.tsx` and `EvaluationHub.tsx` (the
+Button/logo/landing changes don't move this number since `brand-*` was
+never counted). The rise to 775 is not new debt: QA found the guard's
+original regex only watched `bg-`/`text-`/`border-`, so its prefix list was
+widened (ring, gradient from/to/via, fill, stroke, divide, outline, shadow,
+placeholder, caret, accent, decoration) and the baseline re-cut to count
+the 20 pre-existing instances those shapes were hiding.
 
 ## 5. Remaining unmigrated surfaces (post slice-1 baseline)
 
-87 files still carry at least one hardcoded palette class, 755 instances
+87 files still carry at least one hardcoded palette class, 775 instances
 total. Two of them — `OnTimeRateWidget.tsx` and
 `LocationSubmissionWidget.tsx` (30 each) — are Command Center /
 `RegionalDashboard` surfaces explicitly out of scope for DSN-3 (owned by

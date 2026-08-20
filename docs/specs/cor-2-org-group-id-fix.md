@@ -172,8 +172,8 @@ functions, in a mixed, partially-applied state:
 | `get_eval_distribution_metrics` | No anon (SEC-2a grants applied) | No guard at all (SEC-2b body not applied) |
 | `get_location_domain_staff_averages` | No anon | No guard at all |
 | `seq_latest_quarterly_evals(uuid,bigint)` | No anon | No guard at all |
-| `get_staff_domain_avgs` | **Has anon** (not in SEC-2a's 19-name list) | Super-admin-only (SEC-1) |
-| `get_strengths_weaknesses` | **Has anon** | Super-admin-only (SEC-1) |
+| `get_staff_domain_avgs` | **Has anon and PUBLIC** (not in SEC-2a's 19-name list, never grant-locked) | Super-admin-only (SEC-1) |
+| `get_strengths_weaknesses` | No anon (grant-locked: live ACL is `{postgres,authenticated,service_role}` -- SEC-1 revoked it, and it's in `anonReadSurface.test.ts` `CLOSED_FUNCTIONS`) | Super-admin-only (SEC-1) |
 | `get_coach_roster_summary` | No anon | Own coach-scope check, unrelated to SEC-2 |
 | `is_org_allowed_for_sequencing` | Has anon (batch C, intentional) | n/a (predicate) |
 | `get_user_org_id` | Has anon (batch C, intentional) | n/a (predicate) |
@@ -308,6 +308,10 @@ and the original ticket text suggest.
 
 ## Deliberately deferred (not done by this ticket)
 
+- **Confirming the re-parent triggers' unconditional overwrite is the right
+  call for every staff row.** See "Decision made without a spec answer,
+  flagged for QA" under Trigger coverage above -- not resolved here, only
+  documented.
 - **Applying this migration.** Written and committed only, per the hard
   constraint for this work session. Application is a later, supervised step
   like SEC-1/SEC-2's.

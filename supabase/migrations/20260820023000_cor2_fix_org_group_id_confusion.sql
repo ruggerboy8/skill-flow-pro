@@ -84,10 +84,20 @@
 --      not a live data bug. Two new AFTER UPDATE triggers close it.
 --
 -- Idempotent throughout: CREATE OR REPLACE FUNCTION, DROP TRIGGER IF EXISTS
--- before CREATE TRIGGER, explicit REVOKE + GRANT reproducing each function's
--- live ACL exactly (CREATE OR REPLACE preserves ACLs across a same-signature
--- replace, but the explicit re-grant removes any doubt -- local Supabase does
--- not auto-grant, per CLAUDE.md -- and matches the pattern SEC-1/SEC-2 use).
+-- before CREATE TRIGGER, explicit REVOKE + GRANT after each function (CREATE
+-- OR REPLACE preserves ACLs across a same-signature replace, but the
+-- explicit re-grant removes any doubt -- local Supabase does not auto-grant,
+-- per CLAUDE.md -- and matches the pattern SEC-1/SEC-2 use). These grants
+-- match each function's live named-role ACL exactly for
+-- get_coach_roster_summary. For is_org_allowed_for_sequencing and
+-- get_user_org_id, the live ACL also carries a stray PUBLIC grant (the
+-- default `=X` entry alongside the named anon/authenticated/service_role
+-- grants); REVOKE ALL ... FROM PUBLIC deliberately drops that PUBLIC entry
+-- while the following GRANT re-adds the same named-role access, including
+-- anon. No role other than the ones already granted by name relies on the
+-- PUBLIC entry, so this is a harmless least-privilege tightening, not a
+-- functional change -- callers that had access before (anon included, since
+-- both are Batch C predicate functions) still have it.
 -- SIGNATURE STABILITY: no function's parameter list, name, or return type
 -- changes. PostgREST callers using named parameters are unaffected.
 

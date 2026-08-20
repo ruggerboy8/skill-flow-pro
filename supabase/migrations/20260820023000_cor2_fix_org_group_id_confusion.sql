@@ -47,6 +47,17 @@
 --   - current_user_org_id(): already correct (COALESCE staff.organization_id,
 --     then the location -> practice_groups.organization_id chain). Not
 --     redefined; get_user_org_id below is rewritten to match its semantics.
+--   - is_org_allowed_for_sequencing(uuid): looks p_org_id up directly in
+--     practice_groups.id. This was originally "fixed" here on the inference
+--     that p_org_id shared weekly_assignments.org_id's real-organization-id
+--     semantics (same "org_id" name, same sequencer machinery). A PR review
+--     (Codex, PR #42) caught that the inference was wrong for this column
+--     and the fix was reverted before merge -- see the full evidence trail
+--     (live FK, the delete_organization cascade, the live RLS policies)
+--     inline above the function's former section below, and in
+--     docs/specs/cor-2-org-group-id-fix.md. p_org_id really is a
+--     practice_groups id here; the live body is correct as shipped and this
+--     migration does not touch it.
 --
 -- What this migration DOES fix (verified live, see spec doc for the exact
 -- SELECTs and counts):
@@ -56,14 +67,7 @@
 --      practice_groups.id) against l2.group_id (a practice_groups id).
 --      Fixed to resolve the staff's location through to its organization_id
 --      before comparing.
---   2. is_org_allowed_for_sequencing(uuid): looks p_org_id up directly in
---      practice_groups.id. Its only real callers are RLS policies gating
---      sequencer_runs.org_id and the archived zzz_archived_weekly_plan.org_id,
---      columns designed to hold the same real-organization-id values as
---      weekly_assignments.org_id (same sequencer write path, same "org_id"
---      naming). Fixed to check practice_groups.organization_id = p_org_id
---      instead, preserving the "has an active group" gate.
---   3. get_user_org_id(uuid): retired in favour of current_user_org_id
+--   2. get_user_org_id(uuid): retired in favour of current_user_org_id
 --      semantics, per acceptance criteria. NOT dropped (RLS policies on
 --      weekly_assignments, practice_groups, locations, weekly_scores,
 --      organization_pro_moves, organization_pro_move_overrides, and
@@ -75,7 +79,7 @@
 --      the 8 staff with a NULL primary_location_id (all of whom have
 --      staff.organization_id set directly, confirmed live) resolve
 --      correctly instead of getting NULL from the old INNER JOIN-only body.
---   4. Trigger coverage for staff.organization_id re-parenting. The existing
+--   3. Trigger coverage for staff.organization_id re-parenting. The existing
 --      trg_staff_fill_organization_id trigger only fills organization_id
 --      when it is NULL, and only fires on staff row changes -- nothing
 --      re-syncs it when a LOCATION changes practice_groups (locations.group_id)
@@ -84,12 +88,11 @@
 --      not a live data bug. Two new AFTER UPDATE triggers close it.
 --
 -- Idempotent throughout: CREATE OR REPLACE FUNCTION, DROP TRIGGER IF EXISTS
--- before CREATE TRIGGER, explicit REVOKE + GRANT after each function (CREATE
--- OR REPLACE preserves ACLs across a same-signature replace, but the
+-- before CREATE TRIGGER, explicit REVOKE + GRANT after each touched function
+-- (CREATE OR REPLACE preserves ACLs across a same-signature replace, but the
 -- explicit re-grant removes any doubt -- local Supabase does not auto-grant,
 -- per CLAUDE.md -- and matches the pattern SEC-1/SEC-2 use). These grants
--- match each function's live named-role ACL exactly for
--- get_coach_roster_summary. For is_org_allowed_for_sequencing and
+-- match get_coach_roster_summary's live named-role ACL exactly. For
 -- get_user_org_id, the live ACL also carries a stray PUBLIC grant (the
 -- default `=X` entry alongside the named anon/authenticated/service_role
 -- grants); REVOKE ALL ... FROM PUBLIC deliberately drops that PUBLIC entry
@@ -97,7 +100,7 @@
 -- anon. No role other than the ones already granted by name relies on the
 -- PUBLIC entry, so this is a harmless least-privilege tightening, not a
 -- functional change -- callers that had access before (anon included, since
--- both are Batch C predicate functions) still have it.
+-- it is a Batch C predicate function) still have it.
 -- SIGNATURE STABILITY: no function's parameter list, name, or return type
 -- changes. PostgREST callers using named parameters are unaffected.
 
@@ -236,37 +239,43 @@ REVOKE ALL ON FUNCTION public.get_coach_roster_summary(uuid, date) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_coach_roster_summary(uuid, date) TO authenticated, service_role;
 
 -- ============================================================================
--- 2. is_org_allowed_for_sequencing(uuid)
---    Fix: p_org_id is a real organizations.id (same write path/column
---    naming as weekly_assignments.org_id, confirmed live). Check membership
---    via practice_groups.organization_id instead of practice_groups.id, so
---    an organization is allowed when it has at least one active group.
---    organizations has no `active` column of its own (checked live), so the
---    "active" gate stays on practice_groups, just resolved through the
---    correct FK direction.
---    LANGUAGE sql, STABLE SECURITY DEFINER, search_path 'public' preserved.
+-- is_org_allowed_for_sequencing(uuid) -- NOT CHANGED. Originally this
+-- migration also "fixed" this function to check practice_groups.organization_id
+-- instead of practice_groups.id, on the inference that p_org_id shared
+-- weekly_assignments.org_id's real-organization-id semantics because both
+-- columns are named "org_id" on the same sequencer machinery. A PR review
+-- (Codex, PR #42) caught that this inference was wrong for this specific
+-- column and the fix was reverted before merge. Live-verified evidence:
+--   - sequencer_runs.org_id and the archived zzz_archived_weekly_plan.org_id
+--     both carry a live FK straight to practice_groups(id)
+--     (sequencer_runs_org_id_fkey, weekly_plan_org_id_fkey) -- a real
+--     organizations.id could never satisfy that FK.
+--   - supabase/functions/admin-users/index.ts's delete_organization cascade
+--     deletes sequencer_runs by `org_id IN groupIds`, where groupIds is
+--     resolved from practice_groups.id (`.from("practice_groups").select("id")
+--     .eq("organization_id", organization_id)`), i.e. group ids, not org ids.
+--   - The live INSERT policies on both tables ("Service role inserts
+--     sequencer runs for global and allowed orgs" on sequencer_runs,
+--     "System can insert global and allowed org plans" on
+--     zzz_archived_weekly_plan) call is_org_allowed_for_sequencing(org_id)
+--     directly against that same FK-constrained column.
+-- So p_org_id here really is a practice_groups id end to end, and the
+-- original body (EXISTS practice_groups WHERE id = p_org_id AND active) is
+-- correct as shipped. The reverted version would have rejected every
+-- FK-valid value the RLS policies are meant to allow, while no value that
+-- could pass it would ever satisfy the FK -- org-scoped sequencer runs would
+-- have become impossible to insert. Full evidence and the disproved
+-- inference are recorded in docs/specs/cor-2-org-group-id-fix.md.
+-- The `p_org_id` / `org_id` NAMING is still the misleading part (this
+-- column predates the 2026-03-06 organizations split, from when
+-- practice_groups was the thing this codebase called "org" -- see
+-- CLAUDE.md's terminology table). A rename is its own follow-up ticket,
+-- coordinated with the FK, the RLS policies, and admin-users/index.ts, not
+-- something to fold into tonight's fix.
 -- ============================================================================
-CREATE OR REPLACE FUNCTION public.is_org_allowed_for_sequencing(p_org_id uuid)
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-  SELECT CASE
-    WHEN p_org_id IS NULL THEN true
-    ELSE EXISTS (
-      SELECT 1 FROM public.practice_groups pg
-      WHERE pg.organization_id = p_org_id
-        AND pg.active = true
-    )
-  END;
-$function$;
-
-REVOKE ALL ON FUNCTION public.is_org_allowed_for_sequencing(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.is_org_allowed_for_sequencing(uuid) TO anon, authenticated, service_role;
 
 -- ============================================================================
--- 3. get_user_org_id(uuid) -- RETAINED, NOT DROPPED, for compatibility only.
+-- 2. get_user_org_id(uuid) -- RETAINED, NOT DROPPED, for compatibility only.
 --    Acceptance wants the two competing resolvers unified on
 --    current_user_org_id's semantics. This function stays because RLS
 --    policies on weekly_assignments, practice_groups, locations,
@@ -307,7 +316,7 @@ REVOKE ALL ON FUNCTION public.get_user_org_id(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_user_org_id(uuid) TO anon, authenticated, service_role;
 
 -- ============================================================================
--- 4. Trigger coverage: keep staff.organization_id in sync when a LOCATION is
+-- 3. Trigger coverage: keep staff.organization_id in sync when a LOCATION is
 --    re-parented to a different practice group, or a PRACTICE GROUP is
 --    re-parented to a different organization. Mirrors how the existing
 --    trg_staff_fill_organization_id / staff_fill_organization_id() trigger
@@ -385,7 +394,6 @@ DECLARE
 BEGIN
   FOREACH v_sig IN ARRAY ARRAY[
     'public.get_coach_roster_summary(uuid, date)',
-    'public.is_org_allowed_for_sequencing(uuid)',
     'public.get_user_org_id(uuid)'
   ]
   LOOP

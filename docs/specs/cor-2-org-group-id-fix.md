@@ -41,9 +41,30 @@ This was independently re-discovered mid-week by SEC-2b's own fix migration
 (`20260820015735_sec2b_fix_org_group_guard.sql`, written before this ticket
 was picked up, same finding, same evidence). Rather than redo that work, this
 migration builds on it: three of the five originally-named functions needed
-no further change here. The other two named functions and the two functions
-not in SEC-2b's list turned out to need genuine fixes once checked against
-live data. Details per function below.
+no further change here. Of the other two named functions and the two
+functions not in SEC-2b's list, checking against live data turned up one
+genuine fix (`get_coach_roster_summary`) and one more case of the same
+"self-consistent group id, ticket text wrong" pattern
+(`is_org_allowed_for_sequencing`, caught by PR review after this migration's
+first draft got it wrong too -- see "PR review correction" below). Details
+per function below.
+
+### PR review correction (added after initial build)
+
+The first version of this migration also "fixed" `is_org_allowed_for_sequencing`,
+on the same kind of inference that turned out wrong for a different reason
+than the ones this doc catches elsewhere: `weekly_assignments.org_id` is
+confirmed live to hold real `organizations.id` values, and
+`sequencer_runs.org_id` / `zzz_archived_weekly_plan.org_id` share its exact
+column name and sit in the same sequencer machinery, so it seemed reasonable
+that they'd share its semantics too. They don't -- these are three different
+columns with three different histories, and only one of them was ever
+migrated to hold real org ids. A PR review (Codex, on PR #42) caught this
+before merge with three pieces of live evidence (the FK, the deletion
+cascade, the RLS policies -- all reproduced in the per-function section
+below), and the fix was reverted. This is the same failure mode the original
+spec already flagged going in: "inference-from-pattern, zero confirming
+rows" is a real risk, not a formality, and it caught a real mistake here.
 
 ## Per-function findings
 
@@ -77,6 +98,33 @@ was never asked for and is out of scope here.
 (`COALESCE(staff.organization_id, locations -> practice_groups.organization_id)`).
 Not modified; `get_user_org_id` below is rewritten to match it.
 
+**`is_org_allowed_for_sequencing(uuid)`.** **Reverted before merge -- see "PR
+review correction" below.** Looks `p_org_id` up directly in
+`practice_groups.id`, and that is correct. This was originally listed as
+"fixed" here (see git history on this branch) on the inference that
+`p_org_id` shared `weekly_assignments.org_id`'s real-organization-id
+semantics, because both columns are named `org_id` on the same sequencer
+machinery and `weekly_assignments.org_id` is confirmed live to hold real org
+ids. That inference does not hold for this column, and was disproved by a PR
+review before merge. Live evidence: `sequencer_runs.org_id` and the archived
+`zzz_archived_weekly_plan.org_id` both carry a live FK straight to
+`practice_groups(id)` (`sequencer_runs_org_id_fkey`,
+`weekly_plan_org_id_fkey` -- a real `organizations.id` could never satisfy
+that FK); `supabase/functions/admin-users/index.ts`'s `delete_organization`
+cascade deletes `sequencer_runs` by `org_id IN groupIds`, where `groupIds` is
+resolved from `practice_groups.id`
+(`.from("practice_groups").select("id").eq("organization_id", organization_id)`),
+i.e. group ids, not org ids; and the live INSERT policies on both tables
+(`"Service role inserts sequencer runs for global and allowed orgs"` on
+`sequencer_runs`, `"System can insert global and allowed org plans"` on
+`zzz_archived_weekly_plan`) call `is_org_allowed_for_sequencing(org_id)`
+directly against that same FK-constrained column. So `p_org_id` really is a
+`practice_groups` id end to end here, unlike the other org/group confusions
+in this ticket. The now-reverted fix would have rejected every FK-valid
+value the RLS policies are meant to allow while no value that could pass it
+would ever satisfy the FK, making org-scoped sequencer runs impossible to
+insert.
+
 ### Fixed by this migration
 
 **`get_coach_roster_summary(uuid, date)`.** Body compares
@@ -89,19 +137,6 @@ coach's roster summary, leaving only location-scoped or fully-global
 assignments visible. Fix: resolve the staff's location through
 `practice_groups.organization_id` before comparing, same pattern
 `current_user_org_id()` uses.
-
-**`is_org_allowed_for_sequencing(uuid)`.** Looks `p_org_id` up directly in
-`practice_groups.id`. Its only real callers are two RLS policies (on
-`sequencer_runs.org_id` and the archived `zzz_archived_weekly_plan.org_id`),
-gating columns that share the exact naming and write path as
-`weekly_assignments.org_id` (same sequencer machinery, same "populate org_id
-with the caller's real organization id" pattern traced through
-`AdminBuilder.tsx` → `useUserRole().organizationId` →
-`PlannerWorkspace`/`WeekBuilderPanel` → `sequencer-auto-assign`). Fix: check
-`practice_groups.organization_id = p_org_id` instead of
-`practice_groups.id = p_org_id`. `organizations` has no `active` column of
-its own (checked live schema), so the "must have an active group" gate stays
-on `practice_groups`, just resolved through the correct FK direction.
 
 **`get_user_org_id(uuid)`.** Retained, not dropped -- RLS policies on
 `weekly_assignments`, `practice_groups`, `locations`, `weekly_scores`,
@@ -181,10 +216,11 @@ functions, in a mixed, partially-applied state:
 
 So SEC-2a's grant revokes appear to have already been applied to the three
 functions it targets among this set; SEC-2b's body/guard changes (both the
-original and the fix) have not. This migration's bodies for
-`get_coach_roster_summary` and `is_org_allowed_for_sequencing` are new work,
-not affected by that discrepancy. It does not touch the three functions
-SEC-2b guards, for the reasons above.
+original and the fix) have not. This migration's body for
+`get_coach_roster_summary` is new work, not affected by that discrepancy.
+`is_org_allowed_for_sequencing`'s body was never actually changed (see "PR
+review correction" above). It does not touch the three functions SEC-2b
+guards, for the reasons above.
 
 ## Verification queries and results
 
@@ -222,10 +258,67 @@ from sequencer_runs;
 ```
 
 Result: `null_org_id: 20, non_null_org_id: 0`. All 20 rows have a null
-`org_id` -- no live data either confirms or contradicts the org-id reading for
-this column. The fix for `is_org_allowed_for_sequencing` is based on the
-shared column name/write-path pattern with `weekly_assignments.org_id`, not
-on live `sequencer_runs` data (there isn't any yet).
+`org_id` -- row data alone can't settle which id space this column lives in.
+The first draft of this migration filled that gap by inferring
+`sequencer_runs.org_id` shared `weekly_assignments.org_id`'s real-org-id
+semantics purely from the shared column name and the shared sequencer
+machinery, and "fixed" `is_org_allowed_for_sequencing` on that basis. That
+inference was wrong, and a stronger check than row-sampling was sitting
+right there: the FK.
+
+**`sequencer_runs.org_id` / `zzz_archived_weekly_plan.org_id` -- FK check
+(the check that actually settles it):**
+
+```sql
+select
+  con.conname,
+  con.conrelid::regclass as table_name,
+  att.attname as column_name,
+  con.confrelid::regclass as referenced_table,
+  confatt.attname as referenced_column
+from pg_constraint con
+join pg_attribute att on att.attrelid = con.conrelid and att.attnum = any(con.conkey)
+join pg_attribute confatt on confatt.attrelid = con.confrelid and confatt.attnum = any(con.confkey)
+where con.contype = 'f'
+  and con.conrelid in ('public.sequencer_runs'::regclass, 'public.zzz_archived_weekly_plan'::regclass)
+  and att.attname = 'org_id';
+```
+
+Result: `sequencer_runs.org_id` -> `sequencer_runs_org_id_fkey` ->
+`practice_groups.id`; `zzz_archived_weekly_plan.org_id` ->
+`weekly_plan_org_id_fkey` -> `practice_groups.id`. Both columns are FK-bound
+to `practice_groups`, not `organizations` -- a real `organizations.id` value
+could never be inserted into either column. Unlike `weekly_assignments.org_id`
+(no FK to either table, confirmed by the FK inventory in this same doc),
+these two columns are structurally incapable of holding an organization id.
+
+**Corroborating: `admin-users/index.ts`'s `delete_organization` cascade.**
+`groupIds` is resolved at
+`supabase/functions/admin-users/index.ts:1504-1509` as
+`admin.from("practice_groups").select("id").eq("organization_id", organization_id)`
+mapped to `.id` -- i.e. practice_groups ids, not the organization's own id.
+It's then used at `admin-users/index.ts:1639-1640` as
+`admin.from("sequencer_runs").delete().in("org_id", groupIds)`. Deleting
+`sequencer_runs` rows by matching `org_id` against a list of group ids only
+makes sense if `org_id` holds group ids.
+
+**Corroborating: the live RLS policies.** Re-confirmed via `pg_policy`:
+`"Service role inserts sequencer runs for global and allowed orgs"` (INSERT,
+`sequencer_runs`) and `"System can insert global and allowed org plans"`
+(INSERT, `zzz_archived_weekly_plan`) both `WITH CHECK ((org_id IS NULL) OR
+is_org_allowed_for_sequencing(org_id))`, calling the function directly
+against the FK-constrained column. Any `org_id` value that satisfies the FK
+is a `practice_groups.id`, and `is_org_allowed_for_sequencing`'s live body
+(`EXISTS practice_groups WHERE id = p_org_id AND active`) is exactly the
+right check for that. The now-reverted version
+(`practice_groups.organization_id = p_org_id`) would have rejected every
+value that could actually pass the FK.
+
+**Verdict: `sequencer_runs.org_id` and `zzz_archived_weekly_plan.org_id` are
+practice_groups ids, not organization ids** -- the opposite of what
+`weekly_assignments.org_id` turned out to be, despite the identical column
+name. `is_org_allowed_for_sequencing` was correct before this migration and
+is unchanged by it.
 
 **Staff org/location nulls:**
 
@@ -291,9 +384,9 @@ touch), `practice_groups.organization_id -> organizations.id`, and
 **`organizations` has no `active` column** (checked
 `information_schema.columns`): `id, name, slug, practice_type, created_at,
 created_by, app_display_name, email_sign_off, reply_to_email, logo_url,
-brand_color, hr_email`. This is why `is_org_allowed_for_sequencing`'s fix
-keeps the "active" check on `practice_groups` rather than moving it to
-`organizations`.
+brand_color, hr_email`. Recorded for completeness; this was checked while
+evaluating the now-reverted `is_org_allowed_for_sequencing` change and no
+longer has a live consequence, since that function is unchanged.
 
 **Caller-side confirmation of `filters.organizationId` (`FilterBar.tsx`):**
 `loadOrganizations()` queries `.from('practice_groups').select('id, name')`;
@@ -331,6 +424,16 @@ and the original ticket text suggest.
 - **The duplicate `locations_org_fkey` / `locations_organization_id_fkey`
   constraints** noticed while confirming FKs. Not part of COR-2's ask;
   logged here only so it isn't lost, per "note it, don't fix it."
+- **Renaming `sequencer_runs.org_id` / `zzz_archived_weekly_plan.org_id` /
+  `is_org_allowed_for_sequencing`'s `p_org_id` parameter.** The column and
+  parameter NAME is the actually misleading part here, not the logic --
+  these predate the 2026-03-06 organizations split, from when
+  `practice_groups` was the thing this codebase called "org" (see CLAUDE.md's
+  terminology table), and were never renamed when `organizations` was
+  introduced. A rename needs to move together with the FK, the two live RLS
+  policies, and `admin-users/index.ts`'s deletion cascade, or it recreates
+  this exact confusion in the other direction. Candidate follow-up ticket,
+  not a tonight fix.
 
 ## Appendix: verbatim live definitions
 
@@ -415,7 +518,7 @@ AS $function$
 $function$
 ```
 
-### `is_org_allowed_for_sequencing(uuid)` (before this migration)
+### `is_org_allowed_for_sequencing(uuid)` (unchanged, correct as shipped -- see "PR review correction")
 
 ```sql
 CREATE OR REPLACE FUNCTION public.is_org_allowed_for_sequencing(p_org_id uuid)

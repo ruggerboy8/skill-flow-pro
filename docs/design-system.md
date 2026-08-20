@@ -100,15 +100,26 @@ a dark-mode toggle ships.
 Two access patterns exist in `src/lib/domainColors.ts`, and they are **not
 interchangeable**:
 
-- **`getDomainColor()` / `getDomainColorRich()`** — static, fallback-only
-  HSL literals baked into the JS file. These intentionally do **not** track
-  the CSS vars or dark mode live. Used by already-shipped surfaces
-  (RoleRadar, DomainDetail, CompetencyAccordion) so they keep rendering
-  byte-identically; see
-  `docs/features/explore-my-role-build-instructions.md` section D for why.
+- **`getDomainColor()` / `getDomainColorRich()` / `getDomainColorRichRaw()`**
+  — static, fallback-only HSL literals baked into the JS file. These
+  intentionally do **not** track the CSS vars or dark mode live.
+  `DomainDetail.tsx` is the one still-live consumer (it calls
+  `getDomainColorRichRaw()` directly for its alpha-blended gradient, which
+  needs closer review before migrating — see the comment in
+  `domainColors.ts` above `getDomainColorVar()`). `CompetencyAccordion.tsx`
+  imports nothing from this file. `RoleRadar.tsx` was already migrated
+  under DSN-1 and uses the live var-backed getters below, not these.
 - **`getDomainColorVar()` / `getDomainPastelVar()`** — resolve to
   `hsl(var(--domain-*))`, so they track light/dark mode live via the CSS
-  cascade. Use these for anything new, especially in the mobile shell.
+  cascade. Used by `RoleRadar.tsx` (via `getDomainPastelVar()` /
+  `getDomainInk()`) and every other DSN-1-migrated surface. Use these for
+  anything new, especially in the mobile shell.
+
+The claim that swapping the static getters for the var-backed ones is a
+no-op in light mode today, and becomes correct the day a dark-mode toggle
+ships, is DSN-1's finding — see the byte-identical-render constraint in
+`docs/features/explore-my-role-build-instructions.md` section G
+(Acceptance), not a blanket rule that these three screens can never move.
 
 `getDomainInk()` returns the ink token for text on a domain's pastel
 background, falling back to `--foreground` for an unrecognized domain.
@@ -123,9 +134,14 @@ background, falling back to `--foreground` for an unrecognized domain.
 | `--score-4` | Highest |
 
 Each has a `-bg` pastel variant (`--score-1-bg` ... `--score-4-bg`) and a
-dark-mode-only `-ink` variant for on-tint text (mobile shell). No
-`bg-score-N` / `text-score-N` Tailwind utilities exist — consume via inline
-`style`, same pattern as `CompetencyAccordion.tsx` and `DomainDetail.tsx`.
+`-ink` variant (`--score-1-ink` ... `--score-4-ink`), defined in both
+`:root` and `.dark` with different values, following the same shape as the
+domain-ink tokens. Unlike domain-ink (which `getDomainInk()` exposes and
+`RoleRadar.tsx` consumes), **no `--score-*-ink` token has any consumer in
+`src/` today** — they're defined but unused, not a parallel in-use pattern.
+No `bg-score-N` / `text-score-N` Tailwind utilities exist for the base
+score tokens either — consume via inline `style`, same pattern as
+`DomainDetail.tsx`.
 
 ### Status colors
 
@@ -304,13 +320,24 @@ The PWA manifest icon array is defined in `vite.config.ts` (search
   Use wherever there's no org context (pre-auth screens) or as the fallback
   when an org has no logo.
 - **`<OrgMark />`** (`src/components/OrgMark.tsx`) — the org-identity half
-  of the header's marquee slot. Resolves org logo → org name → caller's
-  `fallback`, shared by desktop and mobile headers so they never drift
-  apart (see `docs/specs/dsn-8-product-branding-presence.md`). Per DSN-8's
-  locked rule: **the org logo keeps the top marquee spot**; Pro Moves
-  branding gets guaranteed secondary placements instead (desktop header
-  secondary wordmark, avatar menu footer, the mobile header wordmark
-  pairing, and every loading state via `SignalP`).
+  of the header's marquee slot, shared by desktop and mobile headers so
+  they never drift apart. Its cascade, in `src/lib/orgMark.ts`
+  (`resolveOrgMarkKind()`), is **four branches, in a locked priority
+  order** (the file's own comment: "DSN-8: this priority order is locked —
+  do not reorder it"):
+  1. the org's own uploaded logo (`orgLogoUrl`), if set
+  2. otherwise, the hardcoded Alcan mark — but only when
+     `organizationId === ALCAN_ORG_ID`, so a future non-Alcan org can never
+     see it
+  3. otherwise, the org's display name as plain text
+  4. otherwise, the caller's `fallback`
+
+  DSN-8's spec (not yet committed to `main` as of this doc — spec pending
+  commit, DSN-8) is where this rule was decided: **the org logo/mark keeps
+  the top marquee spot**; Pro Moves branding gets guaranteed secondary
+  placements instead (desktop header secondary wordmark, avatar menu
+  footer, the mobile header wordmark pairing, and every loading state via
+  `SignalP`).
 - **`<SignalP />`** — see section 6.
 
 ### Clear space and minimum size

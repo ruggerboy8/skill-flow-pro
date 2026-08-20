@@ -15,6 +15,26 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    /* DSN-5a: brand palette, source of truth is promoves-brand/exports/README.md.
+    Hex to HSL conversions below; do not hand-edit without re-deriving from the
+    hex. These sit under the semantic tokens as the neutral/accent layer; they
+    do not replace domain/score/status/win tokens. */
+    --brand-navy: 208.9 70.4% 22.5%;      /* #113B62 */
+    --brand-blue: 203.3 100% 26.3%;       /* #005286 */
+    --brand-signal: 202.1 66.8% 58.6%;    /* #4FA8DC */
+    --brand-bone: 42 31.3% 93.7%;         /* #F4F1EA */
+    --brand-charcoal: 214.3 11.9% 11.6%;  /* #1A1D21 */
+    --brand-gray: 216 2.3% 58.2%;         /* #929497 */
+
+    /* DSN-5a: motion contract from promoves-brand/exports/README.md.
+    Run-once, never loops, no bounce. Use --ease-brand with --duration-brand
+    for the Signal P style reveal/settle motion; the shorter steps are for
+    ordinary UI transitions that want the same brand curve. */
+    --ease-brand: cubic-bezier(0.50, 0.05, 0.15, 1);
+    --duration-quick: 200ms;
+    --duration-standard: 400ms;
+    --duration-brand: 1000ms;
+
     /* Base Canvas - Cool Misty Blue */
     --background: 210 40% 98%;
     --foreground: 222.2 84% 4.9%;
@@ -26,9 +46,11 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    /* Brand Primary - Softened Navy */
-    --primary: 215 25% 27%;
-    --primary-foreground: 210 40% 98%;
+    /* Brand Primary - DSN-5a: remapped from generic slate to brand navy.
+    Foreground is brand bone (the kit's dark-ground structure color) since
+    navy reads as a dark ground for text purposes. */
+    --primary: var(--brand-navy);
+    --primary-foreground: var(--brand-bone);
 
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -150,8 +172,12 @@ All colors MUST be HSL.
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* DSN-5a: dark-mode primary follows the kit's existing shadcn pattern
+    (light primary on dark ground) using brand tokens: bone is the dark-ground
+    structure color, charcoal is the dark-ground presentation color, used here
+    as the readable text on a bone button. */
+    --primary: var(--brand-bone);
+    --primary-foreground: var(--brand-charcoal);
 
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
@@ -177,6 +203,27 @@ All colors MUST be HSL.
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
     
+    /* DSN-5a note for DSN-6 (do not change these values here, that ticket owns
+    the fix; DSN-1 merged 2026-08-20 without retuning them): the four rich
+    domain-* values right below are byte-identical to the light-mode values
+    above (same hue/sat/light). They were never re-tuned for a dark ground.
+    Dormant today (no dark-mode toggle ships yet) but DSN-1's helper migration
+    means these values WILL render the day one does. The domain-*-pastel values
+    two blocks down WERE re-tuned for dark (lower lightness, comment already
+    there) and read as the working example. Canonical current dark-mode
+    values, recorded here so DSN-6 has a documented starting point instead of
+    re-discovering them:
+      --domain-clinical: 211 85% 55%  (unchanged from light, needs dark tuning)
+      --domain-clerical: 123 60% 45%  (unchanged from light, needs dark tuning)
+      --domain-cultural: 330 85% 60%  (unchanged from light, needs dark tuning)
+      --domain-case-acceptance: 36 90% 55%  (unchanged from light, needs dark tuning)
+    Per the brand kit's dark-ground guidance (signal blue is the dark-ground
+    accent, bone is the dark-ground structure color), a reasonable direction
+    for DSN-6 is the same move already made for the pastels: keep each hue,
+    pull lightness down and saturation in slightly so the chip reads on a dark
+    card instead of glowing, the way domain-clinical-pastel dropped from
+    211 100% 92% (light) to 211 50% 22% (dark). This is guidance, not a value
+    change; DSN-6 owns picking and applying the final numbers. */
     /* Domain colors (rich/saturated) */
     --domain-clinical: 211 85% 55%;
     --domain-clerical: 123 60% 45%;

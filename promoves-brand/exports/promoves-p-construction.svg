@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<!-- SIGNAL P - MOTION HANDOFF (V3A locked)
+  Canonical construction: centerline circle center (47,37) r17 (id=centerline).
+  Dot rest: EXACTLY on the centerline at -41deg -> (59.83, 25.85), r6.
+  Terminals (neutral): upper -70deg, lower -12deg. Butt cuts. Stem weld ~150-210deg is static.
+  Motion contract: rest -> release/emergence -> travel (direction free) -> deceleration ->
+  attraction/return -> EXACT static rest. Final frame bit-identical to promoves-p.svg.
+  The centerline is the canonical reference path; a small outward radial offset during
+  travel is permitted for legibility. Never an indefinite spinner.
+  Angles: y-down, 0deg=right, positive=clockwise. dot angle a -> (47+17cos(a), 37+17sin(a)).
+  Layers: #signal-p-structure (stem+bowl) and #signal-p-dot are independent - never flatten.
+-->
+<g id="construction-geometry" stroke="#4FA8DC" fill="none">
+  <circle id="centerline" cx="47" cy="37" r="17" stroke-width="0.5" stroke-dasharray="2 2"/>
+  <line id="radial-upper-terminal" x1="47" y1="37" x2="54.87" y2="15.39" stroke-width="0.35"/>
+  <line id="radial-lower-terminal" x1="47" y1="37" x2="69.5" y2="32.22" stroke-width="0.35"/>
+  <line id="radial-rest" x1="47" y1="37" x2="59.83" y2="25.85" stroke-width="0.35" stroke-dasharray="1 1"/>
+</g>
+<g id="signal-p"><g id="signal-p-structure"><rect id="signal-p-stem" x="17" y="14" width="12" height="72" rx="1" fill="#113B62"/><path id="signal-p-bowl" d="M 63.63 33.47 A 17.0 17.0 0 1 1 52.81 21.03" fill="none" stroke="#113B62" stroke-width="12" stroke-linecap="butt"/></g><circle id="signal-p-dot" cx="59.83" cy="25.85" r="6" fill="#4FA8DC"/></g>
+</svg>

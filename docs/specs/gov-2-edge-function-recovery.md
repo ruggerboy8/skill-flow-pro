@@ -126,14 +126,21 @@ verified rather than assumed correct where it happened to already match.
 - **12 stanzas have `verify_jwt = false`, 35 have `verify_jwt = true`.** That
   matches the live platform exactly (confirmed by `grep -c` against the file
   after writing it).
-- **Added declarations that didn't exist before:** `compute-weekly-plans`,
-  `notify-meeting-summary`, `backfill-new-user-excuses`, `sequencer-health`,
-  plus a stanza for each of the other 7 newly-recovered functions that
-  previously had no entry at all (`rollover-weekly`, `override-plan`,
-  `save-priorities`, `manager-priorities-save`, `sequencer-alcan-rankings`,
-  `sequencer-sim-upsert`, `sync-onboarding-assignments`; the last one
-  already had a stanza and kept its existing `false` value, now backed by
-  real source instead of none).
+- **Added declarations that didn't exist before, 12 in total** (verified with
+  `git diff origin/main..HEAD -- supabase/config.toml`, comparing the set of
+  `[functions.*]` stanza headers before and after: 35 before, 47 after, 12
+  added, 0 removed): `backfill-new-user-excuses`, `compute-weekly-plans`,
+  `manager-priorities-save`, `notify-meeting-summary`, `override-plan`,
+  `parse-feedback`, `parse-interview`, `rollover-weekly`, `save-priorities`,
+  `sequencer-alcan-rankings`, `sequencer-health`, `sequencer-sim-upsert`.
+  **Correction from an earlier draft of this section:** it previously listed
+  `sync-onboarding-assignments` as one of the newly-added stanzas and, in the
+  same sentence, described it as already having one, an internal
+  contradiction, and it omitted `parse-feedback` and `parse-interview`
+  entirely. Both are fixed here. `sync-onboarding-assignments` is **not** a
+  new stanza: it already existed in `origin/main` with `verify_jwt = false`
+  (see section 1), and this branch only backed that existing declaration
+  with real source instead of none.
 - **Removed:** nothing needed removing. The suspected stale
   `sequencer-health` stanza the ticket described did not actually exist in
   the file (see section 1), so there was nothing to delete there, only
@@ -147,34 +154,96 @@ repo**, meaning nobody had reviewed them before now.
 
 ### `compute-weekly-plans`
 
-**What it does.** For each of the two roles (DFI=1, RDA=2), computes the
-locked current-week Pro Move picks and a draft next-week preview using the
-recovered sequencer engine (`_shared/sequencer-engine.ts`), then writes both
-results and expands the locked week into `weekly_focus` rows for every active
-location.
+**What the code is written to do.** For each of the two roles (DFI=1,
+RDA=2), compute the locked current-week Pro Move picks and a draft
+next-week preview using the recovered sequencer engine
+(`_shared/sequencer-engine.ts`), then write both results and expand the
+locked week into `weekly_focus` rows for every active location.
 
-**Reads/writes.** Reads `pro_moves`, `competencies`, four `seq_*` RPCs, and
-`manager_priorities`, all via a **service-role** REST client
-(`_shared/sequencer-data.ts`), which bypasses RLS entirely. Writes: upserts
-`alcan_weekly_plan` (both the locked and draft/preview rows), deletes and
-re-inserts `weekly_focus` rows for every active location, all through the
-service-role key.
+**Reads/writes as written.** Reads `pro_moves`, `competencies`, four
+`seq_*` RPCs, and `manager_priorities`, all via a **service-role** REST
+client (`_shared/sequencer-data.ts`), which bypasses RLS entirely. Writes:
+upserts `alcan_weekly_plan` (both the locked and draft/preview rows),
+deletes and re-inserts `weekly_focus` rows for every active location, all
+through the service-role key.
+
+**Against today's schema, it cannot get anywhere near a write.** Both
+tables it targets are gone under those names: `alcan_weekly_plan` was
+dropped outright by `supabase/migrations/20260326212932_0b8d16a0-*.sql`
+(`DROP TABLE IF EXISTS alcan_weekly_plan;`), and `weekly_focus` was renamed
+to `zzz_archived_weekly_focus` by
+`supabase/migrations/20260724210000_slice_d_archive_cycle_era.sql`. No
+later migration recreates either under the old name, and I confirmed that
+by grepping every migration after each drop/rename for the table names.
+But the function never even reaches those writes to find that out, because
+it fails two steps earlier, in the input-fetching stage:
+
+1. `Deno.serve` parses the optional `runDate` and computes dates in plain
+   JS, no database calls yet.
+2. Inside the `for (const roleId of [1, 2])` loop, the first database call
+   of any kind is `await fetchAlcanInputsForRole(...)`
+   (`_shared/sequencer-data.ts`), called before the `alcan_weekly_plan`
+   upsert, not after it.
+3. `fetchAlcanInputsForRole`'s first REST call, against `pro_moves`,
+   succeeds; that table is untouched by either migration.
+4. Its second REST call is a POST to
+   `/rest/v1/rpc/seq_confidence_history_18w`. That function was dropped by
+   name in the `DROP FUNCTION` loop inside the slice D migration (line 26
+   of `20260724210000_slice_d_archive_cycle_era.sql`, alongside
+   `seq_domain_coverage_8w` and `seq_last_selected_by_move`), and nothing
+   recreates it afterward. PostgREST returns a 404 with a JSON error body
+   (`code: "PGRST202"`) for a call to a function that no longer exists,
+   not an array.
+5. The code never checks `confRes.ok`. It runs
+   `const confidenceHistory = (confData || []).map(...)` directly. Since
+   `confData` is the truthy error object, `(confData || [])` evaluates to
+   that object, and calling `.map` on a plain object throws a `TypeError`
+   synchronously, inside `fetchAlcanInputsForRole`.
+6. That `TypeError` propagates up through the `await
+   fetchAlcanInputsForRole(...)` call in `compute-weekly-plans/index.ts`
+   to the handler's outer `catch (error)` block, which returns HTTP 500
+   with `{ error: error.message }`.
+
+The `alcan_weekly_plan` upsert (line 65 of `index.ts`) and the
+`weekly_focus` delete/insert inside `expandToWeeklyFocus` are never
+reached on either role's iteration. **This is a correction from an earlier
+draft of this document**, which described the write as something an
+unauthenticated caller could actually trigger; tracing the code against
+the current schema shows it cannot, because the function dies in its
+input-fetching step before either write statement executes.
 
 **Auth/secret checks: none.** The handler reads only an optional `runDate`
-from the request body. There is no JWT check, no shared-secret header check,
-no admin-role check anywhere in the function.
+from the request body. There is no JWT check, no shared-secret header
+check, no admin-role check anywhere in the function. This is unchanged by
+the schema finding above; the endpoint is still wide open, it just doesn't
+do anything useful once reached.
 
-**Is public exposure justified? No.** This is a full write endpoint with zero
-internal authorization, reachable by anyone who has the URL, and it operates
-org-wide (`p_org_id: null` throughout, so it isn't scoped to one tenant).
+**Is public exposure justified? No**, though for a different reason than
+severity of impact. The absence of any auth check is still a real defect
+in the code itself, and worth fixing on principle regardless of what the
+schema happens to look like this week. But it is not currently a live
+data-integrity hole.
 
-**Risk if hit unauthenticated.** An anonymous caller can trigger a full
-recompute and overwrite of the shared weekly plan and `weekly_focus` tables
-at will, for both roles, as many times as they want. That's a live-data
-integrity hole (participants would see plans flip unpredictably) and a free
-amplification vector against the four backing RPCs. **Confirmed
-higher-severity than the ticket's framing suggested:** this isn't just a
-missing-source gap, it's an unauthenticated org-wide write.
+**Risk if hit unauthenticated, today.** An anonymous caller can invoke a
+service-role Deno function that does a small amount of real work (one
+successful `pro_moves` read) and then throws, returning a 500. No row in
+`alcan_weekly_plan` or `weekly_focus` gets written, because neither of
+those write statements is ever reached and neither target exists under
+that name anymore. The concrete live risk today is **unauthenticated
+invocation of a dead service-role endpoint**, not silent overwrite of
+production planning data. That said, two things keep this from being a
+non-issue: first, the write code is real, correctly targets a
+service-role client that bypasses RLS, and would resume having its
+original effect immediately if `alcan_weekly_plan` or `weekly_focus`
+(or equivalents under those exact names) ever came back, whether by a
+rollback, a new migration, or a compatibility view; second, it still burns
+compute and hits the `pro_moves` table on every anonymous call, which is a
+minor unauthenticated-cost vector on its own even though it can't corrupt
+data right now. **Net effect on the recommendation: this strengthens the
+case to undeploy** (see section 7) rather than weakens it. The function is
+not merely unused, it is unauthenticated *and* non-functional against the
+schema currently live, with no upside to keeping it deployed while it is
+in that state.
 
 ### `sequencer-health`
 
@@ -203,42 +272,82 @@ unnecessary open surface with no legitimate caller.
 
 ### `sync-onboarding-assignments`
 
-**What it does.** For every active location with `onboarding_active = true`,
-walks the onboarding `weekly_focus` templates (cycles 1 through 3), computes
-each template's `week_start_date` for that location's program start, and
-inserts a `weekly_assignments` row for any combination not already present.
+**What the code is written to do.** For every active location with
+`onboarding_active = true`, walk the onboarding `weekly_focus` templates
+(cycles 1 through 3), compute each template's `week_start_date` for that
+location's program start, and insert a `weekly_assignments` row for any
+combination not already present.
 
-**Reads/writes.** Reads `locations` and `weekly_focus`. **Writes**
-`weekly_assignments`: real INSERTs, via a **service-role** client that
-bypasses RLS, guarded only by an existing-row check (so it's idempotent, not
-authorization-checked).
+**Reads/writes as written.** Reads `locations` and `weekly_focus`.
+**Writes** `weekly_assignments`: real INSERTs, via a **service-role**
+client that bypasses RLS, guarded only by an existing-row check (so it's
+idempotent, not authorization-checked).
+
+**Against today's schema, it errors out on the second read and never
+reaches the write.** `weekly_focus` was renamed to
+`zzz_archived_weekly_focus` by
+`supabase/migrations/20260724210000_slice_d_archive_cycle_era.sql`, and no
+later migration recreates a table or view under the plain `weekly_focus`
+name. Tracing the handler in order:
+
+1. The `locations` select (line 41 of `index.ts`) succeeds; that table is
+   untouched by either migration.
+2. The `weekly_focus` select (line 54) fails, because that table no
+   longer exists under that name. The Supabase client returns this as a
+   populated `focusError` (a schema-cache-miss error, the same class
+   PostgREST returns for any query against a table it can't find), not a
+   thrown exception at the query site.
+3. The code explicitly checks this: `if (focusError) { throw new
+   Error(...) }` (line 63-64). Unlike `compute-weekly-plans`, this is a
+   deliberate, handled check, not an incidental `TypeError` from an
+   unguarded `.map`.
+4. The thrown `Error` is caught by the handler's own `try`/`catch` (the
+   `catch` starting the block that contains the whole handler body), which
+   returns `{ success: false, error: ... }` with HTTP 500.
+5. The `for (const location...)` / `for (const template...)` loops that
+   contain the `weekly_assignments` select-then-insert logic (lines 74-129)
+   are never entered, because `focusTemplates` is never assigned; the
+   function throws before that point.
+
+**This part of the earlier draft held up under re-tracing**, and Codex's
+description was accurate: the function does error out on its `weekly_focus`
+query and does exit before ever reaching the `weekly_assignments` insert.
 
 **Auth/secret checks: none.** No JWT validation, no shared secret, no
-admin-role check anywhere in the handler.
+admin-role check anywhere in the handler. Unchanged by the schema finding;
+the endpoint is still wide open, it just fails before doing anything.
 
-**Is public exposure justified? No, and to directly answer the flagged
-question: yes, it can write assignments with zero authentication.** Any
-anonymous caller can trigger inserts into `weekly_assignments` for every
-onboarding-active location in the system, on demand, repeatedly. The
-existing-row check prevents true duplicates for the same
-location/role/week/template, but it does not stop repeated full scans (every
-call re-walks all onboarding locations times all cycle 1 to 3 templates) or
-stop someone from forcing the write path to run whenever they choose.
+**Is public exposure justified? No**, on the same principle as
+`compute-weekly-plans`: an unauthenticated service-role endpoint is a
+defect regardless of whether the schema underneath it currently lets it
+do anything.
 
-**Risk if hit unauthenticated.** This is the most concrete finding of the
-three. It is a genuine unauthenticated production write path. The values
-written are deterministic (derived from existing `weekly_focus` templates,
-not attacker-supplied), which limits it short of arbitrary data injection,
-but it is still real, repeatable, unauthenticated mutation of a live table,
-plus a free query-amplification vector (locations times templates per call).
-Of the three, this is the one to lock down first.
+**Risk if hit unauthenticated, today.** An anonymous caller can invoke a
+service-role Deno function that reads `locations` successfully, fails on
+the `weekly_focus` read, and returns a 500. **No row is written to
+`weekly_assignments` today**, because the function never reaches that
+code. **Correction from an earlier draft of this document**, which
+described this as "the most concrete finding of the three" and said
+outright that an anonymous caller could write assignments; that was wrong
+against the schema as it exists now. The write code is real, targets a
+service-role client, and would resume writing immediately if `weekly_focus`
+(or an equivalent under that exact name) ever came back. Until then, the
+concrete live risk is the same shape as `compute-weekly-plans`:
+**unauthenticated invocation of a dead service-role endpoint**, plus a
+minor unauthenticated-cost vector from the `locations` read on every call.
+**Net effect on the recommendation: this strengthens the case to undeploy**
+rather than weakens it, for the same reason as above, not weaker than a
+"dead source, never wired to a frontend" endpoint but differently dead: it
+was live, wired to real tables at some point, and the schema moved out
+from under it without anyone flipping `verify_jwt` or retiring the
+function.
 
-**All three should move to `verify_jwt = true`** (or, if a legitimate
-anonymous caller exists, for example an external cron hitting
-`rollover-weekly`'s pattern, an explicit in-code auth check like the one
-already present in `backfill-format-evaluator-notes`, see section 5). That
-change is a SEC-4 ticket action, not a GOV-2 one. This document records the
-finding; it does not flip the flag.
+**All three of section 4's functions should move to `verify_jwt = true`**
+(or, if a legitimate anonymous caller exists, for example an external cron
+hitting `rollover-weekly`'s pattern, an explicit in-code auth check like
+the one already present in `backfill-format-evaluator-notes`, see section
+5). That change is a SEC-4 ticket action, not a GOV-2 one. This document
+records the finding; it does not flip the flag.
 
 ## 5. The other live `verify_jwt = false` functions
 
@@ -317,7 +426,7 @@ ticket.
 | `categorize-doctor-content` | true | yes | n/a | 154 | 2026-08-19 | Keep. 1 reference, active AI content pipeline. |
 | `coach-remind` | true | yes | n/a | 265 | 2026-08-19 | Keep. 1 reference. |
 | `coaching-extract-issues` | true | yes | n/a | 15 | 2026-08-19 | Keep. 1 reference. |
-| `compute-weekly-plans` | false | **no** | **yes** | 17 | 2025-11-04 | **Undeploy candidate.** 0 callers found in `src/` or `supabase/functions/`, no cron reference, org-wide unauthenticated write (section 4). Part of a same-batch cluster (see below) that looks like an abandoned Nov 2025 build. Confirm with owner before acting; do not undeploy on this recommendation alone. |
+| `compute-weekly-plans` | false | **no** | **yes** | 17 | 2025-11-04 | **Undeploy candidate, stronger case than "unused."** 0 callers found in `src/` or `supabase/functions/`, no cron reference, and it is unauthenticated and non-functional against today's schema: it fails inside its own input-fetching step, before either of its two writes, because `alcan_weekly_plan` is dropped and the `seq_confidence_history_18w` RPC it calls first no longer exists (section 4). Part of a same-batch cluster (see below) that looks like an abandoned Nov 2025 build. Confirm with owner before acting; do not undeploy on this recommendation alone. |
 | `deputy-get-employees` | true | yes | n/a | 41 | 2026-08-19 | Keep. 3 references, part of the live Deputy integration. |
 | `deputy-initiate-oauth` | true | yes | n/a | 62 | 2026-08-19 | Keep. 1 reference. |
 | `deputy-oauth-callback` | false | yes | n/a | 64 | 2026-08-19 | Keep. 3 references; public is conventional for an OAuth redirect target. |
@@ -356,7 +465,7 @@ ticket.
 | `sequencer-rank` | true | yes | n/a | 262 | 2026-08-19 | Keep. 7 references; this is the actually-used sequencer, distinct from the Alcan-wide cluster above. |
 | `sequencer-sim-upsert` | true | **no** | **yes** | 17 | 2025-11-04 | **Undeploy candidate.** 0 callers found. Same Nov 2025 cluster, super-admin-gated but unused. Confirm with owner first. |
 | `slot-domain-feedback` | true | yes | n/a | 25 | 2026-08-19 | Keep. 2 references. |
-| `sync-onboarding-assignments` | false | **no** | **yes** | 59 | 2026-02-17 | **Highest-priority item in this table.** Confirmed unauthenticated write path into `weekly_assignments` (section 4). 0 callers found in this repo, but repo docs (`docs/archive/edge-function-deployment.md`, `docs/archive/phase-3-5-implementation-plan.md`) describe it as a deliberately-built onboarding sync tool, so "confirm with owner before undeploying" applies doubly here: either it's genuinely dead and should go, or it's still wanted and needs `verify_jwt = true` immediately. Do not leave it as-is either way. |
+| `sync-onboarding-assignments` | false | **no** | **yes** | 59 | 2026-02-17 | **Highest-priority item in this table**, though not for the reason an earlier draft of this document gave. It is unauthenticated and, against today's schema, non-functional: its `weekly_focus` query fails (that table was renamed to `zzz_archived_weekly_focus`) and the function exits before ever reaching the `weekly_assignments` insert (section 4), so no live write is happening right now. 0 callers found in this repo, but repo docs (`docs/archive/edge-function-deployment.md`, `docs/archive/phase-3-5-implementation-plan.md`) describe it as a deliberately-built onboarding sync tool, so "confirm with owner before undeploying" applies doubly here: either it's genuinely dead and should go, or it's still wanted, in which case it needs both a schema fix and `verify_jwt = true` before it's touched again. Do not leave it as-is either way. |
 | `transcribe-audio` | true | yes | n/a | 187 | 2026-08-19 | Keep. 7 references. |
 
 **A caution about the "updated_at" column for the 36 pre-existing
@@ -379,12 +488,18 @@ last-edited date. Treat that column as "last touched by the platform," not
    `manager-priorities-save`, `sequencer-alcan-rankings`,
    `sequencer-sim-upsert`) plus `sequencer-health` be undeployed as a group?**
    All seven show zero callers, share build timestamps, and look like one
-   abandoned "Alcan-wide sequencer v2" effort that never got a frontend. This
-   session recommends it; the ticket says the undeploy decision itself
-   belongs to a separate pass.
+   abandoned "Alcan-wide sequencer v2" effort that never got a frontend.
+   `compute-weekly-plans` is now also confirmed non-functional against the
+   current schema (section 4), which only strengthens this. This session
+   recommends undeploying the group; the ticket says the undeploy decision
+   itself belongs to a separate pass.
 3. **`sync-onboarding-assignments` needs an owner decision this week, not
-   eventually.** It's a live unauthenticated write endpoint regardless of
-   whether it's still wanted.
+   eventually,** for a different reason than an earlier draft of this
+   document gave: it's an unauthenticated endpoint that is currently
+   non-functional (its `weekly_focus` query fails before it ever reaches
+   the `weekly_assignments` write, section 4), left live and unreviewed. If
+   it's still wanted, it needs both a schema fix and `verify_jwt = true`. If
+   it's not, it should go.
 4. Two functions I could not find a clear frontend caller for
    (`parse-feedback`, `parse-interview`) are at least already protected by
    `verify_jwt = true`, so there's no urgency, but they're worth a five-minute

@@ -74,7 +74,7 @@ function SourceBadges({ sources }: { sources: SourceType[] }) {
         const Icon = SOURCE_ICON[s];
         return <span key={s} title={SOURCE_META[s].label} className="inline-flex items-center rounded-full border bg-muted px-1.5 py-0.5 text-muted-foreground"><Icon className="h-3 w-3" /></span>;
       })}
-      {sources.length >= 2 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">×{sources.length}</span>}
+      {sources.length >= 2 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-2xs font-bold text-primary">×{sources.length}</span>}
     </div>
   );
 }
@@ -335,7 +335,7 @@ function AddIssueDialog({ open, onOpenChange, locations, onSave }: { open: boole
               <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-lg border p-2">
                 {locations.map((l) => (
                   <button key={l.id} type="button" onClick={() => toggle(locs, l.id, setLocs)}
-                    className={`rounded-full border px-2.5 py-1 text-[12px] font-semibold ${locs.has(l.id) ? 'border-transparent bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{l.name}</button>
+                    className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${locs.has(l.id) ? 'border-transparent bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{l.name}</button>
                 ))}
               </div>
             )}

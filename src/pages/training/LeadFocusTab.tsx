@@ -112,7 +112,7 @@ export function LeadFocusTab() {
       <div>
         <h1 className="text-xl font-bold tracking-tight">Lead focus schedule</h1>
         <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Shield className="h-3.5 w-3.5" /> One or two behaviors you want the leads driving at their locations each week. Move across weeks like the builder; past weeks are your record.
+          <Shield className="h-4 w-4" /> One or two behaviors you want the leads driving at their locations each week. Move across weeks like the builder; past weeks are your record.
         </p>
       </div>
 
@@ -122,7 +122,7 @@ export function LeadFocusTab() {
           {([['week', 'Week', LayoutList], ['month', 'Month', CalendarDays]] as const).map(([m, label, Icon]) => (
             <button key={m} onClick={() => setViewMode(m)}
               className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-semibold ${viewMode === m ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}>
-              <Icon className="h-3.5 w-3.5" />{label}
+              <Icon className="h-4 w-4" />{label}
             </button>
           ))}
         </div>
@@ -198,7 +198,7 @@ function SelectedWeek({ week, when, monday, onBuild }: { week: HydratedFocusWeek
 function FocusRow({ idx, text, outcome }: { idx: number; text: string; outcome?: string }) {
   return (
     <div className="flex items-start gap-3 border-t py-2.5 first:border-0">
-      <span className="mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-full bg-primary text-[12px] font-bold text-primary-foreground">{idx + 1}</span>
+      <span className="mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{idx + 1}</span>
       <div className="flex-1">
         <div className="text-sm font-semibold">{text}</div>
         {outcome && <span className="mt-1 inline-block rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">{OUTCOME_META[outcome as keyof typeof OUTCOME_META]?.label ?? outcome}</span>}
@@ -233,19 +233,19 @@ function Builder(props: {
             return (
               <div key={it.key} className="mb-3 rounded-xl border p-3">
                 <div className="flex items-start gap-2.5">
-                  <span className="mt-0.5 grid h-[22px] w-[22px] flex-none place-items-center rounded-full bg-muted text-[12px] font-bold text-muted-foreground">{n + 1}</span>
+                  <span className="mt-0.5 grid h-[22px] w-[22px] flex-none place-items-center rounded-full bg-muted text-xs font-bold text-muted-foreground">{n + 1}</span>
                   <div className="flex-1">
                     <Textarea value={it.text} onChange={(e) => props.onEdit(it.key, e.target.value)} rows={2} className="font-semibold" />
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="rounded-full border bg-background px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{it.sourceTitle ? `from: ${it.sourceTitle.slice(0, 24)}${it.sourceTitle.length > 24 ? '…' : ''}` : 'written by you'}</span>
-                        {it.aiPolished && <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-[color:var(--domain-clinical,#0E7C86)]"><Sparkles className="h-3 w-3" />AI-polished</span>}
+                        {it.aiPolished && <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-[color:var(--domain-clinical,#0E7C86)]"><Sparkles className="h-4 w-4" />AI-polished</span>}
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Button variant="outline" size="sm" disabled={it.polishing} onClick={() => props.onPolish(it.key)}>
-                          {it.polishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Sparkles className="mr-1 h-3.5 w-3.5" />Polish</>}
+                          {it.polishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Sparkles className="mr-1 h-4 w-4" />Polish</>}
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => props.onRemove(it.key)}><X className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => props.onRemove(it.key)}><X className="h-5 w-5" /></Button>
                       </div>
                     </div>
                   </div>
@@ -277,12 +277,12 @@ function Builder(props: {
             <div key={iss.id} className="mb-2.5 rounded-lg border p-2.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 text-[13.5px] font-semibold">{iss.title}</div>
-                <Button size="sm" disabled={items.length >= 2} onClick={() => props.onAddIssue(iss)}><Plus className="mr-1 h-3.5 w-3.5" />Focus</Button>
+                <Button size="sm" disabled={items.length >= 2} onClick={() => props.onAddIssue(iss)}><Plus className="mr-1 h-4 w-4" />Focus</Button>
               </div>
               <div className="mt-2 flex flex-wrap gap-1">
                 {iss.is_global && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">Global</span>}
                 {iss.sources.map((s: SourceType) => <span key={s} className="rounded-full border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground">{SOURCE_META[s].label}</span>)}
-                {iss.sources.length >= 2 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">×{iss.sources.length}</span>}
+                {iss.sources.length >= 2 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-2xs font-bold text-primary">×{iss.sources.length}</span>}
               </div>
             </div>
           ))}

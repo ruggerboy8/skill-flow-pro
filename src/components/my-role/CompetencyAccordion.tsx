@@ -16,17 +16,40 @@ interface CompetencyAccordionProps {
   onSelectMove?: (move: ProMoveDetail) => void;
 }
 
-function getScoreBadge(score: number | null) {
+// DSN-4: mastery tier is a competency SCORE, not a submission/delivery
+// STATUS — CLAUDE.md documents these as separate token families
+// (--score-1..4 vs --status-*), so this reads from the score tokens
+// directly rather than being forced through StatusBadge.
+function getScoreBadge(score: number | null): { label: string; style: React.CSSProperties } {
   if (score === null) {
-    return { label: 'Exploration', className: 'bg-muted text-muted-foreground border-muted-foreground/20' };
+    // Badge's outline variant (used below) renders NO fill and
+    // text-foreground, not the muted-gray pill this is meant to be —
+    // pin it explicitly so it doesn't inherit the wrong look.
+    return {
+      label: 'Exploration',
+      style: {
+        backgroundColor: 'hsl(var(--muted))',
+        color: 'hsl(var(--muted-foreground))',
+        borderColor: 'hsl(var(--muted-foreground) / 0.2)',
+      },
+    };
   }
   if (score === 4) {
-    return { label: 'Mastery', className: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' };
+    return {
+      label: 'Mastery',
+      style: { backgroundColor: 'hsl(var(--score-4-bg))', color: 'hsl(var(--score-4))', borderColor: 'hsl(var(--score-4) / 0.3)' },
+    };
   }
   if (score === 3) {
-    return { label: 'Proficient', className: 'bg-blue-500/10 text-blue-600 border-blue-500/30' };
+    return {
+      label: 'Proficient',
+      style: { backgroundColor: 'hsl(var(--score-3-bg))', color: 'hsl(var(--score-3))', borderColor: 'hsl(var(--score-3) / 0.3)' },
+    };
   }
-  return { label: 'Building', className: 'bg-amber-500/10 text-amber-600 border-amber-500/30' };
+  return {
+    label: 'Building',
+    style: { backgroundColor: 'hsl(var(--score-2-bg))', color: 'hsl(var(--score-2))', borderColor: 'hsl(var(--score-2) / 0.3)' },
+  };
 }
 
 export default function CompetencyAccordion({
@@ -70,8 +93,8 @@ export default function CompetencyAccordion({
 
           {/* Meta Group - Badge + Chevron stay together */}
           <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
-            <Badge variant="outline" className={cn('shrink-0 h-6', badge.className)}>
-              {score !== null && <Sparkles className="w-3 h-3 mr-1" />}
+            <Badge variant="outline" className="shrink-0 h-6" style={badge.style}>
+              {score !== null && <Sparkles className="w-4 h-4 mr-1" />}
               {badge.label}
             </Badge>
 

@@ -1,9 +1,8 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { format } from 'date-fns';
-import { CheckCircle2, Circle, Clock, Lock, ArrowUpRight, LucideIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { ArrowUpRight, LucideIcon } from 'lucide-react';
 
 export type AssessmentCardStatus = 'not_started' | 'in_progress' | 'completed' | 'locked';
 
@@ -18,13 +17,6 @@ export interface AssessmentTrackCardProps {
   disabledHint?: string;
 }
 
-const STATUS_META: Record<AssessmentCardStatus, { label: string; icon: LucideIcon; className: string }> = {
-  not_started: { label: 'Not started', icon: Circle, className: 'text-muted-foreground bg-muted' },
-  in_progress: { label: 'In progress', icon: Clock, className: 'text-amber-700 bg-amber-100 dark:text-amber-200 dark:bg-amber-900/40' },
-  completed: { label: 'Complete', icon: CheckCircle2, className: 'text-emerald-700 bg-emerald-100 dark:text-emerald-200 dark:bg-emerald-900/40' },
-  locked: { label: 'Locked', icon: Lock, className: 'text-muted-foreground bg-muted' },
-};
-
 export function AssessmentTrackCard({
   title,
   subtitle,
@@ -35,9 +27,6 @@ export function AssessmentTrackCard({
   primaryAction,
   disabledHint,
 }: AssessmentTrackCardProps) {
-  const meta = STATUS_META[status];
-  const StatusIcon = meta.icon;
-
   return (
     <Card className="p-4 flex flex-col gap-3 transition-shadow hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
@@ -48,10 +37,7 @@ export function AssessmentTrackCard({
             {subtitle && <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>}
           </div>
         </div>
-        <Badge className={cn('gap-1 shrink-0', meta.className)} variant="secondary">
-          <StatusIcon className="h-3 w-3" />
-          {meta.label}
-        </Badge>
+        <StatusBadge status={status} className="shrink-0" />
       </div>
 
       {statusDate && (

@@ -899,7 +899,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
 
               {/* Filter Bar */}
               <div className="flex flex-wrap items-center gap-1.5">
-                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                <Filter className="h-4 w-4 text-muted-foreground" />
                 <Badge
                   variant={filterLowSelf ? 'default' : 'outline'}
                   className="cursor-pointer text-xs"
@@ -1042,7 +1042,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                       className="h-6 w-6 shrink-0"
                       onClick={() => toggleAction(item.action_id)}
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <X className="h-5 w-5" />
                     </Button>
                   </div>
                 );
@@ -1070,7 +1070,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 onClick={handleLoadTemplate}
                 title={savedTemplate ? 'Load your saved template' : orgDefaultTemplate ? 'Load the org default template' : 'No saved template'}
               >
-                <FileDown className="h-3.5 w-3.5" />
+                <FileDown className="h-4 w-4" />
                 Load
               </Button>
               <Button
@@ -1080,7 +1080,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 onClick={handleSaveTemplate}
                 title="Save this agenda as your personal template"
               >
-                <Save className="h-3.5 w-3.5" />
+                <Save className="h-4 w-4" />
                 Save
               </Button>
               {myStaff?.is_super_admin && (
@@ -1091,7 +1091,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                   onClick={handleSaveOrgDefault}
                   title="Make this the default agenda that auto-loads for all coaches"
                 >
-                  <Save className="h-3.5 w-3.5" />
+                  <Save className="h-4 w-4" />
                   Set as default
                 </Button>
               )}
@@ -1103,7 +1103,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 onClick={handleMagicFormat}
                 disabled={isFormatting}
               >
-                <Sparkles className="h-3.5 w-3.5" />
+                <Sparkles className="h-4 w-4" />
                 {isFormatting ? 'Formatting...' : 'Magic Format'}
               </Button>
             </div>

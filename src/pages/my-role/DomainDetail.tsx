@@ -10,19 +10,48 @@ import { ROLE_CONTENT, getRoleTypeFromArchetype, type RoleType } from '@/lib/con
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import CompetencyAccordion from '@/components/my-role/CompetencyAccordion';
 import { ProMoveDrawer } from '@/components/my-role/ProMoveDrawer';
-import { cn } from '@/lib/utils';
 
-function getAverageBadge(score: number | null) {
+// DSN-4: this is a competency SCORE badge, not a submission/delivery
+// STATUS — reads from the --score-* tokens (same family CompetencyAccordion
+// uses below it on this page) rather than StatusBadge, so the two badges on
+// this screen agree with each other.
+function getAverageBadge(score: number | null): { label: string; icon: typeof TrendingUp; style: React.CSSProperties } {
   if (score === null) {
-    return { label: 'Exploration Mode', icon: TrendingUp, className: 'bg-muted/80 text-muted-foreground' };
+    // The Badge below has no `variant` prop, so it defaults to "default"
+    // (solid bg-primary/brand color) unless we pin the fill and text
+    // explicitly — this must never fall back to that default.
+    return {
+      label: 'Exploration Mode',
+      icon: TrendingUp,
+      // Matches the original bg-muted/80 (80% opacity) with no visible
+      // border (the Badge here has no variant, so its default border is
+      // already transparent unless a color class overrides it — none did).
+      style: {
+        backgroundColor: 'hsl(var(--muted) / 0.8)',
+        color: 'hsl(var(--muted-foreground))',
+        borderColor: 'transparent',
+      },
+    };
   }
   if (score >= 3.5) {
-    return { label: 'Mastery', icon: Trophy, className: 'bg-amber-100 text-amber-800' };
+    return {
+      label: 'Mastery',
+      icon: Trophy,
+      style: { backgroundColor: 'hsl(var(--score-4-bg))', color: 'hsl(var(--score-4))' },
+    };
   }
   if (score >= 2.5) {
-    return { label: 'Proficient', icon: Sparkles, className: 'bg-blue-100 text-blue-800' };
+    return {
+      label: 'Proficient',
+      icon: Sparkles,
+      style: { backgroundColor: 'hsl(var(--score-3-bg))', color: 'hsl(var(--score-3))' },
+    };
   }
-  return { label: 'Building', icon: TrendingUp, className: 'bg-orange-100 text-orange-800' };
+  return {
+    label: 'Building',
+    icon: TrendingUp,
+    style: { backgroundColor: 'hsl(var(--score-2-bg))', color: 'hsl(var(--score-2))' },
+  };
 }
 
 export default function DomainDetail() {
@@ -101,7 +130,7 @@ export default function DomainDetail() {
             {/* Score Badge */}
             {!isLoading && data && (
               <div className="flex flex-col items-start md:items-end gap-1.5 mt-2 md:mt-0">
-                <Badge className={cn('px-4 py-2 text-sm font-medium shrink-0', avgBadge.className)}>
+                <Badge className="px-4 py-2 text-sm font-medium shrink-0" style={avgBadge.style}>
                   <BadgeIcon className="w-4 h-4 mr-2" />
                   {avgBadge.label}
                   {typeof data.averageScore === 'number' && (

@@ -115,7 +115,7 @@ export default function TeamPage() {
       <div className="rounded-2xl border border-border bg-card p-4">
         <p className="text-2xs font-bold uppercase tracking-widest text-muted-foreground">This week</p>
         <div className="flex items-baseline gap-2 mt-1">
-          <span className="text-[30px] font-extrabold tabular-nums">{checkedInCount}</span>
+          <span className="text-3xl font-extrabold tabular-nums">{checkedInCount}</span>
           <span className="text-sm text-muted-foreground">of {total} checked in</span>
         </div>
         {rosterData?.meetingDay && (

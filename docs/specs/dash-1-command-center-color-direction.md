@@ -48,3 +48,4 @@ Confidence averages use the `--score-1` through `--score-4` ramp (text plus `-bg
 
 - Phase 1b: moment-aware layout switching, section reordering, stat-card merge, grid re-sorting. Do not do these.
 - COR-6, DSN-3, LocationDetail page, LocationSkillGaps widget, mobile shell, any DB/RPC/hook changes.
+- Note (post-QA, DASH-1a): LocationDetail's location health card inherits the recolor because it renders the same shared `LocationHealthCard` component used on the Command Center; forking that component to keep LocationDetail untouched would be worse than one consistent card. The rest of the LocationDetail page is untouched.

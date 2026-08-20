@@ -2,6 +2,18 @@
 *Status: Draft for review — not yet implemented*
 *Last updated: 2026-03-06*
 
+> **Status note, 2026-08-19 (DOC-3).** The line above is stale: multi-tenancy
+> has substantially shipped since this was written. The `organizations` table
+> exists, `practice_groups.organization_id` links to it (migration
+> `20260306190002`), and `current_user_org_id()` resolves it live. Kept
+> canonical for its terminology (Organization/Group/Location, still locked and
+> correct) and as a record of the original design, not as a build-status
+> report. For what actually exists today, see
+> [data-model.md](data-model.md). One specific correction: the
+> `pro_moves.practice_type` design below (singular column) shipped as written
+> in March, then was converted to a `practice_types` array on 2026-03-11.
+> See the note at that section.
+
 ---
 
 ## Terminology Reference
@@ -81,6 +93,16 @@ organizations (new — the tenant/top-level entity)
 
 ### The `organizations` Table (New)
 
+> **Correction, 2026-08-19 (DOC-3):** the `practice_type` values below
+> (`"pediatric" | "general"`) are the original design and are now stale. The
+> same 2026-03-11 migration that converted `pro_moves.practice_type` to an
+> array (see the correction further down this doc) also renamed the
+> organization-level values to `pediatric_us` and `general_us`, and added a
+> third value, `general_uk`. Current constraint:
+> `chk_org_practice_type CHECK (practice_type IN ('pediatric_us', 'general_us', 'general_uk'))`.
+> `organizations.practice_type` itself is still a single value, not an array;
+> only `pro_moves.practice_types` became an array.
+
 ```sql
 CREATE TABLE organizations (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -150,6 +172,11 @@ a pro move (e.g., substituting their internal policy name). This will include a
 lightweight LLM review step. Out of scope for Phase 1.
 
 ### Database Design
+
+> **Correction, 2026-08-19 (DOC-3):** this shipped as a singular `practice_type`
+> column as written below, then was converted to a `practice_types` **array**
+> on 2026-03-11 (migration `20260311220946`) so a Pro Move could belong to more
+> than one practice type. The SQL below is the original (superseded) design.
 
 ```sql
 -- pro_moves: add practice_type to platform library

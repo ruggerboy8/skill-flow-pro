@@ -1,4 +1,21 @@
-> **Archived 2026-08-19 (DOC-5).** This is a historical record, accurate about the past, and is not a description of how the system works today. Do not treat it as current. For the present state see docs/README.md. Specifically wrong: it tells the reader to ship database changes with `npx supabase db push`, which CLAUDE.md states does not work on this project, and its own stale banner undersells how far behind it is.
+> **Archived 2026-08-19 (DOC-5), banner strengthened 2026-08-19 (DOC-3).** This
+> is a historical record, accurate about the past, and is not a description of
+> how the system works today. Do not treat it as current. **Known wrong,
+> specifically:** (1) the "Build/deploy" line below tells the reader to ship
+> database changes with `npx supabase db push`; CLAUDE.md's "Applying
+> migrations" section states that command is unproven and untrusted on this
+> project and documents the SQL-editor path instead. (2) The stale banner
+> further down this file says it is ~1,529 commits behind `main`; that number
+> is itself now several months old and understates the drift further. (3) The
+> route table, file layout, role list, and every `file:line` reference below
+> were verified against a March-2026 branch and have not been re-checked since.
+> Treat all of them as unverified, not just the migration line. **For a
+> description of how the system works today, read (in order): CLAUDE.md (repo
+> root, for migrations, terminology, design conventions), `docs/system-overview.md`
+> (product tour), and `docs/data-model.md` (current schema, rewritten by
+> DOC-3 to replace this file's data-model companion). This file has no
+> current-state replacement; a full rewrite was explicitly out of scope for
+> DOC-3.**
 
 # Skill Flow Pro — Architecture
 

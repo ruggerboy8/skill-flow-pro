@@ -270,7 +270,9 @@ export default function EvaluationCapture() {
       // Only include these keys at all when there's a real glow, so a
       // grow-only or empty save never references the new columns (those
       // don't exist yet on a DB where the MOB-4 migration hasn't landed).
-      ...(hasGlow ? { glow_source_staff_id: actingStaffId, glow_source_type: "evaluator" } : {}),
+      ...(hasGlow
+        ? { glow_source_staff_id: actingStaffId, glow_source_type: "evaluator", glow_source_name: staffProfile?.name ?? null }
+        : {}),
     });
   }
 
@@ -310,7 +312,9 @@ export default function EvaluationCapture() {
         // MOB-4: same source stamping as handleNoteBlur, and the same
         // conditional-keys guard so a glow-less polish never touches the
         // new columns.
-        ...(hasGlow ? { glow_source_staff_id: actingStaffId, glow_source_type: "evaluator" } : {}),
+        ...(hasGlow
+          ? { glow_source_staff_id: actingStaffId, glow_source_type: "evaluator", glow_source_name: staffProfile?.name ?? null }
+          : {}),
       });
       setDrafts((p) => ({ ...p, [comp.competencyId]: "" }));
       toast({ title: "Polished", description: "Split into a glow and a grow below. Tweak if you like." });

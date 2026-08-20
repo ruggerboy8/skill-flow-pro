@@ -138,6 +138,10 @@ export interface CaptureItemPatch {
   // the two never drift out of sync. See supabase/migrations/20260820200000_mob4_glow_source_columns.sql.
   glow_source_staff_id?: string | null;
   glow_source_type?: string | null;
+  // MOB-4 fix: denormalized giver display name, captured alongside
+  // glow_source_staff_id since a plain participant's RLS can't resolve a
+  // staff id to a name via a live join. See useStaffGlows.ts.
+  glow_source_name?: string | null;
 }
 
 /**

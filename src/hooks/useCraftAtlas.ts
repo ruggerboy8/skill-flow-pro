@@ -145,7 +145,7 @@ export function useCraftAtlas() {
       if (compIds.length > 0) {
         const { data: allProMoves } = await supabase
           .from('pro_moves')
-          .select('action_id, action_statement, competency_id')
+          .select('action_id, action_statement, description, competency_id')
           .in('competency_id', compIds)
           .eq('active', true);
 
@@ -187,6 +187,7 @@ export function useCraftAtlas() {
             const detail: ProMoveDetail = {
               action_id: pm.action_id,
               action_statement: pm.action_statement || '',
+              description: pm.description || null,
               lastPracticed,
               avgConfidence,
             };

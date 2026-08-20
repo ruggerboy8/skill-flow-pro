@@ -7,11 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, FileText, User, AlertCircle, CheckCircle2, Info, MessageSquare } from 'lucide-react';
+import { ArrowLeft, FileText, User, AlertCircle, CheckCircle2, Info, MessageSquare, Sun, Sprout } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { getEvaluation, isLegacyInterviewEval } from '@/lib/evaluations';
+import { legacyNoteOf } from '@/lib/evalCaptureData';
 import { getDomainColor, getDomainColorRaw, getDomainColorRichRaw } from '@/lib/domainColors';
 import { getDomainOrderIndex } from '@/lib/domainUtils';
 import type { EvaluationWithItems, ExtractedInsights, InsightsPerspective, DomainInsight } from '@/lib/evaluations';
@@ -30,7 +31,14 @@ function ReadOnlyScore({ value }: { value: number | null }) {
   return <span className={`px-2.5 py-1 rounded border text-sm ${pill?.cls}`}>{value}</span>;
 }
 
-type RolledNote = { source: 'Observer' | 'Self'; competency: string; text: string; competency_id: number };
+type RolledNote = {
+  source: 'Observer' | 'Self';
+  competency: string;
+  competency_id: number;
+  text: string | null;
+  glow?: string | null;
+  grow?: string | null;
+};
 
 const r1 = (n: number | null) => n == null ? null : Math.round(n * 10) / 10;
 const avg = (arr: Array<number | null>) => {
@@ -47,6 +55,8 @@ type GroupedItem = {
   observer_score: number | null;
   self_note: string | null;
   observer_note: string | null;
+  observer_glow: string | null;
+  observer_grow: string | null;
 };
 
 // Helper to get legacy structure as self_assessment perspective
@@ -447,12 +457,17 @@ export default function EvaluationViewer() {
             // Collect notes for this domain
             const notes: RolledNote[] = domainItems.flatMap(item => {
               const out: RolledNote[] = [];
-              if (item.observer_note) {
-                out.push({ 
-                  source: 'Observer', 
-                  competency: item.competency_name_snapshot, 
+              const glow = item.observer_glow?.trim() || null;
+              const grow = item.observer_grow?.trim() || null;
+              const legacyText = legacyNoteOf(item);
+              if (glow || grow || legacyText) {
+                out.push({
+                  source: 'Observer',
+                  competency: item.competency_name_snapshot,
                   competency_id: item.competency_id,
-                  text: item.observer_note 
+                  text: legacyText,
+                  glow,
+                  grow,
                 });
               }
               if (!isBaseline && item.self_note) {
@@ -545,7 +560,24 @@ export default function EvaluationViewer() {
                                     {note.source}
                                   </span>
                                   <span className="font-medium">{note.competency}: </span>
-                                  <span className="text-muted-foreground">{note.text}</span>
+                                  {note.glow || note.grow ? (
+                                    <div className="mt-1 space-y-1">
+                                      {note.glow && (
+                                        <div className="flex items-start gap-1.5">
+                                          <Sun className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: 'hsl(var(--score-4))' }} />
+                                          <span className="text-muted-foreground">{note.glow}</span>
+                                        </div>
+                                      )}
+                                      {note.grow && (
+                                        <div className="flex items-start gap-1.5">
+                                          <Sprout className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: 'hsl(var(--score-2))' }} />
+                                          <span className="text-muted-foreground">{note.grow}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground">{note.text}</span>
+                                  )}
                                 </div>
                               ))}
                             </div>

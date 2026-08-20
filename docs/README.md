@@ -1,6 +1,8 @@
 # Docs index (honest inventory)
 
-*Inventory built 2026-08-18. Restructured 2026-08-19 by ticket DOC-5.*
+*Inventory built 2026-08-18. Restructured 2026-08-19 by ticket DOC-5. Content
+of the six actively-misleading docs addressed 2026-08-19 by ticket DOC-3.
+See the "actively misleading" section below for what changed.*
 
 This is a map of every file under `docs/`, with a blunt read on whether you can
 trust each one right now.
@@ -66,24 +68,24 @@ is usually claiming to be fresher than it is.
 4. **`docs/enterprise-architecture.md`**: the locked Organization / Group /
    Location terminology. CLAUDE.md cites it as the canonical vocabulary source.
 
-**There is no trustworthy schema or glossary doc right now.** Both
-`data-model.md` and `glossary.md` named five tables that were dropped on
-2026-07-25 as if they were live, so both are archived. Until DOC-3 replaces them,
-`supabase/migrations/` and CLAUDE.md are the source of truth for schema and
-terminology.
+5. **`docs/data-model.md`** and **`docs/glossary.md`**: rewritten 2026-08-19 by
+   DOC-3 to replace the archived versions, which named five tables dropped on
+   2026-07-25 as if they were live. Current.
 
 ---
 
 ## Canonical (`docs/`, top level)
 
-Eight files. If this list grows much past a dozen, something historical has
+Ten files. If this list grows much past a dozen, something historical has
 leaked back in.
 
 | Doc | What it is | Last changed | Status | Why (if not current) |
 |---|---|---|---|---|
 | `README.md` | This index. | 2026-08-19 | CURRENT | |
 | `system-overview.md` | Plain-English tour of the product, the users, and the weekly loop. The designated entry point. | 2026-06-22 | CURRENT | |
-| `enterprise-architecture.md` | The multi-tenant design and the locked terminology; CLAUDE.md cites it as the canonical terminology source. | 2026-03-06 | STALE BUT USEFUL | Marked "Draft, not yet implemented," but multi-tenancy has since largely shipped (the `organizations` table and org chain exist). Kept canonical because it is still the reference for the locked terms. |
+| `data-model.md` | The database as it exists, table by table. Rewritten by DOC-3 2026-08-19 to replace the archived version. | 2026-08-19 | CURRENT | Row counts are a mix of a 2026-08-18 live pass and older, unverified figures; no live DB access was used to write it. Treat counts as relative scale only. |
+| `glossary.md` | Definitions of the domain terms. Rewritten by DOC-3 2026-08-19 to replace the archived version. | 2026-08-19 | CURRENT | |
+| `enterprise-architecture.md` | The multi-tenant design and the locked terminology; CLAUDE.md cites it as the canonical terminology source. | 2026-03-06 (status note added 2026-08-19) | STALE BUT USEFUL | Marked "Draft, not yet implemented," but multi-tenancy has since largely shipped (the `organizations` table and org chain exist). DOC-3 added an inline status note saying so, plus a correction on `pro_moves.practice_type` (shipped singular, became a `practice_types` array on 2026-03-11). Kept canonical because it is still the reference for the locked terms. |
 | `management-model.md` | The management theory behind ProMoves and how the deployed system differs from the designed one. | 2026-07-20 | CURRENT | |
 | `pro-move-versioning-implementation-plan.md` | Effort audit and implementation plan for framework versioning. | 2026-07-30 | CURRENT | Marked APPLIED and verified live; accurately describes the shipped `framework_history` system. |
 | `testing.md` | How to unit test Supabase-backed code with the test double. | 2026-08-18 | CURRENT | |
@@ -146,21 +148,21 @@ Nothing here was deleted: this is the audit trail.
 
 | Doc | What it is | Last changed | Status | Why archived |
 |---|---|---|---|---|
-| `architecture.md` | How the codebase is laid out: stack, routing, auth, roles. | 2026-06-22 | WAS ACTIVELY MISLEADING | Tells the reader "database changes ship via `npx supabase db push`," which CLAUDE.md states does not work on this project. Its own stale banner also undersells how far behind it is. |
-| `data-model.md` | The database as it exists, table by table, with row counts. | 2026-07-30 | WAS ACTIVELY MISLEADING | Lists five tables deleted on 2026-07-25 (`weekly_self_select`, `user_backlog`, `user_backlog_v2`, `manager_priorities`, `resource_events`) as live, including `user_backlog_v2` as the active recommender store. |
-| `glossary.md` | Definitions of the domain terms (Pro Move, check-in/out, sequencer, org hierarchy). | 2026-06-22 | WAS ACTIVELY MISLEADING | Calls `user_backlog_v2` the "active store" and lists two other dropped tables as present. The term definitions are fine; those table rows are not. |
-| `roadmap.md` | Product roadmap and session log. | 2026-03-06 | WAS ACTIVELY MISLEADING | Header says "Living document. Updated at the end of every working session," but it has one session entry and has not been touched in over five months. |
+| `architecture.md` | How the codebase is laid out: stack, routing, auth, roles. | 2026-06-22 (banner strengthened 2026-08-19) | WAS ACTIVELY MISLEADING | Tells the reader "database changes ship via `npx supabase db push`," which CLAUDE.md states does not work on this project. DOC-3 strengthened the banner (listed exactly what's known wrong, pointed at CLAUDE.md/system-overview.md/data-model.md) but did not rewrite the body: that was explicitly out of scope for DOC-3. Still not safe to read as current. |
+| `data-model.md` | The database as it exists, table by table, with row counts. | 2026-07-30 | SUPERSEDED | Lists five tables deleted on 2026-07-25 as live, including `user_backlog_v2` as the active recommender store. **Replaced 2026-08-19 by canonical `docs/data-model.md`** (DOC-3); this archived copy is kept only as a record of what the doc used to say. |
+| `glossary.md` | Definitions of the domain terms (Pro Move, check-in/out, sequencer, org hierarchy). | 2026-06-22 | SUPERSEDED | Calls `user_backlog_v2` the "active store" and lists two other dropped tables as present. **Replaced 2026-08-19 by canonical `docs/glossary.md`** (DOC-3), which also folds in the 2026-08-19 product-owner correction that "cycle" is a fully legacy concept now. |
+| `roadmap.md` | Product roadmap and session log. | 2026-03-06 | WAS ACTIVELY MISLEADING | Header says "Living document. Updated at the end of every working session," but it has one session entry and has not been touched in over five months. DOC-3 reviewed this: the DOC-5 archive plus banner already resolves the danger (an agent routed here is warned before reading), and the doc's content (a March planning session, a pre-multi-tenancy work queue) has no current audience now that the Motion board and `docs/dev/assessment-2026-08-18.md` do this job. A rewrite would just be a second roadmap doc. Left archived and bannered rather than rewritten or deleted; deletion was avoided per the DOC-5 "archive, don't delete" decision. |
 | `progress.md` | Session progress tracker and collaboration process. | 2026-03-06 | WAS ACTIVELY MISLEADING | Header says "Read this at the start of every new session," yet it is five-plus months stale and prescribes the retired Lovable workflow. |
 | `improvement-backlog.md` | Running list of known weirdness and legacy-cleanup candidates. | 2026-07-24 | STALE BUT USEFUL | Predates the Aug-18 assessment, which supersedes several items and formalized them as Motion tickets. Still a good map of the legacy clusters. |
 | `simplification-roadmap.md` | The single ordered cleanup list (DB cleanup, permission unification, navigation). | 2026-07-24 | STALE BUT USEFUL | Partly overtaken by the Aug-18 assessment and the Motion board. |
-| `enterprise-blockers.md` | Issues to clear before a broad enterprise rollout beyond Alcan. | 2026-03-11 | STALE BUT USEFUL | Five months old; some items are now covered by the Aug-18 assessment tickets. |
+| `enterprise-blockers.md` | Issues to clear before a broad enterprise rollout beyond Alcan. | 2026-03-11 (re-checked 2026-08-19) | STALE BUT USEFUL | DOC-3 re-verified §1 and §2 against the live code. The `alcanskills.lovable.app` hardcode this doc warned about is gone (now `mypromoves.com`), but a same-shape gap remains: several email functions still fall back to `johno@alcandentalcooperative.com` / `falvarez@alcandentalcooperative.com` if their env vars aren't set. §3-§8 were not re-checked. |
 | `clean-room-prd.md` | A reverse PRD written as if starting fresh, deliberately blind to the current app. | 2026-07-24 | STALE BUT USEFUL | A point-in-time thought exercise. Read as intent, not state. |
 | `navigation-remediation-plan.md` | Plan to fix navigation and permission-gating issues. | 2026-07-20 | UNVERIFIED | Marked "ready to execute"; how much has shipped was never checked against the routing code. |
 | `edge-function-deployment.md` | How-to for deploying the `sync-onboarding-assignments` edge function. | 2025-12-01 | UNVERIFIED | Eight months old and about one function; the CLI deploy path it describes was never re-confirmed (see GOV-2). |
 | `pro-move-versioning-requirements.md` | The what-and-why requirements for framework versioning. | 2026-07-30 | HISTORICAL RECORD | Requirements for a feature that is now live; useful as rationale. |
 | `phase-c-comparison.md` | Point-in-time scoring of the live platform against the PRD. | 2026-07-24 | HISTORICAL RECORD | A dated 2026-07-24 comparison snapshot. |
 | `phase-3-5-implementation-plan.md` | Plan to finish the `weekly_assignments` migration. | 2025-12-01 | HISTORICAL RECORD | That migration is now the live assignment path; this is the plan that got it there. |
-| `phase2-qa.md` | QA notes for the dual-read feature-flag validation of `weekly_assignments`. | 2025-11-21 | HISTORICAL RECORD | November 2025 QA for a flag that has since become the default path. |
+| `phase2-qa.md` | QA notes for the dual-read feature-flag validation of `weekly_assignments`. | 2025-11-21 (addendum added 2026-08-19) | HISTORICAL RECORD | November 2025 QA for a flag, `VITE_USE_WEEKLY_ASSIGNMENTS`, that DOC-3 confirmed is now fully deleted from the code (not just defaulted on). This is the "documented feature flag is dead" finding from the Aug-18 assessment. |
 | `weekly-assignments-migration-summary.md` | Summary of the completed `weekly_assignments` migration. | 2025-11-21 | HISTORICAL RECORD | Explicitly a "migration completed 2025-11-21" record. |
 | `utilization-snapshot-2026-07-24.md` | Live-queried snapshot of how ProMoves is actually used, with an owner interview. | 2026-07-24 | HISTORICAL RECORD | A dated usage snapshot; numbers are point-in-time. |
 
@@ -255,20 +257,31 @@ uncommitted files above.
 ## The six that were actively misleading
 
 Each of these was checked and found to state something specifically wrong, not
-merely to be old. All six now live under `docs/archive/` with a header naming the
-wrong claim. Fixing their content is ticket DOC-3.
+merely to be old. All six moved under `docs/archive/` with a header naming the
+wrong claim (DOC-5, 2026-08-19). **DOC-3 (2026-08-19) then fixed content where
+fixing made sense:** two got full canonical replacements, the rest stayed
+archived because a rewrite would not have produced a document with a live
+audience. See the archive table above for the per-file reasoning.
 
 1. **`archive/architecture.md`** points the reader at `npx supabase db push`;
-   CLAUDE.md says that command does not work on this project.
+   CLAUDE.md says that command does not work on this project. **Status:**
+   still archived; DOC-3 strengthened the banner instead of rewriting the body
+   (out of scope for this pass).
 2. **`archive/roadmap.md`** claims it is "updated at the end of every working
-   session"; it has one session and is over five months stale.
+   session"; it has one session and is over five months stale. **Status:**
+   still archived; the Motion board and `docs/dev/assessment-2026-08-18.md`
+   now do this document's job, so DOC-3 left it as a labeled historical record
+   rather than writing a second roadmap.
 3. **`archive/progress.md`** claims to be read at the start of every new session;
    it is five-plus months stale and prescribes a retired Lovable workflow.
+   **Status:** still archived, not otherwise touched by DOC-3.
 4. **`archive/data-model.md`** lists five tables deleted on 2026-07-25 as live,
    including naming a dropped table (`user_backlog_v2`) as the active recommender
-   store.
+   store. **Status:** replaced, see canonical `docs/data-model.md`.
 5. **`archive/glossary.md`** describes those same dropped tables as present and
-   active.
+   active. **Status:** replaced, see canonical `docs/glossary.md`.
 6. **`archive/audits/security-rls-audit.md`** embeds a real-format management
    token and reads as "security is handled," which the Aug-18 live audit
-   disproved.
+   disproved. **Status:** still archived, not otherwise touched by DOC-3.
+   Rotating the embedded token is a security action, not a doc-content fix,
+   and is out of scope here.

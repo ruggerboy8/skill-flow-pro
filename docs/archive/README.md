@@ -22,4 +22,10 @@ Contents:
 - `prototypes/`: standalone HTML prototypes that were never wired into the app
 
 For the trust rating of any individual file, see `docs/README.md`. Fixing the
-content of the misleading ones is ticket DOC-3.
+content of the misleading ones was ticket DOC-3 (2026-08-19): two of them,
+`data-model.md` and `glossary.md`, now have canonical replacements at
+`docs/data-model.md` and `docs/glossary.md`. The archived copies here stay as
+a record of what they used to say, not as a source to read from. The rest
+(`architecture.md`, `roadmap.md`, `progress.md`,
+`audits/security-rls-audit.md`) stayed archived; see `docs/README.md` for why
+each one did.

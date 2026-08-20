@@ -825,9 +825,9 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                   {exp.description && <p className="text-xs text-muted-foreground">{exp.description}</p>}
                   <div className="flex gap-1.5">
                     {([
-                      { key: 'addressed' as const, label: '✓ Addressed', variant: 'default' },
-                      { key: 'continuing' as const, label: '→ Continuing', variant: 'secondary' },
-                      { key: 'dropped' as const, label: '✗ Dropped', variant: 'outline' },
+                      { key: 'addressed' as const, label: '✓ Addressed', srLabel: 'Addressed', variant: 'default' },
+                      { key: 'continuing' as const, label: '→ Continuing', srLabel: 'Continuing', variant: 'secondary' },
+                      { key: 'dropped' as const, label: '✗ Dropped', srLabel: 'Dropped', variant: 'outline' },
                     ] as const).map(opt => (
                       <Badge
                         key={opt.key}
@@ -848,6 +848,8 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                             }));
                           }
                         }}
+                        aria-label={`Mark "${exp.title}" as ${opt.srLabel}`}
+                        aria-pressed={status === opt.key}
                       >
                         {opt.label}
                       </Badge>

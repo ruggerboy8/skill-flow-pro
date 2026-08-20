@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateMissingCounts, calculateLocationStats, type SubmissionGates } from './submissionStatus';
+import { calculateMissingCounts, calculateLocationStats, calculateDistinctMissedCount, type SubmissionGates } from './submissionStatus';
 import type { StaffWeekSummary } from '@/types/coachV2';
 
 function week(overrides: Partial<StaffWeekSummary> = {}): StaffWeekSummary {
@@ -127,5 +127,53 @@ describe('calculateLocationStats', () => {
     const result = calculateLocationStats(staff, { ...noGates });
     expect(result.avgConfidence).toBe(3);
     expect(result.avgPerformance).toBe(4);
+  });
+});
+
+describe('calculateDistinctMissedCount', () => {
+  const bothDeadlinesPassed: SubmissionGates = {
+    isPastConfidenceDeadline: true,
+    isPastPerformanceDeadline: true,
+    isPerformanceOpen: true,
+  };
+
+  it('counts a person who missed both confidence and performance once, not twice (DASH-1a QA fix)', () => {
+    // 4-person location, both deadlines passed, 2 people miss both, 2 submit everything.
+    // Distinct people missed = 2, not missingConfCount + missingPerfCount = 4.
+    const staff = [
+      week({ staff_id: 's1', conf_count: 0, perf_count: 0, assignment_count: 2 }),
+      week({ staff_id: 's2', conf_count: 0, perf_count: 0, assignment_count: 2 }),
+      week({ staff_id: 's3', conf_count: 2, perf_count: 2, assignment_count: 2 }),
+      week({ staff_id: 's4', conf_count: 2, perf_count: 2, assignment_count: 2 }),
+    ];
+    const result = calculateDistinctMissedCount(staff, bothDeadlinesPassed);
+    expect(result).toBe(2);
+
+    const locStats = calculateLocationStats(staff, bothDeadlinesPassed);
+    expect(locStats.missingConfCount).toBe(2);
+    expect(locStats.missingPerfCount).toBe(2);
+    expect(locStats.distinctMissedCount).toBe(2);
+  });
+
+  it('counts someone missing only one metric once', () => {
+    const staff = [week({ conf_count: 0, perf_count: 2, assignment_count: 2 })];
+    expect(calculateDistinctMissedCount(staff, bothDeadlinesPassed)).toBe(1);
+  });
+
+  it('does not count anyone before their deadline has passed', () => {
+    const staff = [week({ conf_count: 0, perf_count: 0, assignment_count: 2 })];
+    expect(calculateDistinctMissedCount(staff, {
+      isPastConfidenceDeadline: false,
+      isPastPerformanceDeadline: false,
+      isPerformanceOpen: false,
+    })).toBe(0);
+  });
+
+  it('is 0 when everyone submitted everything', () => {
+    const staff = [
+      week({ staff_id: 's1', conf_count: 2, perf_count: 2, assignment_count: 2 }),
+      week({ staff_id: 's2', conf_count: 2, perf_count: 2, assignment_count: 2 }),
+    ];
+    expect(calculateDistinctMissedCount(staff, bothDeadlinesPassed)).toBe(0);
   });
 });

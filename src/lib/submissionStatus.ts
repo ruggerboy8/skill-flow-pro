@@ -55,6 +55,24 @@ export function calculateMissingCounts(
   return { missingConfCount, missingPerfCount };
 }
 
+/**
+ * DASH-1a QA fix: count DISTINCT staff who are missing at least one
+ * past-deadline submission, so a person missing both confidence and
+ * performance is counted once, not twice. missingConfCount + missingPerfCount
+ * double-counts that person and can wrongly clear the small-team guard in
+ * participationTier (see src/lib/participationTier.ts).
+ */
+export function calculateDistinctMissedCount(
+  staff: StaffWeekSummary[],
+  gates: SubmissionGates
+): number {
+  return staff.filter(s => {
+    const missedConf = gates.isPastConfidenceDeadline && s.conf_count < s.assignment_count;
+    const missedPerf = gates.isPastPerformanceDeadline && s.perf_count < s.assignment_count;
+    return missedConf || missedPerf;
+  }).length;
+}
+
 export function calculateLocationStats(
   staff: StaffWeekSummary[],
   gates: SubmissionGates
@@ -63,6 +81,7 @@ export function calculateLocationStats(
   submissionRate: number;
   missingConfCount: number;
   missingPerfCount: number;
+  distinctMissedCount: number;
   pendingConfCount: number;
   avgConfidence: number;
   avgPerformance: number;
@@ -99,7 +118,8 @@ export function calculateLocationStats(
   
   // "Missing" counts are for LATE submissions (past deadline)
   const { missingConfCount, missingPerfCount } = calculateMissingCounts(staff, gates);
-  
+  const distinctMissedCount = calculateDistinctMissedCount(staff, gates);
+
   // "Pending" count is for not-yet-submitted but not yet late (before deadline)
   const pendingConfCount = !gates.isPastConfidenceDeadline 
     ? staff.filter(s => s.conf_count < s.assignment_count).length 
@@ -144,6 +164,7 @@ export function calculateLocationStats(
     submissionRate,
     missingConfCount,
     missingPerfCount,
+    distinctMissedCount,
     pendingConfCount,
     avgConfidence,
     avgPerformance,

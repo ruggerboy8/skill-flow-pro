@@ -195,11 +195,14 @@ member gets, not just gives or sees.
 - Lead with the focus move + the coach's next step + a learning resource
   (the "what am I working on and how do I get better" question), not the
   calibration table.
-- **Reconsider the coach-vs-self score table on a participant surface.** From
-  the staff chair it reads as "the app that shows me my boss rates me lower
-  than I rate myself." Calibration is a coach's analytical lens; decide
-  deliberately whether it belongs in the staff member's pocket at all, or
-  only inside the eval itself.
+- **Keep the coach-vs-self comparison; reframe how it's shown (John,
+  2026-08-20).** It is an important self-awareness check and stays on the
+  Performance surface. Present it **neutrally and two-directionally** — a staff
+  member may rate themselves *lower* than their coach as often as higher, and
+  both directions are useful signal — rather than as a "you're overconfident"
+  callout. Coach and Self numbers side by side as information, not judgment (no
+  amber/red gap styling); a gap in either direction is a calibration insight,
+  not a failing.
 - Performance is the surface most at risk of being "half-alive" at launch
   (its focus hero has no data for ~75% of evaluated staff today). It only
   earns its tab if the recognition/intake work below lands. Flagged honestly
@@ -222,14 +225,21 @@ member gets, not just gives or sees.
   glow exists it shows that ("Ariyana noticed…"); when none exists yet it
   shows generic encouragement rather than sitting empty (John, 2026-08-20).
   So the surface never reads as broken during the intake ramp.
-- **Forward-looking, not building now (John, 2026-08-20):** today recognition
-  has essentially **one input vector — the two evaluators (Ariyana, Lauren).**
-  The recognition surface should be designed so the *source* of a glow is
-  extensible, because the intent is to eventually let regional managers,
-  office managers, and Lead RDAs give recognition too — e.g. a future nudge
-  to a Lead RDA ("send so-and-so some warm fuzzies this week"). Do not design
-  the multi-source flow now; just don't hard-wire "glow = evaluator-only" into
-  the data or UI.
+- **Glow source: provide for it now (John, 2026-08-20).** Add a source field
+  to recognition so a glow records *who gave it* — the evaluator today
+  (Ariyana, Lauren, the current single input vector), and regional managers,
+  office managers, or Lead RDAs later (e.g. a future nudge to a lead, "send
+  so-and-so some warm fuzzies this week"). Keep it loose: future glows may not
+  come from eval capture at all, so the field should not assume an evaluator.
+  Don't build the multi-source *flows* now — just add the field so nothing has
+  to be re-modeled later.
+- **Surface one glow, chosen well — no clutter (John, 2026-08-20).** Don't show
+  every glow. Feature the single most-worth-showing one: **the glow in the
+  staff member's lowest-confidence domain** (recognition lands where they feel
+  weakest, which is where it means the most). If no glow exists in a
+  low-confidence area, fall back to any recent glow, then to the generic
+  encouragement above. Glows stay captured per competency (competency → domain
+  gives the selection its handle).
 
 ### Lead Team surface — lower priority this pass (entangled with comms)
 
@@ -312,12 +322,15 @@ does not wait on it.
    profile/settings/Team behind a header avatar menu. ✓
 2. **Comms gets its own tab** (the 4th), the Basecamp replacement; **Ask is
    the 5th, chatbot-only.** End state five tabs, zero headroom. ✓
-3. **Recognition:** glow is expected at eval capture; recognition card lives
-   on Home with a generic-encouragement fallback; source of glows kept
-   extensible for future (regional/office managers, leads). ✓
+3. **Recognition:** glow is expected at eval capture (per competency);
+   **add a glow-source field now** (evaluator today, extensible to
+   regional/office managers + leads later); recognition card on Home with a
+   generic-encouragement fallback; **surface only one glow — the one in the
+   staff member's lowest-confidence domain** — to avoid clutter. ✓
+4. **Coach-vs-self comparison:** **keep it** on Performance as a self-awareness
+   check; reframe the display to be neutral and two-directional (self-lower
+   happens too), not an "overconfident" callout. ✓
 
 **Still open:**
-4. **Coach-vs-self calibration table:** keep it on the staff Performance
-   surface, or pull it back into the evaluation only?
 5. **Staff-research gate:** run the light staff pass (§5) before org-wide
    rollout, or note it and proceed on the current (founder + data) basis?

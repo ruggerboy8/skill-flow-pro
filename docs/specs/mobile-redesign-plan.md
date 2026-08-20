@@ -112,16 +112,17 @@ must land before the Home/Performance surfacing, or the surfaces read as broken.
 Today glow is optional in `EvaluationCapture.tsx` (only Score is required) and is
 coerced to `null` when empty. John's decision (2026-08-20): make a glow
 **expected at eval capture** so the positive channel actually gets fed. Change
-the capture flow to prompt for / expect a glow per competency (or per eval —
-John to confirm granularity) alongside grow, without hard-blocking on the AI
-split. Keep the source of a glow **extensible**: today a glow's only attribution
-is the parent `evaluations.evaluator_id` and there is no per-item source column,
-so the intent to later let regional managers, office managers, and Lead RDAs give
-recognition means **not hard-wiring "glow = evaluator-only"** into the write path
-or any new UI. Whether that extensibility is modeled now as a schema column is an
-open question (below) — the ticket must at minimum avoid foreclosing it.
-**Depends on:** nothing. **DB:** likely a capture-flow change; a source column is
-an open decision. **Lane:** cross-cutting (touches capture + possibly schema).
+the capture flow to expect a glow **per competency** (John, 2026-08-20 —
+resolved: per-competency, not per-eval; that granularity is what lets MOB-5
+select a glow by domain), alongside grow, without hard-blocking on the AI split.
+**Add a glow-source field now** (John, 2026-08-20 — resolved): today a glow's
+only attribution is the parent `evaluations.evaluator_id` and there is no
+per-item source column, so add a source field so a glow records *who* gave it
+(evaluator now; regional/office managers and Lead RDAs later). Keep it loose —
+future glows may not come from eval capture at all, so the field must not assume
+an evaluator. Do not build the multi-source *flows* now; just add the field so
+nothing is re-modeled later. **Depends on:** nothing. **DB:** capture-flow change
++ a glow-source column (decided). **Lane:** cross-cutting (capture + schema).
 
 ### MOB-5 — Home recognition card + generic-encouragement fallback, and Performance glow history
 Surface glows to the staff member: a recognition card on Home ("Ariyana noticed
@@ -130,9 +131,14 @@ John (2026-08-20), the Home card **always has something warm** — when a real
 glow exists it shows that; when none exists yet it shows generic encouragement
 rather than sitting empty, so the surface never reads as broken during the intake
 ramp. Reads `evaluation_items.observer_glow` (surfaced today only inside the
-review components, not on Home). Slots into the MOB-3 ranked feed by rank.
-**Depends on:** MOB-4 (real glows to show) and MOB-3 (the feed slot + card
-budget). **Lane:** medium.
+review components, not on Home). **Surface only one glow, chosen well (John,
+2026-08-20):** the Home card features the single glow in the staff member's
+**lowest-confidence domain** (recognition where they feel weakest), not a stack
+of every glow — competency → domain gives the handle, and MOB-4's per-competency
+capture makes it possible. Fallback order: glow in a low-confidence area →
+any recent glow → generic encouragement. Slots into the MOB-3 ranked feed by
+rank. **Depends on:** MOB-4 (real glows + per-competency source) and MOB-3 (the
+feed slot + card budget). **Lane:** medium.
 
 ---
 
@@ -161,9 +167,12 @@ one-tap "I've grown here" that clears the item from the "still building" list an
 is logged as a **positive** signal to the coach (a new persisted concept — this
 needs a small data model for the cleared/grown state, since none exists). Lead
 the page with the focus move + coach's next step + a learning resource. Fold in
-the recognition glow history (MOB-5). The **coach-vs-self calibration table
-decision stays open** (keep on the staff surface or pull back into the eval only
-— skeleton decisions log #4); do not remove it without John's call. Performance
+the recognition glow history (MOB-5). **Keep the coach-vs-self comparison (John,
+2026-08-20 — resolved):** it stays on Performance as a self-awareness check, but
+**reframe the display to be neutral and two-directional** — a staff member may
+rate themselves lower than their coach as often as higher, and both are useful
+signal — Coach and Self side by side as information, not an "overconfident"
+callout (no amber/red gap styling). Performance
 only earns its tab if the recognition work lands — hence its dependency.
 **Depends on:** MOB-4/MOB-5 (recognition), MOB-1. **DB:** a "grown here" state.
 **Lane:** cross-cutting.
@@ -258,28 +267,25 @@ medium.
 - **The lead nudge action** — waits for the comms/notification layer; MOB-era
   lead work is limited to reordering the staff-detail page and disclosure copy
   (not specced here; skeleton §3 "Lead Team surface").
-- **The coach-vs-self calibration-table decision** — still open (skeleton
-  decisions log #4). MOB-7 keeps the table until John decides; no ticket removes
-  it.
 - **The staff-research gate** — the light staff pass (skeleton §5) is a gate
   before *org-wide* rollout, not before this build; the single-user test does not
   wait on it.
 
-## Open questions carried into the tickets
+## Resolved (John, 2026-08-20)
+
+- **Recognition-source (MOB-4)** — add a glow-source field now, kept loose
+  (evaluator today, extensible; must not assume an evaluator).
+- **Glow granularity (MOB-4)** — per competency, so MOB-5 can select by domain.
+- **Glow surfacing (MOB-5)** — feature one glow, the one in the lowest-confidence
+  domain; no clutter.
+- **Coach-vs-self comparison (MOB-7)** — keep it as a self-awareness check;
+  reframe the display neutral and two-directional, not an "overconfident" callout.
+
+## Open questions still carried into the tickets
 
 1. **Desktop participants** — a participant on a desktop browser still gets the
    old sidebar; this plan does not change that (skeleton §4;
    `mobile-design-principles.md` Q4). Confirm that is acceptable for now.
-2. **Recognition-source extensibility location (MOB-4)** — model the glow source
-   as a new `evaluation_items` (or a recognition-table) column now, or just avoid
-   hard-wiring evaluator-only in the write path and defer the schema? The
-   skeleton says "don't hard-wire," which does not by itself decide whether a
-   column lands now.
-3. **Glow granularity at capture (MOB-4)** — expected per competency, or per
-   evaluation? Affects the capture UX and the intake guarantee.
-4. **Coach-vs-self calibration table (MOB-7)** — keep on the staff Performance
-   surface or pull back into the evaluation only? (Skeleton decisions log #4,
-   still open.)
-5. **Staff-research gate (MOB-rollout)** — run the light staff pass before
+2. **Staff-research gate (MOB-rollout)** — run the light staff pass before
    org-wide rollout, or proceed on the founder + data basis? (Skeleton decisions
    log #5, still open.)

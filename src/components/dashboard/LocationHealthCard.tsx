@@ -219,7 +219,13 @@ export function LocationHealthCard({
     >
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-lg font-bold truncate">{stats.name}</CardTitle>
+          {/* min-w-0 overrides the flex item's default min-width:auto, which
+              would otherwise force this box to at least the title's
+              min-content width and defeat truncate's ellipsis - see DASH-2
+              QA fix 1. */}
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-lg font-bold truncate">{stats.name}</CardTitle>
+          </div>
           {headerChip}
         </div>
         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">

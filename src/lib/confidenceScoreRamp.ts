@@ -5,20 +5,25 @@
 export type ScoreBucket = 1 | 2 | 3 | 4;
 
 /**
- * Buckets a 1-4 self-rated confidence average into a score-ramp tier.
- * Under 2.0 -> 1, 2.0 to 2.9 -> 2, 3.0 to 3.9 -> 3, 4.0 and up -> 4.
+ * Buckets a 1-4 self-rated confidence average into a score-ramp tier,
+ * rounding to the NEAREST rating with half-point boundaries: under 1.5 ->
+ * 1, 1.5 to 2.49 -> 2, 2.5 to 3.49 -> 3, 3.5 and up -> 4. This matches the
+ * repo's established score-ramp convention (see the local scoreBucket in
+ * src/components/performance/ConfidenceCard.tsx and its siblings) and the
+ * DASH-1a spec's "keyed to the rounded average" (DASH-1a QA fix: this used
+ * to floor at integer boundaries instead of rounding to nearest).
  *
  * Returns undefined for non-finite input (NaN/Infinity) rather than
- * guessing (DASH-1a QA fix: NaN used to fall through every comparison and
- * silently land on bucket 4, the "best" score). Callers already treat an
- * undefined average as "no data" and render the existing muted state, so
- * this reuses that path instead of inventing a new one.
+ * guessing (an earlier QA fix: NaN used to fall through every comparison
+ * and silently land on bucket 4, the "best" score). Callers already treat
+ * an undefined average as "no data" and render the existing muted state,
+ * so this reuses that path instead of inventing a new one.
  */
 export function scoreBucket(avg: number): ScoreBucket | undefined {
   if (!Number.isFinite(avg)) return undefined;
-  if (avg < 2.0) return 1;
-  if (avg < 3.0) return 2;
-  if (avg < 4.0) return 3;
+  if (avg < 1.5) return 1;
+  if (avg < 2.5) return 2;
+  if (avg < 3.5) return 3;
   return 4;
 }
 

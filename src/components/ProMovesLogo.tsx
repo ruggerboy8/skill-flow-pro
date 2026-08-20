@@ -18,7 +18,13 @@ export function ProMovesLogo({ className }: { className?: string }) {
     <img
       src="/brand/promoves-wordmark.svg"
       alt="Pro Moves"
-      className={cn('inline-block h-[1.5em] w-auto align-middle select-none', className)}
+      className={cn(
+        // max-w-full + object-contain: in narrow containers (the max-w-md
+        // pre-auth cards on a phone) the mark shrinks to fit, keeping its
+        // aspect ratio instead of overflowing the card.
+        'inline-block h-[1.5em] w-auto max-w-full object-contain align-middle select-none',
+        className
+      )}
       draggable={false}
     />
   );

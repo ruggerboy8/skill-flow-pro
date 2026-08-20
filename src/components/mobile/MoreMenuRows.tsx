@@ -46,21 +46,26 @@ function Row({
 }
 
 /** "{location name} · {n} teammates" — Copy appendix. */
-function useTeamRowSub(locationId: string | null, staffId: string | undefined) {
+function useTeamRowSub(locationId: string | null, staffId: string | undefined, roleId: number | null) {
   const [sub, setSub] = useState<string | null>(null);
 
   useEffect(() => {
     if (!locationId || !staffId) return;
     let cancelled = false;
     (async () => {
+      // Count only the lead's own role, matching the /team roster's role filter
+      // (a Lead RDA sees RDAs only), so the "N teammates" subtitle can't disagree
+      // with the roster count.
+      let countQuery = supabase
+        .from('staff')
+        .select('id', { count: 'exact', head: true })
+        .eq('primary_location_id', locationId)
+        .eq('is_participant', true)
+        .neq('id', staffId);
+      if (roleId != null) countQuery = countQuery.eq('role_id', roleId);
       const [{ data: location }, { count }] = await Promise.all([
         supabase.from('locations').select('name').eq('id', locationId).maybeSingle(),
-        supabase
-          .from('staff')
-          .select('id', { count: 'exact', head: true })
-          .eq('primary_location_id', locationId)
-          .eq('is_participant', true)
-          .neq('id', staffId),
+        countQuery,
       ]);
       if (cancelled) return;
       const locationName = (location as any)?.name ?? 'Your location';
@@ -69,7 +74,7 @@ function useTeamRowSub(locationId: string | null, staffId: string | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [locationId, staffId]);
+  }, [locationId, staffId, roleId]);
 
   return sub;
 }
@@ -109,7 +114,7 @@ export function MoreMenuRows({
   const { signOut } = useAuth();
   const { isLead } = useUserRole();
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
-  const teamSub = useTeamRowSub(isLead ? staffProfile?.primary_location_id ?? null : null, staffProfile?.id);
+  const teamSub = useTeamRowSub(isLead ? staffProfile?.primary_location_id ?? null : null, staffProfile?.id, isLead ? staffProfile?.role_id ?? null : null);
   const managementLinks = getManagementLinks(navigation);
   const [installOpen, setInstallOpen] = useState(false);
   const [installOptedOut, setInstallOptedOut] = useState(false);

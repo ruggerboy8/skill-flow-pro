@@ -39,6 +39,7 @@ export default function Layout() {
     organizationId,
     isLoading: roleInfoLoading,
     isCoach,
+    isLead,
     isSuperAdmin,
     isOrgAdmin,
     isRegional,
@@ -187,6 +188,13 @@ export default function Layout() {
     // Doctor portal — for admins/coaches who are also doctors
     ...(isDoctor ? [
       { name: 'Doctor', href: '/doctor', icon: Stethoscope },
+    ] : []),
+    // Lead RDAs get a Team link (their team surface), on every layout — desktop
+    // sidebar and the mobile avatar menu — replacing the old Coach page they lost
+    // when isLead was dropped from showCoachTabs. On mobile Home there is also a
+    // "My Team" button; this keeps a route for desktop / unflagged-browser leads.
+    ...(isLead ? [
+      { name: 'Team', href: '/team', icon: Users },
     ] : []),
     ...(showCoachTabs ? [
       { name: 'Coach', href: '/coach', icon: Users },

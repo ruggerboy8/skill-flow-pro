@@ -49,8 +49,14 @@ export function participationTier({
  * signal, not a single absence in a small team. Passes when at least 3
  * people are missing, or - for teams too small to ever reach 3 - when the
  * team has 5 or fewer people and at most 1 of them submitted.
+ *
+ * A team of 0 or fewer never passes (DASH-1a QA fix): with no one on the
+ * roster, "0 submitted" is meaningless data, not a real shortfall, and the
+ * un-guarded math would otherwise force a red tier for a location with no
+ * staff at all.
  */
 export function passesSmallTeamGuard(missedCount: number, teamSize: number): boolean {
+  if (teamSize <= 0) return false;
   if (missedCount >= RED_MIN_MISSED) return true;
   const submitted = Math.max(teamSize - missedCount, 0);
   return teamSize <= SMALL_TEAM_MAX_SIZE && submitted <= SMALL_TEAM_MAX_SUBMITTED;

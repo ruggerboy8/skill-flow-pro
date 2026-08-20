@@ -97,6 +97,12 @@ describe('passesSmallTeamGuard', () => {
   it('fails for a team bigger than 5 with under 3 missed', () => {
     expect(passesSmallTeamGuard(2, 6)).toBe(false);
   });
+
+  it('never passes for a team of 0 or fewer, even with missedCount 0 (DASH-1a QA fix)', () => {
+    expect(passesSmallTeamGuard(0, 0)).toBe(false);
+    expect(passesSmallTeamGuard(0, -1)).toBe(false);
+    expect(passesSmallTeamGuard(5, 0)).toBe(false);
+  });
 });
 
 describe('tierColorTokens', () => {

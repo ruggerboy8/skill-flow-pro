@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "check": "tsc --noEmit -p tsconfig.app.json && npm run lint && vitest run && vite build",
+    "demo:capture": "playwright test --config=demo-capture/playwright.config.ts",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -78,10 +79,12 @@
     "@eslint/js": "^9.9.0",
     "@lovable.dev/vite-plugin-dev-server-bridge": "^1.0.2",
     "@lovable.dev/vite-plugin-hmr-gate": "^1.6.0",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/typography": "^0.5.15",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^22.5.5",
+    "dotenv": "^17.4.2",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react-swc": "^3.5.0",
@@ -94,6 +97,7 @@
     "lovable-tagger": "^1.1.7",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.11",
+    "tsx": "^4.23.12",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.1",

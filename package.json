@@ -10,7 +10,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "test": "vitest run",
-    "check": "tsc --noEmit -p tsconfig.app.json && npm run lint && vitest run && vite build",
+    "check:colors": "node scripts/check-hardcoded-colors.mjs",
+    "check": "tsc --noEmit -p tsconfig.app.json && npm run lint && npm run check:colors && vitest run && vite build",
     "demo:capture": "playwright test --config=demo-capture/playwright.config.ts",
     "preview": "vite preview"
   },

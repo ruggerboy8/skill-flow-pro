@@ -89,9 +89,14 @@ export const getDomainColorRich = (domain: string): string => {
 // ThemeProvider/toggle sets it, even though next-themes is installed and
 // several screens already carry dormant `dark:` Tailwind classes). So this
 // migration is a no-op today and becomes correct the day a dark-mode toggle
-// ships, instead of needing another sweep then. RoleRadar, DomainDetail's
-// domain header and other high-traffic screens have been migrated under
-// DSN-1; see the ticket report for the full list migrated vs. deferred.
+// ships, instead of needing another sweep then. Under DSN-1, RoleRadar,
+// ThisWeekPanel, the eval-results-v2 surface, the coach evaluation/dashboard
+// screens, and the doctor/clinical screens have been migrated to these
+// var-backed getters. DomainDetail.tsx and CompetencyAccordion.tsx are NOT
+// migrated yet — they still call the static helpers directly — because
+// their alpha-blended gradient composition needs closer review than a
+// mechanical swap; they're in the deferred set for a follow-up ticket. See
+// the DSN-1 ticket report for the full list migrated vs. deferred.
 export const getDomainColorVar = (domain: string): string => {
   const varName = DOMAIN_CSS_VARS[(domain || '').trim()];
   return varName ? `hsl(var(${varName}))` : getDomainColorRich(domain);

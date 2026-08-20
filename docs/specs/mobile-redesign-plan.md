@@ -170,19 +170,21 @@ These make Explore and Performance worth opening and give check-out its own
 ritual. They depend on the foundation (tab structure) and, for Performance, on
 the recognition spine.
 
-### MOB-6 — Explore reframe: lead with tools, de-emphasize graded squares
-Flip Explore from a report card wearing a library's name into "what to actually
-do and say." Lead with the tools (`pro_move_resources` via `ProMoveDrawer`, plus
-the move description as the universal fallback) instead of opening on the graded
-`levelForScore` tiles in `CraftAtlasOverview`; de-emphasize the graded squares
-(grading belongs to Performance). **This ticket is deliberately narrow: only the
-low-risk reorder.** The fuller "museum"/Craft Atlas + Alcan Way build is **NOT a
-one-shot and is split out into its own iterative track (John, 2026-08-20)** —
-John wants a dedicated design conversation about what the museum looks like
-before it is specced, and it will be built in sections. So MOB-6 reserves
-Explore's identity and reorders; the atlas/Alcan-Way build is separate,
-post-conversation. **The Alcan Way is holding-space only** (no code exists).
-**Depends on:** MOB-1 (tab identity). **Lane:** medium.
+### MOB-6 — Craft Atlas: lead with tools + effective search (APPROVED to build)
+Build the Craft Atlas (the "My Role" pillar of Explore) as a value surface, not
+a report card. **Keep the domain → competency → move → resource structure** (it
+mirrors the eval and staff know it) — John, 2026-08-20: do NOT flatten it.
+Instead **make the depth navigable with effective search** across the role's
+moves (find a specific move/topic fast without four taps). Lead with the tools:
+each move surfaces its `pro_move_resources` (script/audio via `ProMoveDrawer`)
+with the **description as the universal fallback** (per the resource audit),
+and grading is de-emphasized (the `levelForScore` tiles stop being the entry
+point; grading belongs to Performance). **The Alcan Way "museum" is a SEPARATE
+LATER track** — John wants to imagine and build it together, iteratively, after
+a dedicated design conversation; it is holding-space only here (no code exists).
+Search that lands with the Atlas also serves the future Ask surface (E4). **Only
+the Atlas is approved now.** **Depends on:** MOB-1 (tab identity). **Lane:**
+medium (touches `src/pages/my-role/*` + a search index over the role's moves).
 
 ### MOB-7 — Performance reframe: growth tool, with an "I've grown here" lifecycle
 Give flagged / "still building" items a lifecycle. Today a low confidence score
@@ -318,6 +320,13 @@ medium.
 - **Value card resource tiers (MOB-3)** — Doctors stay on the **description**
   tier for v1 (don't wire the `doctor_*` content in yet). Card copy never
   promises "listen"/"script" when showing text.
+- **Craft Atlas (MOB-6) APPROVED to build.** Keep the domain→competency→move
+  structure (do NOT flatten); make depth navigable with **effective search**.
+  The Alcan Way "museum" is a separate later track, imagined and built together.
+- **Build + preview process** — run the whole approved build (MOB-1/2/3, MOB-4/5,
+  MOB-6) and give John **one combined preview** at the end, not per-ticket.
+- **Adversarial review must include a design (UI/UX) agent**, not only
+  functionality/correctness reviewers (John, 2026-08-20).
 
 ## Open questions still carried into the tickets
 

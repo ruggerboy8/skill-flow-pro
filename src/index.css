@@ -203,32 +203,18 @@ All colors MUST be HSL.
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
     
-    /* DSN-5a note for DSN-6 (do not change these values here, that ticket owns
-    the fix; DSN-1 merged 2026-08-20 without retuning them): the four rich
-    domain-* values right below are byte-identical to the light-mode values
-    above (same hue/sat/light). They were never re-tuned for a dark ground.
-    Dormant today (no dark-mode toggle ships yet) but DSN-1's helper migration
-    means these values WILL render the day one does. The domain-*-pastel values
-    two blocks down WERE re-tuned for dark (lower lightness, comment already
-    there) and read as the working example. Canonical current dark-mode
-    values, recorded here so DSN-6 has a documented starting point instead of
-    re-discovering them:
-      --domain-clinical: 211 85% 55%  (unchanged from light, needs dark tuning)
-      --domain-clerical: 123 60% 45%  (unchanged from light, needs dark tuning)
-      --domain-cultural: 330 85% 60%  (unchanged from light, needs dark tuning)
-      --domain-case-acceptance: 36 90% 55%  (unchanged from light, needs dark tuning)
-    Per the brand kit's dark-ground guidance (signal blue is the dark-ground
-    accent, bone is the dark-ground structure color), a reasonable direction
-    for DSN-6 is the same move already made for the pastels: keep each hue,
-    pull lightness down and saturation in slightly so the chip reads on a dark
-    card instead of glowing, the way domain-clinical-pastel dropped from
-    211 100% 92% (light) to 211 50% 22% (dark). This is guidance, not a value
-    change; DSN-6 owns picking and applying the final numbers. */
+    /* Rich domain colors, dark-tuned (DSN-6, 2026-08-20). Unlike the pastel
+    variants below (backgrounds, tuned DARKER so chips do not glow), the rich
+    values are accents: spine stripes, chart fills, icons sitting ON dark
+    cards, so they go slightly LIGHTER and less saturated to stay readable
+    without turning neon. Hues unchanged from light mode. All four measure
+    7:1+ against the dark card background. Dormant until a dark-mode toggle
+    ships (DSN-7). Light-mode values are untouched. */
     /* Domain colors (rich/saturated) */
-    --domain-clinical: 211 85% 55%;
-    --domain-clerical: 123 60% 45%;
-    --domain-cultural: 330 85% 60%;
-    --domain-case-acceptance: 36 90% 55%;
+    --domain-clinical: 211 70% 65%;
+    --domain-clerical: 123 45% 55%;
+    --domain-cultural: 330 70% 68%;
+    --domain-case-acceptance: 36 80% 62%;
 
     /* Domain colors (pastel) — dark-tuned so chips don't glow near-white on dark cards */
     --domain-clinical-pastel: 211 50% 22%;

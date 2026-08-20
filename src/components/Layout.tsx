@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import alcanLogo from '@/assets/alcan-logo.png';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
@@ -18,6 +17,7 @@ import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOp
 import { Skeleton } from '@/components/ui/skeleton';
 import { PendingSurveysCard } from '@/components/home/PendingSurveysCard';
 import { ProMovesLogo } from '@/components/ProMovesLogo';
+import { OrgMark } from '@/components/OrgMark';
 import { ALCAN_ORG_ID } from '@/lib/askAlcanAccess';
 import { useMobileShell } from '@/hooks/useMobileShell';
 import { MobileTabBar } from '@/components/mobile/MobileTabBar';
@@ -259,10 +259,19 @@ export default function Layout() {
       <div className="h-screen supports-[height:100dvh]:h-[100dvh] bg-background flex flex-col">
         <header className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-card flex-none">
           <div className="flex items-center gap-2 min-w-0">
-            <img src={alcanLogo} alt="Alcan" className="h-6 object-contain dark:invert flex-none" />
             {/* Org logo + product wordmark side by side (the sister-brand
-                pairing from the brand brief). min-w-0 on the parent lets the
-                wordmark shrink on narrow phones. */}
+                pairing from the brand brief). Org half is the same cascade
+                the desktop header uses (org logo_url, then Alcan's mark for
+                the Alcan org only, then org name text, then nothing here —
+                DSN-8) so a future non-Alcan org never sees Alcan's mark.
+                min-w-0 on the parent lets the wordmark shrink on narrow
+                phones. */}
+            <OrgMark
+              orgLogoUrl={orgLogoUrl}
+              organizationId={organizationId}
+              orgName={orgName}
+              imgClassName="h-6 object-contain dark:invert flex-none"
+            />
             <ProMovesLogo className="text-sm shrink min-w-0" />
           </div>
           {/* Former "More" tab's contents (Profile, Sign out, My evaluations,
@@ -295,21 +304,16 @@ export default function Layout() {
               <SidebarTrigger />
               
               {/* Org logo — custom logo, else Alcan's mark for Alcan, else a
-                  neutral text wordmark so other orgs never see Alcan branding. */}
+                  neutral text wordmark so other orgs never see Alcan branding.
+                  This is the app's one marquee slot and stays org-first,
+                  unchanged in priority — DSN-8. */}
               <div className="absolute left-1/2 -translate-x-1/2">
-                {orgLogoUrl ? (
-                  <img
-                    src={orgLogoUrl}
-                    alt={orgName ?? 'ProMoves'}
-                    className="h-6 object-contain dark:invert"
-                  />
-                ) : organizationId === ALCAN_ORG_ID ? (
-                  <img src={alcanLogo} alt="Alcan" className="h-6 object-contain dark:invert" />
-                ) : orgName ? (
-                  <span className="text-sm font-semibold text-foreground">{orgName}</span>
-                ) : (
-                  <ProMovesLogo className="text-base" />
-                )}
+                <OrgMark
+                  orgLogoUrl={orgLogoUrl}
+                  organizationId={organizationId}
+                  orgName={orgName}
+                  fallback={<ProMovesLogo className="text-base" />}
+                />
               </div>
               
               <div className="flex-1" />

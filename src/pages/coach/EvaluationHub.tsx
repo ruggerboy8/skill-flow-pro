@@ -58,11 +58,33 @@ import { transcribeWithChunking, type ChunkProgress, CHUNK_SIZE_BYTES } from '@/
 import { useSidebar } from '@/components/ui/sidebar';
 import ReactQuill from 'react-quill';
 
+// DSN-3: migrated off hardcoded red/orange/blue/green classes onto the
+// --score-1..4 tokens — the same 1-4 confidence scale used everywhere else
+// in the app (CompetencyAccordion, DomainDetail, the low-confidence pill a
+// few hundred lines down in this same file). Style objects instead of
+// className strings because there are no bg-score-N/text-score-N Tailwind
+// utilities defined (score tokens are consumed via inline style elsewhere).
 const SCORE_OPTIONS = [
-  { value: 1, label: '1 - Needs Development', color: 'bg-red-100 text-red-800 border-red-200' },
-  { value: 2, label: '2 - Developing', color: 'bg-orange-100 text-orange-800 border-orange-200' },
-  { value: 3, label: '3 - Proficient', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-  { value: 4, label: '4 - Advanced', color: 'bg-green-100 text-green-800 border-green-200' }
+  {
+    value: 1,
+    label: '1 - Needs Development',
+    style: { backgroundColor: 'hsl(var(--score-1-bg))', color: 'hsl(var(--score-1))', borderColor: 'hsl(var(--score-1) / 0.4)' },
+  },
+  {
+    value: 2,
+    label: '2 - Developing',
+    style: { backgroundColor: 'hsl(var(--score-2-bg))', color: 'hsl(var(--score-2))', borderColor: 'hsl(var(--score-2) / 0.4)' },
+  },
+  {
+    value: 3,
+    label: '3 - Proficient',
+    style: { backgroundColor: 'hsl(var(--score-3-bg))', color: 'hsl(var(--score-3))', borderColor: 'hsl(var(--score-3) / 0.4)' },
+  },
+  {
+    value: 4,
+    label: '4 - Advanced',
+    style: { backgroundColor: 'hsl(var(--score-4-bg))', color: 'hsl(var(--score-4))', borderColor: 'hsl(var(--score-4) / 0.4)' },
+  },
 ];
 
 export function EvaluationHub() {
@@ -1466,20 +1488,20 @@ export function EvaluationHub() {
               <div className="flex items-center space-x-6">
                 <div className="flex items-center space-x-2">
                   {completionStatus.observerComplete ? (
-                    <Check className="w-5 h-5 text-green-600" />
+                    <Check className="w-5 h-5" style={{ color: 'hsl(var(--status-complete))' }} />
                   ) : (
                     <div className="w-5 h-5 rounded-full border-2 border-muted-foreground"></div>
                   )}
-                  <span className={cn(
-                     "font-medium",
-                     completionStatus.observerComplete ? "text-green-600" : "text-muted-foreground"
-                   )}>
+                  <span
+                    className={cn("font-medium", !completionStatus.observerComplete && "text-muted-foreground")}
+                    style={completionStatus.observerComplete ? { color: 'hsl(var(--status-complete))' } : undefined}
+                  >
                      Observation ({observerScoresCount}/{totalItems})
                      {completionStatus.observerNaCount > 0 && (
                        <span className="text-muted-foreground font-normal"> · {completionStatus.observerNaCount} N/A</span>
                      )}
                      {completionStatus.missingObserverNotes > 0 && (
-                       <span className="text-orange-600 dark:text-orange-400 font-normal"> · {completionStatus.missingObserverNotes} note{completionStatus.missingObserverNotes !== 1 ? 's' : ''} needed</span>
+                       <span className="font-normal" style={{ color: 'hsl(var(--status-late))' }}> · {completionStatus.missingObserverNotes} note{completionStatus.missingObserverNotes !== 1 ? 's' : ''} needed</span>
                      )}
                    </span>
                 </div>
@@ -1522,10 +1544,10 @@ export function EvaluationHub() {
           <TabsTrigger value="summary" className="flex items-center gap-2">
             Summary
             {recordingState.isRecording && (
-              <span className={cn(
-                "w-2 h-2 rounded-full",
-                recordingState.isPaused ? "bg-amber-500" : "bg-red-500 animate-pulse"
-              )} />
+              <span
+                className={cn("w-2 h-2 rounded-full", !recordingState.isPaused && "bg-destructive animate-pulse")}
+                style={recordingState.isPaused ? { backgroundColor: 'hsl(var(--status-late))' } : undefined}
+              />
             )}
           </TabsTrigger>
         </TabsList>
@@ -1654,22 +1676,24 @@ export function EvaluationHub() {
                     >
                       N/A
                     </button>
-                    {SCORE_OPTIONS.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={(e) => { e.stopPropagation(); if (!isReadOnly) handleObserverScoreChange(item.competency_id, option.value); }}
-                        disabled={isReadOnly || saving}
-                        className={cn(
-                          "px-3 py-2 rounded-md text-sm font-medium border transition-colors",
-                          item.observer_score === option.value && !item.observer_is_na
-                            ? option.color
-                            : "bg-background border-border hover:bg-muted",
-                          isReadOnly && "cursor-not-allowed opacity-60"
-                        )}
-                      >
-                        {option.value}
-                      </button>
-                    ))}
+                    {SCORE_OPTIONS.map((option) => {
+                      const isSelected = item.observer_score === option.value && !item.observer_is_na;
+                      return (
+                        <button
+                          key={option.value}
+                          onClick={(e) => { e.stopPropagation(); if (!isReadOnly) handleObserverScoreChange(item.competency_id, option.value); }}
+                          disabled={isReadOnly || saving}
+                          className={cn(
+                            "px-3 py-2 rounded-md text-sm font-medium border transition-colors",
+                            !isSelected && "bg-background border-border hover:bg-muted",
+                            isReadOnly && "cursor-not-allowed opacity-60"
+                          )}
+                          style={isSelected ? option.style : undefined}
+                        >
+                          {option.value}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {/* Aggregated self-score (read-only, from weekly performance submissions). */}
@@ -1729,14 +1753,17 @@ export function EvaluationHub() {
                            disabled={isReadOnly}
                            className={cn(
                              "min-h-[80px]",
-                             isLowScore && noteEmpty && !isReadOnly && "border-orange-400 focus-visible:ring-orange-400"
+                             // DSN-3: status-late token via arbitrary-value syntax — there's
+                             // no border-status-late/ring-status-late Tailwind utility, and
+                             // this needs the focus-visible: variant which inline style can't do.
+                             isLowScore && noteEmpty && !isReadOnly && "border-[hsl(var(--status-late))] focus-visible:ring-[hsl(var(--status-late))]"
                            )}
                          />
                          {isLowScore && !isReadOnly && (
-                           <p className={cn(
-                             "text-xs",
-                             noteEmpty ? "text-orange-600 dark:text-orange-400 font-medium" : "text-muted-foreground"
-                           )}>
+                           <p
+                             className={cn("text-xs", !noteEmpty && "text-muted-foreground")}
+                             style={noteEmpty ? { color: 'hsl(var(--status-late))', fontWeight: 500 } : undefined}
+                           >
                              {noteEmpty ? "⚠ Note required for scores of 1-2" : "Note required for scores of 1-2"}
                            </p>
                          )}
@@ -1829,7 +1856,7 @@ export function EvaluationHub() {
                     {!isReadOnly && (
                       <div className="pt-3 border-t flex items-center justify-between">
                         {mappingJustCompleted ? (
-                          <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                          <div className="flex items-center gap-2" style={{ color: 'hsl(var(--status-complete))' }}>
                             <Check className="w-4 h-4" />
                             <span className="text-sm font-medium">Notes populated</span>
                           </div>

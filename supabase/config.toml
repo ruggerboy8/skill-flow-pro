@@ -1,88 +1,41 @@
 project_id = "yeypngaufuualdfzcjpk"
 
+# --- Edge function reconciliation, GOV-2, 2026-08-19 ---
+# The [functions.*] stanzas below were regenerated from the live deployment
+# inventory (mcp Supabase list_edge_functions against yeypngaufuualdfzcjpk),
+# not from what previously happened to be in this file. Before this pass,
+# config.toml disagreed with production in both directions: 12 functions were
+# live with verify_jwt=false but only 8 of those had a stanza here at all
+# (compute-weekly-plans, notify-meeting-summary, backfill-new-user-excuses,
+# sequencer-health had none), and this file declared a stanza for
+# sync-onboarding-assignments whose source directory did not exist in the
+# repo (now recovered; see docs/specs/gov-2-edge-function-recovery.md).
+# Every stanza below is verified against the live inventory, one per
+# deployed function, alphabetical. No stanza here implies a deploy action;
+# undeploying anything is explicitly out of scope for this pass.
+
+[functions.admin-users]
+verify_jwt = true
+
+[functions.backfill-format-evaluator-notes]
+verify_jwt = false
+
+[functions.backfill-new-user-excuses]
+verify_jwt = false
+
+[functions.categorize-doctor-content]
+verify_jwt = true
+
 [functions.coach-remind]
 verify_jwt = true
 
 [functions.coaching-extract-issues]
 verify_jwt = true
 
-[functions.lead-request-meeting]
-verify_jwt = true
-
-[functions.send-hr-export]
-verify_jwt = true
-
-[functions.generate-audio]
-verify_jwt = true
-
-[functions.save-audio]
-verify_jwt = true
-
-[functions.sequencer-rank]
-verify_jwt = true
-
-
-[functions.sync-onboarding-assignments]
+[functions.compute-weekly-plans]
 verify_jwt = false
 
-[functions.transcribe-audio]
-verify_jwt = true
-
-[functions.extract-insights]
-verify_jwt = false
-
-[functions.admin-users]
-verify_jwt = true
-
-[functions.planner-upsert]
-verify_jwt = true
-
-[functions.format-transcript]
-verify_jwt = true
-
-[functions.categorize-doctor-content]
-verify_jwt = true
-
-[functions.format-pro-move-content]
-verify_jwt = true
-
-[functions.polish-note]
-verify_jwt = false
-
-[functions.notify-eval-release]
-verify_jwt = true
-
-[functions.format-reflection]
-verify_jwt = false
-
-[functions.format-evaluator-note]
-verify_jwt = true
-
-[functions.map-observation-notes]
-verify_jwt = true
-
-[functions.slot-domain-feedback]
-verify_jwt = true
-
-[functions.separate-feedback]
-verify_jwt = true
-
-[functions.format-agenda]
-verify_jwt = true
-
-[functions.invite-to-schedule]
-verify_jwt = true
-
-[functions.map-baseline-domain-notes]
-verify_jwt = true
-
-[functions.generate-pro-move-weights]
-verify_jwt = true
-
-[functions.sequencer-auto-assign]
-verify_jwt = true
-
-[functions.pro-move-suggest]
+[functions.deputy-get-employees]
 verify_jwt = true
 
 [functions.deputy-initiate-oauth]
@@ -100,9 +53,104 @@ verify_jwt = false
 [functions.deputy-test-connection]
 verify_jwt = true
 
-[functions.deputy-get-employees]
-verify_jwt = true
-
-[functions.backfill-format-evaluator-notes]
+[functions.extract-insights]
 verify_jwt = false
 
+[functions.format-agenda]
+verify_jwt = true
+
+[functions.format-evaluator-note]
+verify_jwt = true
+
+[functions.format-pro-move-content]
+verify_jwt = true
+
+[functions.format-reflection]
+verify_jwt = false
+
+[functions.format-transcript]
+verify_jwt = true
+
+[functions.generate-audio]
+verify_jwt = true
+
+[functions.generate-pro-move-weights]
+verify_jwt = true
+
+[functions.invite-to-schedule]
+verify_jwt = true
+
+[functions.lead-request-meeting]
+verify_jwt = true
+
+[functions.manager-priorities-save]
+verify_jwt = true
+
+[functions.map-baseline-domain-notes]
+verify_jwt = true
+
+[functions.map-observation-notes]
+verify_jwt = true
+
+[functions.notify-eval-release]
+verify_jwt = true
+
+[functions.notify-meeting-summary]
+verify_jwt = false
+
+[functions.override-plan]
+verify_jwt = true
+
+[functions.parse-feedback]
+verify_jwt = true
+
+[functions.parse-interview]
+verify_jwt = true
+
+[functions.planner-upsert]
+verify_jwt = true
+
+[functions.polish-note]
+verify_jwt = false
+
+[functions.pro-move-suggest]
+verify_jwt = true
+
+[functions.rollover-weekly]
+verify_jwt = true
+
+[functions.save-audio]
+verify_jwt = true
+
+[functions.save-priorities]
+verify_jwt = true
+
+[functions.send-hr-export]
+verify_jwt = true
+
+[functions.separate-feedback]
+verify_jwt = true
+
+[functions.sequencer-alcan-rankings]
+verify_jwt = true
+
+[functions.sequencer-auto-assign]
+verify_jwt = true
+
+[functions.sequencer-health]
+verify_jwt = false
+
+[functions.sequencer-rank]
+verify_jwt = true
+
+[functions.sequencer-sim-upsert]
+verify_jwt = true
+
+[functions.slot-domain-feedback]
+verify_jwt = true
+
+[functions.sync-onboarding-assignments]
+verify_jwt = false
+
+[functions.transcribe-audio]
+verify_jwt = true

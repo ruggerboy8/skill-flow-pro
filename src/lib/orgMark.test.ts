@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveOrgMarkKind } from './OrgMark';
+import { resolveOrgMarkKind } from '@/lib/orgMark';
 import { ALCAN_ORG_ID } from '@/lib/askAlcanAccess';
 
 describe('resolveOrgMarkKind', () => {

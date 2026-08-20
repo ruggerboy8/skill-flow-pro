@@ -81,6 +81,13 @@ export default function Layout() {
       });
   }, [organizationId]);
   
+  // Org mark pending state (QA fix): organizationId arrives asynchronously
+  // via useUserRole, so the org half of the header's marquee slot has
+  // nothing to show for a beat on first load. OrgMark uses this to render
+  // an invisible placeholder instead of resolving to its fallback branch
+  // early, then eases the real mark in once it resolves.
+  const orgMarkPending = !organizationId;
+
   const location = useLocation();
   const { toast } = useToast();
 
@@ -270,6 +277,7 @@ export default function Layout() {
               orgLogoUrl={orgLogoUrl}
               organizationId={organizationId}
               orgName={orgName}
+              pending={orgMarkPending}
               imgClassName="h-6 object-contain dark:invert flex-none"
             />
             <ProMovesLogo className="text-sm shrink min-w-0" />
@@ -312,6 +320,7 @@ export default function Layout() {
                   orgLogoUrl={orgLogoUrl}
                   organizationId={organizationId}
                   orgName={orgName}
+                  pending={orgMarkPending}
                   fallback={<ProMovesLogo className="text-base" />}
                 />
               </div>

@@ -43,7 +43,12 @@ export interface SignalPProps {
   mode?: SignalPMode;
   /** Structure color: 'light' = navy (default, for light grounds), 'dark' = bone (for dark grounds, e.g. the charcoal soundstage). */
   variant?: SignalPVariant;
-  /** One lap's duration in ms. Default 1000 (--duration-brand). Contract range is 800-1200ms; stay inside it. */
+  /**
+   * One lap's duration in ms. Default 1000 (--duration-brand). Contract
+   * range is 800-1200ms; stay inside it. Clamped to a minimum of 1ms
+   * internally so a duration of 0 (or negative) can't produce a NaN
+   * progress value -- it degenerates to an instant snap-to-rest instead.
+   */
   duration?: number;
   className?: string;
   /**
@@ -103,6 +108,19 @@ export function SignalP({
     const dot = dotRef.current;
     if (!dot) return;
 
+    // Computed here, not read from render scope: getDotRestPoint returns a
+    // fresh array every call, and render-scope values can't be in this
+    // effect's dependency array without an unstable reference tearing the
+    // effect down and restarting the lap on every unrelated parent
+    // re-render (DSN-5c QA finding). The dependency array below is
+    // primitives only for exactly that reason -- keep it that way.
+    const restPoint = getDotRestPoint(build);
+
+    // Guard against a degenerate duration (0, negative, or NaN): the
+    // contract's range is 800-1200ms, but a caller passing something outside
+    // that shouldn't produce a NaN progress value that silently no-ops.
+    const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 1;
+
     let cancelled = false;
     let rafId: number | null = null;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -119,7 +137,7 @@ export function SignalP({
       const t0 = performance.now();
       const frame = (now: number) => {
         if (cancelled) return;
-        const t = Math.min((now - t0) / duration, 1);
+        const t = Math.min((now - t0) / safeDuration, 1);
         const s = BRAND_EASE(t);
         const [x, y] = getLapPoint(build, s, false, RADIAL_LIFT_MAX);
         setDotPosition(x, y);
@@ -129,7 +147,7 @@ export function SignalP({
           // The endpoints are law: snap to the exact static rest position
           // rather than trust the trig at s=1, so the final frame is
           // bit-identical to the static mark.
-          setDotPosition(rest[0], rest[1]);
+          setDotPosition(restPoint[0], restPoint[1]);
           onDone();
         }
       };
@@ -158,11 +176,23 @@ export function SignalP({
       if (timeoutId !== null) clearTimeout(timeoutId);
       // Land back at rest so unmount/mode-change mid-flight never leaves a
       // stray frame behind.
-      setDotPosition(rest[0], rest[1]);
+      setDotPosition(restPoint[0], restPoint[1]);
     };
-  }, [shouldAnimate, mode, duration, build, rest]);
+    // Primitives only, deliberately -- see the comment on restPoint above.
+  }, [shouldAnimate, mode, duration, build]);
 
-  const resolvedLabel = label === null ? undefined : label ?? (mode === 'waiting' ? 'Loading' : undefined);
+  // `null` is an explicit opt-out (decorative, e.g. next to visible "Loading..."
+  // text) -- never falls back to the mode default. An empty string is
+  // treated the same as "no label given" rather than rendered as a literal
+  // empty aria-label alongside aria-hidden="true".
+  const resolvedLabel =
+    label === null
+      ? undefined
+      : label && label.length > 0
+        ? label
+        : mode === 'waiting'
+          ? 'Loading'
+          : undefined;
 
   return (
     <svg

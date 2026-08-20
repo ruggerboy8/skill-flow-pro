@@ -43,10 +43,16 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
       // Convert lookback option to weeks (52 * 5 = 260 weeks ≈ 5 years for "all time")
       const weeks = lookback === 'all' ? 260 : parseInt(lookback);
       
+      // Pull the full population per role, not just the bottom few. The domain
+      // confidence chips average across ALL rated pro moves; averaging only the
+      // lowest 3 per role made every chip read near the floor (and made a domain
+      // vanish as the window widened). The "individual pro moves" drill-down
+      // still shows the lowest 3 per role, derived client-side below. 100 matches
+      // DomainConfidenceHeatmap's "get all" call and covers every move a role has.
       const { data, error: err } = await supabase.rpc('get_location_skill_gaps', {
         p_location_id: locationId,
         p_lookback_weeks: weeks,
-        p_limit_per_role: 3,
+        p_limit_per_role: 100,
       });
 
       if (err) {
@@ -63,18 +69,20 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
     }
   }, [locationId, lookback]);
 
-  // Domain-level averages for the primary view
+  // Domain-level averages across the full rated population (not the bottom 3),
+  // with a rating count per domain so thin samples are visible.
   const domainAvgs = useMemo(() => {
-    const byDomain = new Map<string, { sum: number; count: number }>();
+    const byDomain = new Map<string, { sum: number; count: number; ratings: number }>();
     gaps.forEach(g => {
       if (!g.domain_name) return;
-      const existing = byDomain.get(g.domain_name) ?? { sum: 0, count: 0 };
+      const existing = byDomain.get(g.domain_name) ?? { sum: 0, count: 0, ratings: 0 };
       existing.sum += g.avg_confidence;
       existing.count += 1;
+      existing.ratings += g.staff_count ?? 0;
       byDomain.set(g.domain_name, existing);
     });
     return Array.from(byDomain.entries())
-      .map(([domain, { sum, count }]) => ({ domain, avg: sum / count }))
+      .map(([domain, { sum, count, ratings }]) => ({ domain, avg: sum / count, ratings }))
       .sort((a, b) => getDomainOrderIndex(a.domain) - getDomainOrderIndex(b.domain));
   }, [gaps]);
 
@@ -87,7 +95,14 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
     return acc;
   }, new Map());
 
-  const roleEntries = Array.from(roleGroups.entries()).sort((a, b) => a[0] - b[0]);
+  // The drill-down keeps its "priority focus" framing: the lowest 3 per role,
+  // taken client-side from the full population we now fetch.
+  const roleEntries = Array.from(roleGroups.entries())
+    .map(([roleId, group]): [number, { name: string; gaps: SkillGap[] }] => [
+      roleId,
+      { ...group, gaps: [...group.gaps].sort((a, b) => a.avg_confidence - b.avg_confidence).slice(0, 3) },
+    ])
+    .sort((a, b) => a[0] - b[0]);
   const lookbackLabel = lookback === 'all' ? 'all time' : `${lookback} weeks`;
 
   function getConfidenceColor(avg: number): string {
@@ -218,7 +233,7 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
           <div>
             <p className="text-xs text-muted-foreground mb-2">Team Self-Reported Confidence by Domain</p>
             <div className="flex flex-wrap gap-2">
-              {domainAvgs.map(({ domain, avg }) => {
+              {domainAvgs.map(({ domain, avg, ratings }) => {
                 const richColor = getDomainColorRich(domain);
                 const bgCls = avg >= 3.0 ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200/50' : avg >= 2.5 ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200/50' : 'bg-rose-50 dark:bg-rose-950/20 border-rose-200/50';
                 const textCls = avg >= 3.0 ? 'text-emerald-700 dark:text-emerald-400' : avg >= 2.5 ? 'text-amber-700 dark:text-amber-400' : 'text-rose-700 dark:text-rose-400';
@@ -227,6 +242,7 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
                     <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: richColor }} />
                     <span className="text-xs font-medium text-muted-foreground">{domain}</span>
                     <span className={cn('text-sm font-bold', textCls)}>{avg.toFixed(1)}</span>
+                    <span className="text-2xs text-muted-foreground">n={ratings}</span>
                   </div>
                 );
               })}

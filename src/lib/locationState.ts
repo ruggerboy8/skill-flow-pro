@@ -285,11 +285,22 @@ export async function computeWeekState(params: {
     null;
   const orgTz = (staff.locations as any)?.timezone || 'America/Chicago';
 
-  // Eligibility (onboarding status) — isEligibleForProMoves is pure and
-  // always true today, so this never actually short-circuits; kept for
-  // when that stops being a stub. Fed into the pure core below.
-  const eligible = isEligibleForProMoves(staff, now);
-  const onboardingWeeksLeft = eligible ? undefined : getOnboardingWeeksLeft(staff, now);
+  // Check eligibility (onboarding status). isEligibleForProMoves is pure and
+  // always true today, so this never actually short-circuits in practice —
+  // kept as an early return (matching origin/main exactly) so that if it
+  // ever stops being a stub, an ineligible staff member still skips
+  // assembleWeek()/weekly_scores/excused_* below, same as before this
+  // refactor (TST-3 QA finding: ordering must stay byte-faithful).
+  if (!isEligibleForProMoves(staff, now)) {
+    const weeksLeft = getOnboardingWeeksLeft(staff, now);
+    return {
+      state: 'onboarding',
+      nextAction: `Complete onboarding`,
+      backlogCount: 0,
+      selectionPending: false,
+      onboardingWeeksLeft: weeksLeft
+    };
+  }
 
   // Calculate Monday anchor in org timezone
   const mondayStr = formatInTimeZone(anchors.mondayZ, orgTz, 'yyyy-MM-dd');
@@ -414,12 +425,12 @@ export async function computeWeekState(params: {
 
   // Delegate the actual state decision to the pure core (TST-3). Same
   // branch order and same returned StaffStatus shapes as the inline state
-  // machine this replaced.
+  // machine this replaced. eligible is always true here — the ineligible
+  // case already returned above, matching origin/main's ordering.
   const facts: WeekStateFacts = {
     now,
     anchors: { checkin_due, checkout_open, checkout_due },
-    eligible,
-    onboardingWeeksLeft,
+    eligible: true,
     hasAssignments,
     confComplete,
     perfComplete,

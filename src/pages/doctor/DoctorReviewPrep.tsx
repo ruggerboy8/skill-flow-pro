@@ -301,7 +301,7 @@ export default function DoctorReviewPrep() {
       <div className="space-y-6 max-w-2xl mx-auto">
         <div className="flex items-center gap-3">
           <Link to="/doctor">
-            <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" aria-label="Back to Home"><ArrowLeft className="h-4 w-4" /></Button>
           </Link>
           <div>
             <h2 className="text-xl font-bold">Meeting Prep Not Available Yet</h2>
@@ -320,7 +320,7 @@ export default function DoctorReviewPrep() {
       <div className="space-y-6 max-w-2xl mx-auto">
         <div className="flex items-center gap-3">
           <Link to="/doctor">
-            <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" aria-label="Back to Home"><ArrowLeft className="h-4 w-4" /></Button>
           </Link>
           <div>
             <h2 className="text-xl font-bold">Review Meeting Summary</h2>
@@ -338,7 +338,7 @@ export default function DoctorReviewPrep() {
       <div className="space-y-6 max-w-2xl mx-auto">
         <div className="flex items-center gap-3">
           <Link to="/doctor">
-            <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" aria-label="Back to Home"><ArrowLeft className="h-4 w-4" /></Button>
           </Link>
           <div>
             <h2 className="text-xl font-bold">Meeting Prep</h2>
@@ -380,7 +380,7 @@ export default function DoctorReviewPrep() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link to="/doctor">
-          <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" aria-label="Back to Home"><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
         <div>
           <h2 className="text-xl font-bold">Prepare for Your {meetingTypeLabel}</h2>
@@ -614,6 +614,7 @@ export default function DoctorReviewPrep() {
                       size="icon"
                       className="h-6 w-6 shrink-0"
                       onClick={() => toggleAction(item.action_id)}
+                      aria-label={`Remove ${pm?.action_statement ?? 'Pro Move'} from focus areas`}
                     >
                       <X className="h-3.5 w-3.5" />
                     </Button>

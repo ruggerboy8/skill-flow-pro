@@ -89,6 +89,7 @@ export function AudioRecorder({
                     variant="outline"
                     size="icon"
                     className="shrink-0"
+                    aria-label={isPaused ? 'Resume recording' : 'Pause recording'}
                   >
                     {isPaused ? (
                       <Mic className="w-4 h-4 text-red-500" />
@@ -101,6 +102,7 @@ export function AudioRecorder({
                     variant="destructive"
                     size="icon"
                     className="shrink-0"
+                    aria-label="Stop recording"
                   >
                     <Square className="w-4 h-4" />
                   </Button>
@@ -121,6 +123,7 @@ export function AudioRecorder({
                 variant="outline"
                 size="icon"
                 className="shrink-0"
+                aria-label={isPlaying ? 'Pause playback' : 'Play recording'}
               >
                 {isPlaying ? (
                   <Pause className="w-4 h-4" />

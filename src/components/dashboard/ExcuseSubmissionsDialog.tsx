@@ -251,13 +251,13 @@ export function ExcuseSubmissionsDialog({
           <div className="space-y-2">
             <Label className="text-sm font-medium">Week</Label>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={goToPrevWeek}>
+              <Button variant="outline" size="icon" onClick={goToPrevWeek} aria-label="Previous week">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <div className="flex-1 text-center font-medium">
                 Week of {formatInTimeZone(weekMonday, tz, 'MMM d, yyyy')}
               </div>
-              <Button variant="outline" size="icon" onClick={goToNextWeek}>
+              <Button variant="outline" size="icon" onClick={goToNextWeek} aria-label="Next week">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>

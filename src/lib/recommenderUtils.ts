@@ -1,5 +1,16 @@
 // Utility functions for Recommender Panel
 
+// lastPracticedWeeks should always be a number, but it can arrive as the
+// string "999" when it crosses the JSON boundary from the sequencer-rank
+// edge function, even though every type in this file says number. Every
+// function below that reads lastPracticedWeeks (for the 999 "never
+// practiced" sentinel or the >= 8 staleness threshold) funnels the value
+// through this single helper, so a stringified sentinel is never treated
+// differently from the numeric one in one place and not another. See COR-5.
+function normalizeWeeks(value: unknown): number {
+  return typeof value === 'string' ? Number(value) : (value as number);
+}
+
 // Formatting and display utilities
 export function formatPrimaryReason(move: {
   primaryReasonCode: 'LOW_CONF' | 'RETEST' | 'NEVER' | 'STALE' | 'TIE';
@@ -7,12 +18,7 @@ export function formatPrimaryReason(move: {
   lowConfShare: number | null;
   lastPracticedWeeks: number;
 }): string {
-  // lastPracticedWeeks can arrive as the string "999" when it crosses the
-  // JSON boundary from the sequencer-rank edge function, even though the
-  // type says number. Normalize once so the sentinel compare below is
-  // reliable regardless of which shape it actually arrives in.
-  const rawWeeks: unknown = move.lastPracticedWeeks;
-  const weeks = typeof rawWeeks === 'string' ? Number(rawWeeks) : rawWeeks as number;
+  const weeks = normalizeWeeks(move.lastPracticedWeeks);
 
   switch (move.primaryReasonCode) {
     case 'LOW_CONF': {
@@ -44,7 +50,8 @@ export function formatPrimaryReason(move: {
   }
 }
 
-export function formatLastPracticed(weeks: number): string {
+export function formatLastPracticed(weeksInput: number): string {
+  const weeks = normalizeWeeks(weeksInput);
   if (weeks === 999) return 'Never';
   if (weeks === 0) return 'This week';
   if (weeks === 1) return '1 wk ago';
@@ -76,11 +83,7 @@ export function getBadges(move: {
   lastPracticedWeeks: number;
   primaryReasonCode: string;
 }): BadgeInfo[] {
-  // See the matching normalization note in formatPrimaryReason: this must
-  // stay a number for both the 999 sentinel compare and the >= 8 staleness
-  // compare, or a stringified "999" gets mislabeled as Stale instead of New.
-  const rawWeeks: unknown = move.lastPracticedWeeks;
-  const weeks = typeof rawWeeks === 'string' ? Number(rawWeeks) : rawWeeks as number;
+  const weeks = normalizeWeeks(move.lastPracticedWeeks);
 
   const candidates: Record<string, BadgeInfo> = {};
 
@@ -142,14 +145,15 @@ export function applyFilters(
   // Apply signal filters (union - include if ANY match)
   if (filters.signals.length > 0) {
     result = result.filter((move) => {
+      const weeks = normalizeWeeks(move.lastPracticedWeeks);
       return filters.signals.some((signal) => {
         switch (signal) {
           case 'low_conf':
             return move.lowConfShare !== null && move.lowConfShare >= 0.33;
           case 'never':
-            return move.lastPracticedWeeks === 999;
+            return weeks === 999;
           case 'stale':
-            return move.lastPracticedWeeks >= 8 && move.lastPracticedWeeks !== 999;
+            return weeks >= 8 && weeks !== 999;
           case 'retest':
             return move.retestDue === true;
           default:
@@ -181,8 +185,10 @@ export function applyFilters(
           return b.lowConfShare - a.lowConfShare;
         }
         // 4. lastPracticedWeeks desc (999 sorts highest)
-        if (b.lastPracticedWeeks !== a.lastPracticedWeeks) {
-          return b.lastPracticedWeeks - a.lastPracticedWeeks;
+        const aWeeks4 = normalizeWeeks(a.lastPracticedWeeks);
+        const bWeeks4 = normalizeWeeks(b.lastPracticedWeeks);
+        if (bWeeks4 !== aWeeks4) {
+          return bWeeks4 - aWeeks4;
         }
         // 5. proMoveId asc
         return a.proMoveId - b.proMoveId;
@@ -199,8 +205,10 @@ export function applyFilters(
       }
       case 'weeks': {
         // 1. lastPracticedWeeks desc (999 sorts highest)
-        if (b.lastPracticedWeeks !== a.lastPracticedWeeks) {
-          return b.lastPracticedWeeks - a.lastPracticedWeeks;
+        const aWeeks = normalizeWeeks(a.lastPracticedWeeks);
+        const bWeeks = normalizeWeeks(b.lastPracticedWeeks);
+        if (bWeeks !== aWeeks) {
+          return bWeeks - aWeeks;
         }
         // 2. finalScore desc
         return b.finalScore - a.finalScore;

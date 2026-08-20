@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { applyFilters, getBadges, formatPrimaryReason, FilterState } from './recommenderUtils';
+import { applyFilters, getBadges, formatPrimaryReason, formatLastPracticed, FilterState } from './recommenderUtils';
 
 // A "move" here is a ranked Pro Move recommendation as the sequencer panel
 // renders it: a candidate for "what should this location practice this
@@ -580,5 +580,55 @@ describe('applyFilters - "domain" sort', () => {
     const lowerNeed = move({ proMoveId: 2, domainName: 'Clinical', finalScore: 10 });
     const result = applyFilters([lowerNeed, higherNeed], NO_FILTERS, 'domain');
     expect(result.map((m) => m.proMoveId)).toEqual([1, 2]);
+  });
+});
+
+describe('lastPracticedWeeks sentinel normalization (string "999" vs numeric 999)', () => {
+  // lastPracticedWeeks can cross the JSON boundary from the sequencer-rank
+  // edge function as the string "999" instead of the number 999, even though
+  // every type in recommenderUtils.ts says number. Every function that reads
+  // it funnels through one normalizeWeeks() helper, so the string sentinel
+  // must behave identically to the numeric one everywhere: the badge, the
+  // conflict-message path, the "never" filter, the "stale" filter, and
+  // formatLastPracticed. See COR-5.
+  const stringSentinel = '999' as unknown as number;
+
+  it('labels the move New (not Stale) in getBadges', () => {
+    const badges = getBadges({
+      lowConfShare: null,
+      retestDue: false,
+      lastPracticedWeeks: stringSentinel,
+      primaryReasonCode: 'NEVER',
+    });
+    expect(badges.map((b) => b.label)).toContain('New');
+    expect(badges.map((b) => b.label)).not.toContain('Stale');
+  });
+
+  it('surfaces the conflicting-data message when paired with a STALE reason code', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const text = formatPrimaryReason({
+      primaryReasonCode: 'STALE',
+      primaryReasonValue: null,
+      lowConfShare: null,
+      lastPracticedWeeks: stringSentinel,
+    });
+    expect(text).toBe('Conflicting data: marked stale but never practiced');
+    warnSpy.mockRestore();
+  });
+
+  it('is included by the "never" signal filter', () => {
+    const neverAsString = move({ proMoveId: 1, lastPracticedWeeks: stringSentinel });
+    const result = applyFilters([neverAsString], { signals: ['never'], domains: [] }, 'need');
+    expect(result.map((m) => m.proMoveId)).toEqual([1]);
+  });
+
+  it('is excluded by the "stale" signal filter even though 999 >= 8', () => {
+    const neverAsString = move({ proMoveId: 1, lastPracticedWeeks: stringSentinel });
+    const result = applyFilters([neverAsString], { signals: ['stale'], domains: [] }, 'need');
+    expect(result).toEqual([]);
+  });
+
+  it('formats as "Never" in formatLastPracticed', () => {
+    expect(formatLastPracticed(stringSentinel)).toBe('Never');
   });
 });

@@ -267,8 +267,10 @@ export default function EvaluationCapture() {
       observer_note: buildObserverNote(comp.glow, comp.grow),
       // MOB-4: stamp who gave the glow only when a glow is actually saved;
       // clearing the glow clears the source too, so the two never drift.
-      glow_source_staff_id: hasGlow ? actingStaffId : null,
-      glow_source_type: hasGlow ? "evaluator" : null,
+      // Only include these keys at all when there's a real glow, so a
+      // grow-only or empty save never references the new columns (those
+      // don't exist yet on a DB where the MOB-4 migration hasn't landed).
+      ...(hasGlow ? { glow_source_staff_id: actingStaffId, glow_source_type: "evaluator" } : {}),
     });
   }
 
@@ -305,9 +307,10 @@ export default function EvaluationCapture() {
         observer_glow: glow,
         observer_grow: grow,
         observer_note: buildObserverNote(glow, grow),
-        // MOB-4: same source stamping as handleNoteBlur.
-        glow_source_staff_id: hasGlow ? actingStaffId : null,
-        glow_source_type: hasGlow ? "evaluator" : null,
+        // MOB-4: same source stamping as handleNoteBlur, and the same
+        // conditional-keys guard so a glow-less polish never touches the
+        // new columns.
+        ...(hasGlow ? { glow_source_staff_id: actingStaffId, glow_source_type: "evaluator" } : {}),
       });
       setDrafts((p) => ({ ...p, [comp.competencyId]: "" }));
       toast({ title: "Polished", description: "Split into a glow and a grow below. Tweak if you like." });
@@ -669,7 +672,7 @@ export default function EvaluationCapture() {
                 ? <Check className="h-4 w-4 shrink-0" style={{ color: "hsl(var(--status-complete))" }} />
                 : <Sun className="h-4 w-4 shrink-0" style={{ color: "hsl(var(--status-pending))" }} />}
               <span>{missingGlow.length === 0 ? "Every scored competency has a glow"
-                : `${missingGlow.length} competenc${missingGlow.length === 1 ? "y" : "ies"} don't have a glow yet — recognition is the one thing staff actually want back`}</span>
+                : `${missingGlow.length} competenc${missingGlow.length === 1 ? "y" : "ies"} don't have a glow yet. Recognition is the one thing staff actually want back.`}</span>
             </div>
           </div>
 

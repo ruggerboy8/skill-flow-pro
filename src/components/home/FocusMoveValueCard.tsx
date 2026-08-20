@@ -8,6 +8,7 @@ import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useCurrentFocus } from '@/hooks/useCurrentFocus';
 import { LearnerLearnDrawer } from '@/components/learner/LearnerLearnDrawer';
 import { selectFocusMoveValueTier, type FocusValueTier } from '@/lib/focusMoveValue';
+import { getDomainColorRichRaw } from '@/lib/domainColors';
 
 const TIER_ICON: Record<FocusValueTier, typeof BookOpen> = {
   script: MessageCircle,
@@ -91,23 +92,19 @@ export function FocusMoveValueCard() {
   // the card must never render an empty shell.
   if (!selection) return null;
 
+  // Bare "statement" tier: no script, audio, or description exists, so this
+  // card would just restate the action statement that `CurrentFocusCard`
+  // already shows above it. Render nothing rather than a second card saying
+  // the same thing.
+  if (selection.tier === 'statement') return null;
+
   const Icon = TIER_ICON[selection.tier];
+  const richColor = getDomainColorRichRaw(focusItem.domainName);
 
-  // For the script/audio tiers, the content lives in the drawer. For the
-  // text tiers, the content *is* the card — show it directly.
-  const bodyText =
-    selection.tier === 'description'
-      ? resourceData.description
-      : selection.tier === 'statement'
-        ? focusItem.statement
-        : null;
-
-  // Only offer a drawer CTA when the drawer actually has something to show:
-  // script, audio, and description tiers all guarantee that. The bare
-  // "statement" tier means no script, audio, or description exists, so the
-  // drawer would just be an empty state — skip the CTA rather than promise
-  // more than the card can deliver.
-  const showDrawerCta = selection.tier !== 'statement';
+  // For the script/audio tiers, the content lives in the drawer. The
+  // description tier renders inline as intentional teaching content, not a
+  // degraded fallback (matches ProMoveDrawer's "The Move" framing).
+  const bodyText = selection.tier === 'description' ? resourceData.description : null;
 
   return (
     <>
@@ -117,19 +114,25 @@ export function FocusMoveValueCard() {
             Your focus move
           </p>
           {bodyText && (
-            <p className="text-sm leading-relaxed line-clamp-4">{bodyText}</p>
-          )}
-          {showDrawerCta && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => setDrawerOpen(true)}
+            <div
+              className="text-sm leading-relaxed line-clamp-4 p-3.5 rounded-2xl border"
+              style={{
+                backgroundColor: `hsl(${richColor} / 0.04)`,
+                borderColor: `hsl(${richColor} / 0.15)`,
+              }}
             >
-              <Icon className="mr-2 h-4 w-4" />
-              {selection.label}
-            </Button>
+              {bodyText}
+            </div>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => setDrawerOpen(true)}
+          >
+            <Icon className="mr-2 h-4 w-4" />
+            {selection.label}
+          </Button>
         </CardContent>
       </Card>
       <LearnerLearnDrawer

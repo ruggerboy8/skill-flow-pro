@@ -79,7 +79,7 @@ export function MobileTabBar() {
             style={active ? { color: 'hsl(var(--primary))', fontWeight: 700 } : undefined}
           >
             <Icon className="h-6 w-6" strokeWidth={1.9} />
-            <span style={{ fontSize: '10px', fontWeight: active ? 700 : 500 }}>{label}</span>
+            <span className="text-xs" style={{ fontWeight: active ? 700 : 500 }}>{label}</span>
           </button>
         );
       })}

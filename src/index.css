@@ -200,13 +200,15 @@ All colors MUST be HSL.
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
     
-    /* DSN-5a note for DSN-1 (do not change these values here, that ticket owns
-    the fix): the four rich domain-* values right below are byte-identical to
-    the light-mode values above (same hue/sat/light). That is the DSN-1 bug,
-    these were never re-tuned for a dark ground. The domain-*-pastel values
+    /* DSN-5a note for DSN-6 (do not change these values here, that ticket owns
+    the fix; DSN-1 merged 2026-08-20 without retuning them): the four rich
+    domain-* values right below are byte-identical to the light-mode values
+    above (same hue/sat/light). They were never re-tuned for a dark ground.
+    Dormant today (no dark-mode toggle ships yet) but DSN-1's helper migration
+    means these values WILL render the day one does. The domain-*-pastel values
     two blocks down WERE re-tuned for dark (lower lightness, comment already
     there) and read as the working example. Canonical current dark-mode
-    values, recorded here so DSN-1 has a documented starting point instead of
+    values, recorded here so DSN-6 has a documented starting point instead of
     re-discovering them:
       --domain-clinical: 211 85% 55%  (unchanged from light, needs dark tuning)
       --domain-clerical: 123 60% 45%  (unchanged from light, needs dark tuning)
@@ -214,11 +216,11 @@ All colors MUST be HSL.
       --domain-case-acceptance: 36 90% 55%  (unchanged from light, needs dark tuning)
     Per the brand kit's dark-ground guidance (signal blue is the dark-ground
     accent, bone is the dark-ground structure color), a reasonable direction
-    for DSN-1 is the same move already made for the pastels: keep each hue,
+    for DSN-6 is the same move already made for the pastels: keep each hue,
     pull lightness down and saturation in slightly so the chip reads on a dark
     card instead of glowing, the way domain-clinical-pastel dropped from
     211 100% 92% (light) to 211 50% 22% (dark). This is guidance, not a value
-    change; DSN-1 still owns picking and applying the final numbers. */
+    change; DSN-6 owns picking and applying the final numbers. */
     /* Domain colors (rich/saturated) */
     --domain-clinical: 211 85% 55%;
     --domain-clerical: 123 60% 45%;

@@ -152,16 +152,33 @@ widened (ring, gradient from/to/via, fill, stroke, divide, outline, shadow,
 placeholder, caret, accent, decoration) and the baseline re-cut to count
 the 20 pre-existing instances those shapes were hiding.
 
-## 5. Remaining unmigrated surfaces (post slice-1 baseline)
+## 5. What slice 2 migrated
 
-87 files still carry at least one hardcoded palette class, 775 instances
-total. Two of them — `OnTimeRateWidget.tsx` and
-`LocationSubmissionWidget.tsx` (30 each) — are Command Center /
-`RegionalDashboard` surfaces explicitly out of scope for DSN-3 (owned by
-in-flight DASH tickets on their own branches); leave them for that work.
-`SignalsBanner.tsx`, `DomainConfidenceHeatmap.tsx`, and
-`LocationHealthCard.tsx` are also dashboard surfaces named in the
-exclusion list but already show 0 — DASH-1 already migrated them.
+Baseline: 775 → 556 (219 instances, 10 files). Target surfaces were coach
+dashboard / staff detail / recommender-adjacent (doctor pro-move materials)
+screens, picked from slice 1's highest-count list.
+
+| Surface | Before | After | Notes |
+|---|---|---|---|
+| `src/components/clinical/ClinicalBaselineResults.tsx` | 28 | 0 | "In Progress"/"Complete" header treatment → `StatusBadge` (`in_progress`/`completed`) + `--status-late`/`--status-complete` for the icon box and gradient; discrepancy-flag ring → `--status-late`. |
+| `src/components/dashboard/LocationSkillGaps.tsx` | 24 | 0 | Confidence-average badges and domain chips used a red/amber/green traffic light on `avg_confidence` — replaced with `scoreBucket()`/`scoreBucketTokens()` from `src/lib/confidenceScoreRamp.ts` (the DASH-1a rule: confidence scores use the 1-4 score ramp, never a traffic light). Same fix applied to `StaffOverviewTab.tsx`, `StaffDetailV2.tsx`'s domain strip, and `StaffPriorityFocusTab.tsx`'s confidence badge — all four had independently reinvented the same traffic-light anti-pattern. |
+| `src/components/coach/StaffOverviewTab.tsx` | 15 | 0 | Same confidence-traffic-light fix as above. |
+| `src/pages/coach/StaffDetailV2.tsx` | 15 | 0 | Domain confidence strip → score ramp (as above); "Exempt" week badge → `--status-excused` tokens (was hardcoded amber; excused/exempt already has a dedicated, intentionally-neutral token). |
+| `src/lib/coachingSessionStatus.ts` | 24 | 16 | 5 of 7 pipeline stages → `--status-late` (amber "attention" reuse) / `--status-complete`. `scheduling_invite_sent` (sky) and `meeting_pending` (purple) left hardcoded — see §6. |
+| `src/components/coach/RecordingStartCard.tsx` | 23 | 0 | Recording/paused/processed states → `bg-destructive`/`text-destructive` (recording, dark-mode-aware token per §2) and `--status-late`/`--status-complete` (paused/processed), matching the established recording-dot convention in `EvaluationHub.tsx`. |
+| `src/components/coach/RecordingProcessCard.tsx` | 14 | 0 | Same paused/attention amber → `--status-late`. |
+| `src/components/clinical/CoachBaselineWizard.tsx` | 20 | 0 | `SCORE_CONFIG` (1-4 rating buttons) → `--score-1..4`/`-bg`; "Complete" pill, co-editor "Edited by" flag, "Notes mapped" confirmation → `--status-complete`/`--status-late`; recording pulse dot → `bg-destructive`. |
+| `src/components/doctor/DoctorProMoveDrawer.tsx` | 24 | 6 | `MATERIAL_SECTIONS`: "Why It Matters" → `--status-late`, "Scripting" → `--status-released`, "What Good Looks Like" → `--status-complete`. "Gut Check Questions" (purple) left hardcoded — see §6. Kept in sync with the identical config duplicated in `DoctorMaterialsSheet.tsx`. |
+| `src/components/doctor/DoctorMaterialsSheet.tsx` | 24 | 6 | Same `MATERIAL_SECTIONS` fix, same purple gap. |
+| `src/components/doctor/RatingBandCollapsible.tsx` | 24 | 0 | 1-4 self-rating bands → `--score-1..4`/`-bg` (DASH-1a: band 1 shifts from hardcoded red to `--score-1`'s orange — a real, intentional hue shift, not a bug — see §6). |
+| `src/components/coach/StaffPriorityFocusTab.tsx` | 9 | 1 | Confidence badge (1 or 2) → `scoreBucketTokens(scoreBucket(...))`. One `dark:bg-slate-800` card-surface class left hardcoded (decorative glass-card pattern, see §6). |
+
+## 6. Remaining unmigrated surfaces (post slice-2 baseline)
+
+80 files still carry at least one hardcoded palette class, 556 instances
+total. `OnTimeRateWidget.tsx` and `LocationSubmissionWidget.tsx` (30 each)
+remain out of scope (Command Center / `RegionalDashboard`, owned by DASH
+tickets).
 
 Highest-count remaining files, for whoever scopes the next slice:
 
@@ -170,38 +187,70 @@ Highest-count remaining files, for whoever scopes the next slice:
 | `src/components/coach/OnTimeRateWidget.tsx` | 30 (dashboard, excluded) |
 | `src/components/dashboard/LocationSubmissionWidget.tsx` | 30 (dashboard, excluded) |
 | `src/components/admin/EditUserDrawer.tsx` | 26 |
-| `src/components/home/ThisWeekPanel.tsx` | 25 |
-| `src/components/dashboard/LocationSkillGaps.tsx` | 24 |
-| `src/components/doctor/DoctorMaterialsSheet.tsx` | 24 |
-| `src/components/doctor/DoctorProMoveDrawer.tsx` | 24 |
-| `src/components/doctor/RatingBandCollapsible.tsx` | 24 |
-| `src/lib/coachingSessionStatus.ts` | 24 |
-| `src/components/coach/RecordingStartCard.tsx` | 23 |
-| `src/pages/doctor/DoctorReviewPrep.tsx` | 22 (also has the same blue "backfill" alert pattern as `Index.tsx`, and `EditUserDrawer.tsx` above shares it too — worth doing those together so the "info banner" convention from §1.5 gets applied consistently in one pass) |
-| `src/components/clinical/CoachBaselineWizard.tsx` | 20 |
+| `src/components/home/ThisWeekPanel.tsx` | 25 (see §6 — mostly the decorative glass-border pattern plus the unmapped amber notice banner) |
+| `src/pages/doctor/DoctorReviewPrep.tsx` | 22 (shares the blue "backfill" info-banner pattern with `EditUserDrawer.tsx` — do them together, see the `--status-info` gap below) |
 | `src/components/admin/ProMoveList.tsx` | 19 |
-| `src/components/clinical/ClinicalBaselineResults.tsx` | 18 |
 | `src/pages/doctor/DoctorHome.tsx` | 17 |
-| ... 72 more files, 1-16 instances each | see `scripts/hardcoded-colors-baseline.json` for the full per-file list |
+| `src/components/doctor/DomainAssessmentStep.tsx` | 16 |
+| `src/lib/constants/domains.ts` | 16 |
+| `src/pages/EvaluationViewer.tsx` | 16 |
+| ... 70 more files, 1-13 instances each | see `scripts/hardcoded-colors-baseline.json` for the full per-file list |
 
 Run `node scripts/check-hardcoded-colors.mjs --update-baseline` after any
 future migration slice lands to see the current full list and confirm the
 new total.
 
-## 6. Ambiguous items left for follow-up (not fixed here, flagged instead)
+## 7. Ambiguous items left for follow-up (not fixed here, flagged instead)
 
 - **`--status-info`-shaped gap.** The blue "informational notice" pattern
   (`border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20`
   + matching text/button treatment) appears in at least three files
-  (`Index.tsx`, migrated this slice; `EditUserDrawer.tsx` and
-  `DoctorReviewPrep.tsx`, not migrated). It doesn't cleanly fit domain,
-  score, status, or win, and isn't decorative either. This slice mapped
-  `Index.tsx`'s copy to `brand-signal`/`brand-navy`/`brand-blue` as a
-  reasonable interim "info" convention (§1.5), but a real `--status-info`
-  (or `--info-*`) token pair, with light and dark values chosen on
-  purpose, would be a cleaner fix than three separate ad hoc brand-token
-  mappings. Candidate for a DSN-5d or DSN-3-slice-2 follow-up.
+  (`Index.tsx`, migrated in slice 1; `EditUserDrawer.tsx` and
+  `DoctorReviewPrep.tsx`, still not migrated). It doesn't cleanly fit
+  domain, score, status, or win, and isn't decorative either. A real
+  `--status-info` (or `--info-*`) token pair, with light and dark values
+  chosen on purpose, would be a cleaner fix than more ad hoc brand-token
+  mappings. Candidate for a DSN-5d or DSN-3 slice-3 follow-up.
+- **Amber "notice" banners (distinct from the info-banner gap above).**
+  `ThisWeekPanel.tsx`'s paused-account and exempt-week banners, and the
+  identical pattern in `WeekBuilderPanel.tsx` / `DoctorReviewPrep.tsx`, use
+  `bg-amber-50 border-amber-200` + amber text as a general "heads up,
+  nothing to do" notice — not a status pill, a whole banner. Mapping it to
+  `--status-excused` (the closest semantic match — "no penalty this week")
+  would flip the banner from amber to neutral gray, a bigger visual change
+  than a like-for-like migration should make unilaterally. Left hardcoded
+  and flagged rather than guessed at; worth deciding alongside the
+  `--status-info` gap above since both are "banner, not pill" cases.
+- **Pipeline stages with no matching token (sky, purple).**
+  `coachingSessionStatus.ts`'s `scheduling_invite_sent` (sky) and
+  `meeting_pending` (purple), and `MATERIAL_SECTIONS`'s "Gut Check
+  Questions" (purple, duplicated in `DoctorProMoveDrawer.tsx` and
+  `DoctorMaterialsSheet.tsx`) each need a hue with no existing token.
+  Collapsing them onto an already-used token (e.g. `--status-released` for
+  both "Scripting" and "Gut Check Questions") would make two visually
+  distinct categories indistinguishable, which defeats the point of the
+  color coding. Left hardcoded rather than guessed at. If a future ticket
+  adds more non-alarm hues to the token set, these are the two consumers
+  waiting for them.
+- **Score band 1 hue shift (flag for visual QA, not a gap).**
+  `RatingBandCollapsible.tsx` and `LocationSkillGaps.tsx` /
+  `StaffOverviewTab.tsx` / `StaffDetailV2.tsx` / `StaffPriorityFocusTab.tsx`
+  previously rendered the lowest confidence tier in red; the `--score-1`
+  token (and the DASH-1a score ramp generally) is orange, not red, by
+  deliberate design ("confidence scores never render red"). This is a
+  precedented, intentional choice, not an oversight, but it is a visible
+  hue change worth a screenshot check.
+- **Decorative "glass card" border/surface pattern, unmigrated.**
+  `border-white/40 dark:border-slate-700/40` (+ `bg-white/X
+  dark:bg-slate-800/X`) is a consistent frosted-glass treatment repeated
+  across at least 7 files (`ThisWeekPanel.tsx`, `ConfidenceWizard.tsx`,
+  `PerformanceWizard.tsx`, `MyRoleLayout.tsx`, `FacilitatePage.tsx`,
+  `card.tsx`, `StaffPriorityFocusTab.tsx`). It's decorative chrome, not one
+  of the four locked scales (§1.4), so this slice left it alone rather than
+  forcing it onto `border`/`card` tokens that would look flatter. If it's
+  going to be tokenized, it deserves its own `--glass-border`/`--glass-bg`
+  pair rather than folding into generic shadcn chrome tokens — a decision
+  for whoever scopes that ticket, not this migration.
 - **`slatebrand.400`/`slatebrand.600`** in `tailwind.config.ts` has zero
-  consumers in `src/`, same as the `brand.50/600/900` keys this slice
-  removed. Left it alone since it wasn't named in this ticket's scope —
-  worth a one-line cleanup ticket.
+  consumers in `src/`, same as the `brand.50/600/900` keys slice 1 removed.
+  Still out of this ticket's named scope — worth a one-line cleanup ticket.

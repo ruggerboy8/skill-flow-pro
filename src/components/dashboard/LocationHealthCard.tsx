@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Users, AlertCircle, CheckCircle2, CloudOff, Clock } from "lucide-react";
+import { Users, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { participationTier, tierColorTokens } from "@/lib/participationTier";
+import { buildLocationStatusLine } from "@/lib/locationStatusLine";
 
 export interface LocationStats {
   id: string;
@@ -41,19 +41,19 @@ interface LocationHealthCardProps {
   nextDeadlineLabel?: string | null;
 }
 
-// DASH-1a: a card carries at most one alarm (its own border/wash). Badges
-// inside never go past --status-late (amber) - see src/lib/participationTier.ts.
-function chipStyle(token: { bg: string; text: string; border: string }) {
-  return {
-    backgroundColor: token.bg,
-    color: token.text,
-    borderColor: token.border,
-  };
+// DASH-2: the only chip a calm card ever shows is none at all. The header
+// chip is reserved for watch/red tier (filled, alarm-capable) or an excused
+// state (quiet outline, no icon) - see the spec's "at most one chip" rule.
+function ExcusedChip({ label }: { label: string }) {
+  return (
+    <span
+      className="inline-flex items-center rounded-full border bg-transparent px-2 py-0.5 text-xs font-medium shrink-0"
+      style={{ color: 'hsl(var(--status-excused))', borderColor: 'hsl(var(--status-excused) / 0.3)' }}
+    >
+      {label}
+    </span>
+  );
 }
-
-const LATE_CHIP = { bg: 'hsl(var(--status-late-bg))', text: 'hsl(var(--status-late))', border: 'hsl(var(--status-late) / 0.3)' };
-const PENDING_CHIP = { bg: 'hsl(var(--status-pending-bg))', text: 'hsl(var(--status-pending))', border: 'hsl(var(--status-pending) / 0.3)' };
-const COMPLETE_CHIP = { bg: 'hsl(var(--status-complete-bg))', text: 'hsl(var(--status-complete))', border: 'hsl(var(--status-complete) / 0.3)' };
 
 export function LocationHealthCard({
   stats,
@@ -63,8 +63,12 @@ export function LocationHealthCard({
 }: LocationHealthCardProps) {
   const navigate = useNavigate();
 
-  const isFullyExcused = excuseStatus?.isConfExcused && excuseStatus?.isPerfExcused;
-  const isPartiallyExcused = (excuseStatus?.isConfExcused || excuseStatus?.isPerfExcused) && !isFullyExcused;
+  const isFullyExcused = Boolean(excuseStatus?.isConfExcused && excuseStatus?.isPerfExcused);
+  const isPartiallyExcused = Boolean(
+    (excuseStatus?.isConfExcused || excuseStatus?.isPerfExcused) && !isFullyExcused,
+  );
+  const confExcused = excuseStatus?.isConfExcused ?? false;
+  const perfExcused = excuseStatus?.isPerfExcused ?? false;
 
   const confClosed = submissionGates?.confidenceClosed ?? false;
   const perfClosed = submissionGates?.performanceClosed ?? false;
@@ -104,103 +108,104 @@ export function LocationHealthCard({
       ? tierTokens.text
       : 'hsl(var(--foreground))';
 
-  // Render the big number based on deadline state
+  const confSub = stats.confSubmitted ?? 0;
+  const confExp = stats.confExpected ?? 0;
+  const perfSub = stats.perfSubmitted ?? 0;
+  const perfExp = stats.perfExpected ?? 0;
+
+  // One big number per state (spec rule 1): a raw progress fraction before
+  // anything is due, otherwise a rate percent, never both stacked together.
   const renderBigNumber = () => {
     if (isFullyExcused) {
+      const reason = excuseStatus?.confReason || excuseStatus?.perfReason;
       return (
         <>
-          <div className="text-2xl font-black text-muted-foreground">—</div>
-          <div className="text-2xs text-muted-foreground leading-tight">Location Excused</div>
+          <div className="text-2xl font-black text-muted-foreground">Excused</div>
+          {reason && <div className="text-2xs text-muted-foreground leading-tight">{reason}</div>}
         </>
       );
     }
 
-    const confSub = stats.confSubmitted ?? 0;
-    const confExp = stats.confExpected ?? 0;
-    const perfSub = stats.perfSubmitted ?? 0;
-    const perfExp = stats.perfExpected ?? 0;
-
-    // After both deadlines: combined rate
-    if (confClosed && perfClosed) {
+    if (!anyDeadlinePassed) {
       return (
         <>
-          <div className="text-2xl font-black" style={{ color: rateColor }}>
-            {displayRate}%
+          <div className="text-xl font-black text-foreground">
+            {confSub}/{confExp}
           </div>
-          <div className="text-2xs text-muted-foreground leading-tight">Submitted</div>
+          <div className="text-2xs text-muted-foreground leading-tight">checked in</div>
         </>
       );
     }
 
-    // After conf deadline, perf not yet due
-    if (confClosed && !perfClosed) {
-      return (
-        <>
-          <div className="text-2xl font-black" style={{ color: rateColor }}>
-            {displayRate}%
-          </div>
-          <div className="text-2xs text-muted-foreground leading-tight">Conf Rate</div>
-          {perfOpen && confExp > 0 && (
-            <div className="text-2xs text-muted-foreground mt-0.5">
-              {perfSub}/{perfExp} perf
-            </div>
-          )}
-        </>
-      );
-    }
-
-    // Before any deadline: show raw progress counts
     return (
       <>
-        <div className="text-xl font-black text-foreground">
-          {confSub}/{confExp}
+        <div className="text-2xl font-black" style={{ color: rateColor }}>
+          {displayRate}%
         </div>
-        <div className="text-2xs text-muted-foreground leading-tight">Conf</div>
-        {perfOpen && confExp > 0 && (
-          <div className="text-2xs text-muted-foreground mt-0.5">
-            {perfSub}/{perfExp} perf
-          </div>
-        )}
+        <div className="text-2xs text-muted-foreground leading-tight">
+          {confClosed && !perfClosed ? 'conf submitted' : 'submitted'}
+        </div>
       </>
     );
   };
 
-  // Determine which excuse badge to show
-  const getContextualExcuseBadge = () => {
-    if (isFullyExcused) {
-      const reason = excuseStatus?.confReason || excuseStatus?.perfReason;
-      return (
-        <Badge variant="secondary" className="bg-muted text-muted-foreground gap-1 shrink-0">
-          <CloudOff className="h-4 w-4" />
-          {reason ? `Excused: ${reason}` : 'Excused'}
-        </Badge>
-      );
+  // Fractions to the right of the big number, right-aligned and muted (spec
+  // rule 5). A partially excused metric's slot reads "Conf excused" instead
+  // of a fraction so the excuse isn't lost once its number stops appearing.
+  const renderFractions = () => {
+    if (isFullyExcused) return null;
+
+    if (!anyDeadlinePassed) {
+      if (perfOpen && confExp > 0 && !perfExcused) {
+        return `Perf ${perfSub}/${perfExp}`;
+      }
+      return null;
     }
 
-    if (isPartiallyExcused) {
-      if (excuseStatus?.isConfExcused && submissionGates && !submissionGates.confidenceClosed) {
-        return (
-          <Badge variant="outline" className="border-warning text-warning gap-1 shrink-0">
-            Conf Excused{excuseStatus.confReason ? `: ${excuseStatus.confReason}` : ''}
-          </Badge>
-        );
-      }
-      if (excuseStatus?.isPerfExcused && submissionGates?.performanceOpen) {
-        return (
-          <Badge variant="outline" className="border-warning text-warning gap-1 shrink-0">
-            Perf Excused{excuseStatus.perfReason ? `: ${excuseStatus.perfReason}` : ''}
-          </Badge>
-        );
-      }
-      return (
-        <Badge variant="outline" className="border-warning text-warning gap-1 shrink-0">
-          {excuseStatus?.isConfExcused ? 'Conf' : 'Perf'} Excused
-        </Badge>
-      );
-    }
-
-    return null;
+    const confPart = confExcused ? 'Conf excused' : `Conf ${confSub}/${confExp}`;
+    const perfPart = perfExcused ? 'Perf excused' : `Perf ${perfSub}/${perfExp}`;
+    return `${confPart} · ${perfPart}`;
   };
+
+  const headerChip = (() => {
+    if (isFullyExcused) return <ExcusedChip label="Excused" />;
+    if (isPartiallyExcused) {
+      const metric = confExcused ? 'Conf' : 'Perf';
+      return <ExcusedChip label={`${metric} excused`} />;
+    }
+    if (tier === 'watch' || tier === 'red') {
+      const tokens = tierColorTokens(tier)!;
+      return (
+        <span
+          className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium shrink-0"
+          style={{ backgroundColor: tokens.bg, color: tokens.text, borderColor: tokens.border }}
+        >
+          <AlertCircle className="h-4 w-4" />
+          {stats.distinctMissedCount} missed
+        </span>
+      );
+    }
+    return null;
+  })();
+
+  const statusPhrases = buildLocationStatusLine({
+    tier,
+    isFullyExcused,
+    isPartiallyExcused,
+    confExcused,
+    perfExcused,
+    confReason: excuseStatus?.confReason ?? null,
+    perfReason: excuseStatus?.perfReason ?? null,
+    confClosed,
+    perfClosed,
+    perfOpen,
+    missingConfCount: confExcused ? 0 : stats.missingConfCount,
+    missingPerfCount: perfExcused ? 0 : stats.missingPerfCount,
+    distinctMissedCount: stats.distinctMissedCount,
+    nextDeadlineLabel: nextDeadlineLabel ?? null,
+  });
+
+  const fractions = renderFractions();
 
   return (
     <Card
@@ -213,102 +218,35 @@ export function LocationHealthCard({
       onClick={() => navigate(`/dashboard/location/${stats.id}`)}
     >
       <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <CardTitle className="text-lg font-bold truncate">{stats.name}</CardTitle>
-              {getContextualExcuseBadge()}
-            </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-              <Users className="h-3 w-3" />
-              {stats.staffCount} Active Staff
-            </div>
-          </div>
-          <div className="text-right shrink-0">
-            <div className="text-2xs text-primary font-medium mb-0.5 uppercase tracking-wide">
-              This Week
-            </div>
-            {renderBigNumber()}
-          </div>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-lg font-bold truncate">{stats.name}</CardTitle>
+          {headerChip}
+        </div>
+        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+          <Users className="h-4 w-4" />
+          {stats.staffCount} active staff
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {isFullyExcused ? (
-            <Badge variant="secondary" className="bg-muted/50 text-muted-foreground gap-1">
-              <CheckCircle2 className="h-4 w-4" />
-              No submissions required
-            </Badge>
-          ) : (
-            <>
-              {stats.missingConfCount > 0 && !excuseStatus?.isConfExcused && (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
-                  style={chipStyle(LATE_CHIP)}
-                >
-                  <AlertCircle className="h-4 w-4" />
-                  {stats.missingConfCount} Late Conf
-                </span>
-              )}
-              {(stats.pendingConfCount ?? 0) > 0 && !excuseStatus?.isConfExcused && (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
-                  style={chipStyle(PENDING_CHIP)}
-                >
-                  <Clock className="h-4 w-4" />
-                  {stats.pendingConfCount} Awaiting Conf
-                </span>
-              )}
-              {stats.missingPerfCount > 0 && !excuseStatus?.isPerfExcused && (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
-                  style={chipStyle(LATE_CHIP)}
-                >
-                  <AlertCircle className="h-4 w-4" />
-                  {stats.missingPerfCount} Late Perf
-                </span>
-              )}
-              {perfOpen && !perfClosed && stats.missingPerfCount === 0 && !excuseStatus?.isPerfExcused && (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
-                  style={chipStyle(PENDING_CHIP)}
-                >
-                  <Clock className="h-4 w-4" />
-                  Perf Window Open
-                </span>
-              )}
-              {excuseStatus?.isConfExcused && (
-                <Badge variant="secondary" className="bg-muted/50 text-muted-foreground gap-1">
-                  Conf Excused
-                </Badge>
-              )}
-              {excuseStatus?.isPerfExcused && (
-                <Badge variant="secondary" className="bg-muted/50 text-muted-foreground gap-1">
-                  Perf Excused
-                </Badge>
-              )}
-              {/* Before any deadline: show next deadline context */}
-              {!anyDeadlinePassed && stats.missingConfCount === 0 && (stats.pendingConfCount ?? 0) === 0 &&
-               !excuseStatus?.isConfExcused && !excuseStatus?.isPerfExcused && nextDeadlineLabel && (
-                <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground gap-1">
-                  <Clock className="h-4 w-4" />
-                  {nextDeadlineLabel}
-                </Badge>
-              )}
-              {/* After deadline(s), all good - quiet, not a celebration */}
-              {anyDeadlinePassed && stats.missingConfCount === 0 && (stats.pendingConfCount ?? 0) === 0 &&
-               stats.missingPerfCount === 0 && !excuseStatus?.isConfExcused && !excuseStatus?.isPerfExcused && (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
-                  style={chipStyle(COMPLETE_CHIP)}
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  On Track
-                </span>
-              )}
-            </>
+      <CardContent className="pt-0">
+        <div className="flex items-end justify-between gap-2">
+          <div>{renderBigNumber()}</div>
+          {fractions && (
+            <div className="text-2xs text-muted-foreground text-right shrink-0">{fractions}</div>
           )}
         </div>
+        {statusPhrases.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-1 text-2xs text-muted-foreground mt-2">
+            {statusPhrases.map((phrase, index) => (
+              <span key={index} className="inline-flex items-center gap-1">
+                {index > 0 && <span aria-hidden="true">&middot;</span>}
+                {phrase.icon === 'check' && (
+                  <CheckCircle2 className="h-4 w-4" style={{ color: 'hsl(var(--status-complete))' }} />
+                )}
+                {phrase.text}
+              </span>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

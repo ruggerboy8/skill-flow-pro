@@ -7,6 +7,7 @@ import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { PwaManager } from "@/components/pwa/PwaManager";
 import { BatchProcessorProvider } from "@/contexts/BatchProcessorContext";
 import { SimProvider } from "@/devtools/SimProvider";
+import { SignalP } from "@/components/brand/SignalP";
 
 // Pages (same imports you already have)
 import Login from "@/pages/Login";
@@ -105,13 +106,12 @@ function AppRoutes() {
   }
 
   if (loading) {
+    // DSN-5c: app-level auth gate, before we know whether there's a session.
+    // The brand loader in "waiting" mode -- discrete laps, never a
+    // continuous spin -- replaces the old ad hoc spinner div here.
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div
-          className="h-6 w-6 animate-spin rounded-full border-2 border-muted border-t-primary"
-          role="status"
-          aria-label="Loading"
-        />
+        <SignalP mode="waiting" size={48} />
       </div>
     );
   }

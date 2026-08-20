@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateMissingCounts, calculateLocationStats, type SubmissionGates } from './submissionStatus';
+import { calculateMissingCounts, calculateLocationStats, calculateDistinctMissedCount, calculateDueSubmissionTotals, type SubmissionGates } from './submissionStatus';
 import type { StaffWeekSummary } from '@/types/coachV2';
 
 function week(overrides: Partial<StaffWeekSummary> = {}): StaffWeekSummary {
@@ -127,5 +127,116 @@ describe('calculateLocationStats', () => {
     const result = calculateLocationStats(staff, { ...noGates });
     expect(result.avgConfidence).toBe(3);
     expect(result.avgPerformance).toBe(4);
+  });
+});
+
+describe('calculateDistinctMissedCount', () => {
+  const bothDeadlinesPassed: SubmissionGates = {
+    isPastConfidenceDeadline: true,
+    isPastPerformanceDeadline: true,
+    isPerformanceOpen: true,
+  };
+
+  it('counts a person who missed both confidence and performance once, not twice (DASH-1a QA fix)', () => {
+    // 4-person location, both deadlines passed, 2 people miss both, 2 submit everything.
+    // Distinct people missed = 2, not missingConfCount + missingPerfCount = 4.
+    const staff = [
+      week({ staff_id: 's1', conf_count: 0, perf_count: 0, assignment_count: 2 }),
+      week({ staff_id: 's2', conf_count: 0, perf_count: 0, assignment_count: 2 }),
+      week({ staff_id: 's3', conf_count: 2, perf_count: 2, assignment_count: 2 }),
+      week({ staff_id: 's4', conf_count: 2, perf_count: 2, assignment_count: 2 }),
+    ];
+    const result = calculateDistinctMissedCount(staff, bothDeadlinesPassed);
+    expect(result).toBe(2);
+
+    const locStats = calculateLocationStats(staff, bothDeadlinesPassed);
+    expect(locStats.missingConfCount).toBe(2);
+    expect(locStats.missingPerfCount).toBe(2);
+    expect(locStats.distinctMissedCount).toBe(2);
+  });
+
+  it('counts someone missing only one metric once', () => {
+    const staff = [week({ conf_count: 0, perf_count: 2, assignment_count: 2 })];
+    expect(calculateDistinctMissedCount(staff, bothDeadlinesPassed)).toBe(1);
+  });
+
+  it('does not count anyone before their deadline has passed', () => {
+    const staff = [week({ conf_count: 0, perf_count: 0, assignment_count: 2 })];
+    expect(calculateDistinctMissedCount(staff, {
+      isPastConfidenceDeadline: false,
+      isPastPerformanceDeadline: false,
+      isPerformanceOpen: false,
+    })).toBe(0);
+  });
+
+  it('is 0 when everyone submitted everything', () => {
+    const staff = [
+      week({ staff_id: 's1', conf_count: 2, perf_count: 2, assignment_count: 2 }),
+      week({ staff_id: 's2', conf_count: 2, perf_count: 2, assignment_count: 2 }),
+    ];
+    expect(calculateDistinctMissedCount(staff, bothDeadlinesPassed)).toBe(0);
+  });
+});
+
+describe('calculateDueSubmissionTotals', () => {
+  it('counts conf only once its deadline has passed, perf only once its deadline has passed', () => {
+    const staff = [week({ conf_count: 1, perf_count: 1, assignment_count: 2 })];
+
+    const beforeEither = calculateDueSubmissionTotals(staff, {
+      isPastConfidenceDeadline: false,
+      isPastPerformanceDeadline: false,
+      isPerformanceOpen: false,
+    });
+    expect(beforeEither).toEqual({ confSubmitted: 0, confExpected: 0, perfSubmitted: 0, perfExpected: 0 });
+
+    const confOnly = calculateDueSubmissionTotals(staff, {
+      isPastConfidenceDeadline: true,
+      isPastPerformanceDeadline: false,
+      isPerformanceOpen: false,
+    });
+    expect(confOnly).toEqual({ confSubmitted: 1, confExpected: 2, perfSubmitted: 0, perfExpected: 0 });
+
+    const both = calculateDueSubmissionTotals(staff, {
+      isPastConfidenceDeadline: true,
+      isPastPerformanceDeadline: true,
+      isPerformanceOpen: true,
+    });
+    expect(both).toEqual({ confSubmitted: 1, confExpected: 2, perfSubmitted: 1, perfExpected: 2 });
+  });
+
+  it('excludes a not-yet-due location entirely from the org total, not as a 0-of-N drag (P1 Codex fix)', () => {
+    // Location A: conf deadline passed, 5 staff (10 assignments), 7 submitted.
+    const locationA = [
+      week({ staff_id: 'a1', conf_count: 2, assignment_count: 2 }),
+      week({ staff_id: 'a2', conf_count: 2, assignment_count: 2 }),
+      week({ staff_id: 'a3', conf_count: 2, assignment_count: 2 }),
+      week({ staff_id: 'a4', conf_count: 1, assignment_count: 2 }),
+      week({ staff_id: 'a5', conf_count: 0, assignment_count: 2 }),
+    ];
+    const gatesA: SubmissionGates = { isPastConfidenceDeadline: true, isPastPerformanceDeadline: false, isPerformanceOpen: false };
+
+    // Location B: conf deadline NOT passed yet, 5 staff (10 assignments), 0 submitted so far.
+    const locationB = [
+      week({ staff_id: 'b1', conf_count: 0, assignment_count: 2 }),
+      week({ staff_id: 'b2', conf_count: 0, assignment_count: 2 }),
+      week({ staff_id: 'b3', conf_count: 0, assignment_count: 2 }),
+      week({ staff_id: 'b4', conf_count: 0, assignment_count: 2 }),
+      week({ staff_id: 'b5', conf_count: 0, assignment_count: 2 }),
+    ];
+    const gatesB: SubmissionGates = { isPastConfidenceDeadline: false, isPastPerformanceDeadline: false, isPerformanceOpen: false };
+
+    const dueA = calculateDueSubmissionTotals(locationA, gatesA);
+    const dueB = calculateDueSubmissionTotals(locationB, gatesB);
+
+    expect(dueA).toEqual({ confSubmitted: 7, confExpected: 10, perfSubmitted: 0, perfExpected: 0 });
+    expect(dueB).toEqual({ confSubmitted: 0, confExpected: 0, perfSubmitted: 0, perfExpected: 0 });
+
+    // Pooled org total reflects only the due location: 7/10 = 70%, not
+    // (7+0)/(10+10) = 35% from summing B's raw 0-of-10 in as if it were owed.
+    const orgConfSubmitted = dueA.confSubmitted + dueB.confSubmitted;
+    const orgConfExpected = dueA.confExpected + dueB.confExpected;
+    expect(orgConfSubmitted).toBe(7);
+    expect(orgConfExpected).toBe(10);
+    expect((orgConfSubmitted / orgConfExpected) * 100).toBe(70);
   });
 });

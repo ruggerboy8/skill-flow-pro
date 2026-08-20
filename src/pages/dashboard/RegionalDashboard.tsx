@@ -15,8 +15,9 @@ import { format as formatDate } from 'date-fns';
 import { StaffWeekSummary } from '@/types/coachV2';
 import { nowUtc } from '@/lib/centralTime';
 import { useLocationTimezone } from '@/hooks/useLocationTimezone';
-import { getLocationSubmissionGates, calculateLocationStats, type SubmissionGates } from '@/lib/submissionStatus';
+import { getLocationSubmissionGates, calculateLocationStats, calculateDistinctMissedCount, calculateDueSubmissionTotals, type SubmissionGates } from '@/lib/submissionStatus';
 import { getSubmissionPolicy, getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
+import { participationTier, tierColorTokens } from '@/lib/participationTier';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LocationConfig {
@@ -110,6 +111,13 @@ export default function RegionalDashboard() {
       byLocation.get(s.location_id)!.push(s);
     });
 
+    // DASH-1a Codex fix (P1): raw conf/perf submitted & expected counts,
+    // but only for locations where that metric is actually due (and not
+    // excused), see calculateDueSubmissionTotals. Collected alongside the
+    // per-location stats below so the org-wide colored rates can never be
+    // dragged down by a location that isn't due yet.
+    const dueTotalsList: ReturnType<typeof calculateDueSubmissionTotals>[] = [];
+
     const stats: LocationStats[] = Array.from(byLocation.entries()).map(([locId, staff]) => {
       // Use per-location gates if available, otherwise default to "nothing due yet"
       const gates = locationGatesMap.get(locId) ?? {
@@ -120,12 +128,12 @@ export default function RegionalDashboard() {
       
       const locStats = calculateLocationStats(staff, gates);
       const excuseStatus = getExcuseStatus(locId);
-      
+
       let adjustedMissingConf = locStats.missingConfCount;
       let adjustedMissingPerf = locStats.missingPerfCount;
       let adjustedPendingConf = locStats.pendingConfCount;
       let adjustedSubmissionRate = locStats.submissionRate;
-      
+
       if (excuseStatus.isConfExcused) {
         adjustedMissingConf = 0;
         adjustedPendingConf = 0;
@@ -133,11 +141,23 @@ export default function RegionalDashboard() {
       if (excuseStatus.isPerfExcused) {
         adjustedMissingPerf = 0;
       }
-      
+
       if (excuseStatus.isConfExcused && excuseStatus.isPerfExcused) {
         adjustedSubmissionRate = 100;
       }
-      
+
+      // Gates with any excused metric turned off, so an excused-but-due
+      // metric is treated as not due either. Shared by distinctMissedCount
+      // (DASH-1a QA fix) and the due-only submission totals (DASH-1a Codex
+      // fix, P1) below.
+      const effectiveGates: SubmissionGates = {
+        ...gates,
+        isPastConfidenceDeadline: gates.isPastConfidenceDeadline && !excuseStatus.isConfExcused,
+        isPastPerformanceDeadline: gates.isPastPerformanceDeadline && !excuseStatus.isPerfExcused,
+      };
+      const distinctMissedCount = calculateDistinctMissedCount(staff, effectiveGates);
+      dueTotalsList.push(calculateDueSubmissionTotals(staff, effectiveGates));
+
       return {
         id: locId,
         name: staff[0]?.location_name || 'Unknown',
@@ -145,6 +165,7 @@ export default function RegionalDashboard() {
         submissionRate: adjustedSubmissionRate,
         missingConfCount: adjustedMissingConf,
         missingPerfCount: adjustedMissingPerf,
+        distinctMissedCount,
         pendingConfCount: adjustedPendingConf,
         confSubmitted: locStats.confSubmittedCount,
         confExpected: locStats.confExpectedCount,
@@ -158,42 +179,72 @@ export default function RegionalDashboard() {
     const totalStaff = stats.reduce((sum, s) => sum + s.staffCount, 0);
     const totalMissingConf = stats.reduce((sum, s) => sum + s.missingConfCount, 0);
     const totalMissingPerf = stats.reduce((sum, s) => sum + s.missingPerfCount, 0);
+    // DASH-1a QA fix: sum of per-location DISTINCT missed counts. Safe to
+    // sum across locations since a staff member belongs to exactly one.
+    const totalDistinctMissed = stats.reduce((sum, s) => sum + s.distinctMissedCount, 0);
     const totalPendingConf = stats.reduce((sum, s) => sum + (s.pendingConfCount ?? 0), 0);
+    // Raw, deadline-unaware counts, used ONLY for the neutral pre-deadline
+    // progress display ("X/Y conf submitted" when nothing is due yet).
+    // Never feed these into a colored rate; see totalDue* below.
     const totalConfSubmitted = stats.reduce((sum, s) => sum + (s.confSubmitted ?? 0), 0);
     const totalConfExpected = stats.reduce((sum, s) => sum + (s.confExpected ?? 0), 0);
     const totalPerfSubmitted = stats.reduce((sum, s) => sum + (s.perfSubmitted ?? 0), 0);
     const totalPerfExpected = stats.reduce((sum, s) => sum + (s.perfExpected ?? 0), 0);
-    const avgRate = stats.length > 0 
-      ? stats.reduce((sum, s) => sum + s.submissionRate, 0) / stats.length 
-      : 0;
-    
+
+    // DASH-1a Codex fix (P1): due-only, excuse-aware totals that the
+    // colored confRate/perfRate/avgRate must be built from instead, a
+    // not-yet-due (or excused) location contributes nothing to either side
+    // of the ratio, rather than dragging the denominator down. See
+    // summaryTiers below, which is the only place these feed into.
+    const totalDueConfSubmitted = dueTotalsList.reduce((sum, d) => sum + d.confSubmitted, 0);
+    const totalDueConfExpected = dueTotalsList.reduce((sum, d) => sum + d.confExpected, 0);
+    const totalDuePerfSubmitted = dueTotalsList.reduce((sum, d) => sum + d.perfSubmitted, 0);
+    const totalDuePerfExpected = dueTotalsList.reduce((sum, d) => sum + d.perfExpected, 0);
+
     // Check if any location has passed a deadline
     const anyLocationPastDeadline = stats.some(s => {
       const gates = locationGatesMap.get(s.id);
       return gates?.isPastConfidenceDeadline || gates?.isPastPerformanceDeadline;
     });
 
-    return { 
-      locationStats: stats, 
-      totals: { totalStaff, totalMissingConf, totalMissingPerf, totalPendingConf, avgRate, locationCount: stats.length,
-        totalConfSubmitted, totalConfExpected, totalPerfSubmitted, totalPerfExpected, anyLocationPastDeadline }
+    return {
+      locationStats: stats,
+      totals: { totalStaff, totalMissingConf, totalMissingPerf, totalDistinctMissed, totalPendingConf, locationCount: stats.length,
+        totalConfSubmitted, totalConfExpected, totalPerfSubmitted, totalPerfExpected,
+        totalDueConfSubmitted, totalDueConfExpected, totalDuePerfSubmitted, totalDuePerfExpected,
+        anyLocationPastDeadline }
     };
   }, [summaries, locationGatesMap]);
 
-  // Compute signals — only fire when a deadline has actually passed
+  // Compute signals, only fire when a deadline has actually passed, and
+  // use the same participationTier bands as the summary cards and location
+  // cards so the banner never disagrees with them (DASH-1a).
   const signals = useMemo((): Signal[] => {
     const result: Signal[] = [];
     locationStats.forEach(loc => {
       const gates = locationGatesMap.get(loc.id);
-      // Only signal if at least one deadline has passed for this location
-      const anyDeadlinePassed = gates?.isPastConfidenceDeadline || gates?.isPastPerformanceDeadline;
-      if (anyDeadlinePassed && loc.submissionRate < 70 && loc.staffCount > 0) {
-        result.push({
-          type: 'participation_drop',
-          message: `${loc.name}: participation rate is ${Math.round(loc.submissionRate)}% this week — below 70%.`,
-          locationName: loc.name,
-        });
-      }
+      const anyDeadlinePassed = !!(gates?.isPastConfidenceDeadline || gates?.isPastPerformanceDeadline);
+      if (!anyDeadlinePassed || loc.staffCount === 0) return;
+
+      // Round once and reuse for both the >= 85 gate and the tier decision
+      // (DASH-1a QA fix), so a rate that displays as 85% can never still
+      // read "below 85%" in the signal message.
+      const displayRate = Math.round(loc.submissionRate);
+      if (displayRate >= 85) return;
+
+      const tier = participationTier({
+        rate: displayRate,
+        missedCount: loc.distinctMissedCount,
+        teamSize: loc.staffCount,
+        anyDeadlinePassed,
+      });
+
+      result.push({
+        type: 'participation_drop',
+        message: `${loc.name}: participation rate is ${displayRate}% this week, below 85%.`,
+        locationName: loc.name,
+        severity: tier === 'red' ? 'red' : 'watch',
+      });
     });
     return result;
   }, [locationStats, locationGatesMap]);
@@ -228,6 +279,63 @@ export default function RegionalDashboard() {
   }, [locationStats]);
 
   const locationIdList = useMemo(() => locationStats.map(l => l.id), [locationStats]);
+
+  // Org-wide rates and tiers for the summary cards, same participationTier
+  // bands as the location cards and signals banner (DASH-1a). Each rate is
+  // rounded ONCE here and reused for both the tier decision and the
+  // displayed percentage (DASH-1a QA fix for the rounding mismatch), so
+  // the JSX below just renders these numbers directly.
+  //
+  // DASH-1a Codex fix (P1): these are built from totalDue*, not the raw
+  // totalConf*/totalPerf* sums, so a location that isn't due yet (or is
+  // excused) can never dilute a colored rate, it contributes to neither
+  // the numerator nor the denominator, the same way an individual
+  // LocationHealthCard treats a not-yet-due metric as 100%, not 0%.
+  const summaryTiers = useMemo(() => {
+    const confRate = Math.round(
+      totals.totalDueConfExpected > 0
+        ? (totals.totalDueConfSubmitted / totals.totalDueConfExpected) * 100
+        : 100
+    );
+    const perfRate = Math.round(
+      totals.totalDuePerfExpected > 0
+        ? (totals.totalDuePerfSubmitted / totals.totalDuePerfExpected) * 100
+        : 100
+    );
+    // Avg Completion pools due conf + due perf into one combined rate,
+    // mirroring how each location's own submissionRate is computed,
+    // this is the org's own due-participation rate, not an unweighted
+    // average of each location's percentage.
+    const dueExpected = totals.totalDueConfExpected + totals.totalDuePerfExpected;
+    const dueSubmitted = totals.totalDueConfSubmitted + totals.totalDuePerfSubmitted;
+    const avgRate = Math.round(dueExpected > 0 ? (dueSubmitted / dueExpected) * 100 : 100);
+    return {
+      confRate,
+      perfRate,
+      avgRate,
+      confTier: participationTier({
+        rate: confRate,
+        missedCount: totals.totalMissingConf,
+        teamSize: totals.totalStaff,
+        anyDeadlinePassed: totals.anyLocationPastDeadline,
+      }),
+      perfTier: participationTier({
+        rate: perfRate,
+        missedCount: totals.totalMissingPerf,
+        teamSize: totals.totalStaff,
+        anyDeadlinePassed: totals.anyLocationPastDeadline,
+      }),
+      // Uses the summed DISTINCT missed count (DASH-1a QA fix), not
+      // totalMissingConf + totalMissingPerf, which double-counts anyone
+      // missing both metrics.
+      avgTier: participationTier({
+        rate: avgRate,
+        missedCount: totals.totalDistinctMissed,
+        teamSize: totals.totalStaff,
+        anyDeadlinePassed: totals.anyLocationPastDeadline,
+      }),
+    };
+  }, [totals]);
 
   if (loading) {
     return (
@@ -317,34 +425,63 @@ export default function RegionalDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-4">
-                {totals.totalMissingConf > 0 && (
-                  <div>
-                    <div className="text-2xl font-bold text-destructive">{totals.totalMissingConf}</div>
-                    <p className="text-xs text-muted-foreground">Late Conf</p>
-                  </div>
-                )}
-                {totals.totalPendingConf > 0 && (
-                  <div>
-                    <div className="text-2xl font-bold text-primary">{totals.totalPendingConf}</div>
-                    <p className="text-xs text-muted-foreground">Pending Conf</p>
-                  </div>
-                )}
-                {totals.totalMissingPerf > 0 && (
-                  <div>
-                    <div className="text-2xl font-bold text-warning">{totals.totalMissingPerf}</div>
-                    <p className="text-xs text-muted-foreground">Missing Perf</p>
-                  </div>
-                )}
-              {totals.totalMissingConf === 0 && totals.totalPendingConf === 0 && totals.totalMissingPerf === 0 && (
-                  <div>
-                    <div className="text-sm text-muted-foreground">All on track!</div>
-                    {nextDeadlineLabel && (
-                      <p className="text-xs text-muted-foreground/70 mt-1">Next: {nextDeadlineLabel}</p>
-                    )}
-                  </div>
-                )}
-              </div>
+              {totals.totalMissingConf === 0 && totals.totalPendingConf === 0 && totals.totalMissingPerf === 0 ? (
+                <div>
+                  <div className="text-sm text-muted-foreground">All on track!</div>
+                  {nextDeadlineLabel && (
+                    <p className="text-xs text-muted-foreground/70 mt-1">Next: {nextDeadlineLabel}</p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex gap-4">
+                  {totals.totalConfExpected > 0 && (
+                    <div>
+                      <div
+                        className="text-2xl font-bold"
+                        style={{ color: tierColorTokens(summaryTiers.confTier)?.text ?? 'hsl(var(--foreground))' }}
+                      >
+                        {summaryTiers.confRate}%
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {totals.totalDueConfSubmitted}/{totals.totalDueConfExpected} conf submitted
+                      </p>
+                      {totals.totalMissingConf > 0 && (
+                        <span
+                          className="inline-flex items-center mt-1 rounded-full px-1.5 py-0.5 text-2xs font-medium"
+                          style={{ backgroundColor: 'hsl(var(--status-late-bg))', color: 'hsl(var(--status-late))' }}
+                        >
+                          {totals.totalMissingConf} late
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {totals.totalPendingConf > 0 && (
+                    <div>
+                      <div className="text-2xl font-bold text-foreground">{totals.totalPendingConf}</div>
+                      <p className="text-xs text-muted-foreground">Pending Conf</p>
+                    </div>
+                  )}
+                  {totals.totalMissingPerf > 0 && (
+                    <div>
+                      <div
+                        className="text-2xl font-bold"
+                        style={{ color: tierColorTokens(summaryTiers.perfTier)?.text ?? 'hsl(var(--foreground))' }}
+                      >
+                        {summaryTiers.perfRate}%
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {totals.totalDuePerfSubmitted}/{totals.totalDuePerfExpected} perf submitted
+                      </p>
+                      <span
+                        className="inline-flex items-center mt-1 rounded-full px-1.5 py-0.5 text-2xs font-medium"
+                        style={{ backgroundColor: 'hsl(var(--status-late-bg))', color: 'hsl(var(--status-late))' }}
+                      >
+                        {totals.totalMissingPerf} late
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -357,7 +494,12 @@ export default function RegionalDashboard() {
             </CardHeader>
             <CardContent>
               {totals.anyLocationPastDeadline ? (
-                <div className="text-3xl font-bold">{Math.round(totals.avgRate)}%</div>
+                <div
+                  className="text-3xl font-bold"
+                  style={{ color: tierColorTokens(summaryTiers.avgTier)?.text ?? 'hsl(var(--foreground))' }}
+                >
+                  {summaryTiers.avgRate}%
+                </div>
               ) : (
                 <div>
                   <div className="text-2xl font-bold text-foreground">

@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Users, AlertCircle, CheckCircle2, CloudOff, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { participationTier, tierColorTokens } from "@/lib/participationTier";
 
 export interface LocationStats {
   id: string;
@@ -11,6 +12,7 @@ export interface LocationStats {
   submissionRate: number;      // 0-100 (conf+perf complete %)
   missingConfCount: number;    // staff missing confidence (after deadline - LATE)
   missingPerfCount: number;    // staff missing performance (after deadline - LATE)
+  distinctMissedCount: number; // DISTINCT staff missing anything (a person missing both conf and perf counts once)
   pendingConfCount?: number;   // staff not yet submitted but before deadline
   confSubmitted?: number;      // raw count of conf submissions
   confExpected?: number;       // raw count of expected conf submissions
@@ -39,8 +41,22 @@ interface LocationHealthCardProps {
   nextDeadlineLabel?: string | null;
 }
 
-export function LocationHealthCard({ 
-  stats, 
+// DASH-1a: a card carries at most one alarm (its own border/wash). Badges
+// inside never go past --status-late (amber) - see src/lib/participationTier.ts.
+function chipStyle(token: { bg: string; text: string; border: string }) {
+  return {
+    backgroundColor: token.bg,
+    color: token.text,
+    borderColor: token.border,
+  };
+}
+
+const LATE_CHIP = { bg: 'hsl(var(--status-late-bg))', text: 'hsl(var(--status-late))', border: 'hsl(var(--status-late) / 0.3)' };
+const PENDING_CHIP = { bg: 'hsl(var(--status-pending-bg))', text: 'hsl(var(--status-pending))', border: 'hsl(var(--status-pending) / 0.3)' };
+const COMPLETE_CHIP = { bg: 'hsl(var(--status-complete-bg))', text: 'hsl(var(--status-complete))', border: 'hsl(var(--status-complete) / 0.3)' };
+
+export function LocationHealthCard({
+  stats,
   excuseStatus,
   submissionGates,
   nextDeadlineLabel,
@@ -55,22 +71,38 @@ export function LocationHealthCard({
   const perfOpen = submissionGates?.performanceOpen ?? false;
   const anyDeadlinePassed = confClosed || perfClosed;
 
-  // Visual status: only color-grade after a deadline has passed
-  const getStatusClasses = (rate: number) => {
-    if (isFullyExcused) return "border-muted bg-muted/20";
-    if (!anyDeadlinePassed) return "border-border bg-card";
-    if (rate < 50) return "border-destructive/30 bg-destructive/5";
-    if (rate < 80) return "border-warning/30 bg-warning/5";
-    return "border-primary/30 bg-primary/5";
-  };
+  // Round once and reuse everywhere (tier decision AND display) so a
+  // displayed 60% can never be judged red and a displayed 85% can never
+  // read as below the watch threshold (DASH-1a QA fix: rounding mismatch).
+  const displayRate = Math.round(stats.submissionRate);
 
-  const getRateColor = (rate: number) => {
-    if (isFullyExcused) return "text-muted-foreground";
-    if (!anyDeadlinePassed) return "text-foreground";
-    if (rate < 50) return "text-destructive";
-    if (rate < 80) return "text-warning";
-    return "text-primary";
-  };
+  // The single source of truth for card-level alarm color: red only past a
+  // deadline and below the red threshold (with the small-team guard), amber
+  // in the watch band, otherwise the default surface. See DASH-1a spec.
+  // Uses distinctMissedCount (DASH-1a QA fix), not missingConfCount +
+  // missingPerfCount, which double-counts anyone missing both metrics.
+  const tier = participationTier({
+    rate: displayRate,
+    missedCount: stats.distinctMissedCount,
+    teamSize: stats.staffCount,
+    anyDeadlinePassed,
+  });
+  const tierTokens = tierColorTokens(tier);
+
+  // Use a subtle wash (5% of the raw hue), not the opaque chip background,
+  // so the card reads as a gentle tint rather than a filled badge.
+  const cardWashStyle: React.CSSProperties = isFullyExcused || !tierTokens
+    ? {}
+    : {
+        borderColor: tierTokens.border,
+        backgroundColor: tier === 'red' ? 'hsl(var(--status-missing) / 0.05)' : 'hsl(var(--status-late) / 0.05)',
+      };
+
+  const rateColor = isFullyExcused
+    ? 'hsl(var(--muted-foreground))'
+    : tierTokens
+      ? tierTokens.text
+      : 'hsl(var(--foreground))';
 
   // Render the big number based on deadline state
   const renderBigNumber = () => {
@@ -92,8 +124,8 @@ export function LocationHealthCard({
     if (confClosed && perfClosed) {
       return (
         <>
-          <div className={cn("text-2xl font-black", getRateColor(stats.submissionRate))}>
-            {Math.round(stats.submissionRate)}%
+          <div className="text-2xl font-black" style={{ color: rateColor }}>
+            {displayRate}%
           </div>
           <div className="text-2xs text-muted-foreground leading-tight">Submitted</div>
         </>
@@ -104,8 +136,8 @@ export function LocationHealthCard({
     if (confClosed && !perfClosed) {
       return (
         <>
-          <div className={cn("text-2xl font-black", getRateColor(stats.submissionRate))}>
-            {Math.round(stats.submissionRate)}%
+          <div className="text-2xl font-black" style={{ color: rateColor }}>
+            {displayRate}%
           </div>
           <div className="text-2xs text-muted-foreground leading-tight">Conf Rate</div>
           {perfOpen && confExp > 0 && (
@@ -139,12 +171,12 @@ export function LocationHealthCard({
       const reason = excuseStatus?.confReason || excuseStatus?.perfReason;
       return (
         <Badge variant="secondary" className="bg-muted text-muted-foreground gap-1 shrink-0">
-          <CloudOff className="h-3 w-3" />
+          <CloudOff className="h-4 w-4" />
           {reason ? `Excused: ${reason}` : 'Excused'}
         </Badge>
       );
     }
-    
+
     if (isPartiallyExcused) {
       if (excuseStatus?.isConfExcused && submissionGates && !submissionGates.confidenceClosed) {
         return (
@@ -166,16 +198,18 @@ export function LocationHealthCard({
         </Badge>
       );
     }
-    
+
     return null;
   };
 
   return (
-    <Card 
+    <Card
       className={cn(
         "cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all border-2 relative",
-        getStatusClasses(stats.submissionRate)
+        isFullyExcused && "border-muted bg-muted/20",
+        !isFullyExcused && (tier === 'neutral' || tier === 'good') && "border-border bg-card",
       )}
+      style={cardWashStyle}
       onClick={() => navigate(`/dashboard/location/${stats.id}`)}
     >
       <CardHeader className="pb-2">
@@ -202,34 +236,46 @@ export function LocationHealthCard({
         <div className="flex flex-wrap gap-2 mt-2">
           {isFullyExcused ? (
             <Badge variant="secondary" className="bg-muted/50 text-muted-foreground gap-1">
-              <CheckCircle2 className="h-3 w-3" />
+              <CheckCircle2 className="h-4 w-4" />
               No submissions required
             </Badge>
           ) : (
             <>
               {stats.missingConfCount > 0 && !excuseStatus?.isConfExcused && (
-                <Badge variant="destructive" className="gap-1">
-                  <AlertCircle className="h-3 w-3" />
+                <span
+                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
+                  style={chipStyle(LATE_CHIP)}
+                >
+                  <AlertCircle className="h-4 w-4" />
                   {stats.missingConfCount} Late Conf
-                </Badge>
+                </span>
               )}
               {(stats.pendingConfCount ?? 0) > 0 && !excuseStatus?.isConfExcused && (
-                <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground gap-1">
-                  <Clock className="h-3 w-3" />
+                <span
+                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
+                  style={chipStyle(PENDING_CHIP)}
+                >
+                  <Clock className="h-4 w-4" />
                   {stats.pendingConfCount} Awaiting Conf
-                </Badge>
+                </span>
               )}
               {stats.missingPerfCount > 0 && !excuseStatus?.isPerfExcused && (
-                <Badge variant="destructive" className="gap-1">
-                  <AlertCircle className="h-3 w-3" />
+                <span
+                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
+                  style={chipStyle(LATE_CHIP)}
+                >
+                  <AlertCircle className="h-4 w-4" />
                   {stats.missingPerfCount} Late Perf
-                </Badge>
+                </span>
               )}
               {perfOpen && !perfClosed && stats.missingPerfCount === 0 && !excuseStatus?.isPerfExcused && (
-                <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground gap-1">
-                  <Clock className="h-3 w-3" />
+                <span
+                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
+                  style={chipStyle(PENDING_CHIP)}
+                >
+                  <Clock className="h-4 w-4" />
                   Perf Window Open
-                </Badge>
+                </span>
               )}
               {excuseStatus?.isConfExcused && (
                 <Badge variant="secondary" className="bg-muted/50 text-muted-foreground gap-1">
@@ -242,20 +288,23 @@ export function LocationHealthCard({
                 </Badge>
               )}
               {/* Before any deadline: show next deadline context */}
-              {!anyDeadlinePassed && stats.missingConfCount === 0 && (stats.pendingConfCount ?? 0) === 0 && 
+              {!anyDeadlinePassed && stats.missingConfCount === 0 && (stats.pendingConfCount ?? 0) === 0 &&
                !excuseStatus?.isConfExcused && !excuseStatus?.isPerfExcused && nextDeadlineLabel && (
                 <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground gap-1">
-                  <Clock className="h-3 w-3" />
+                  <Clock className="h-4 w-4" />
                   {nextDeadlineLabel}
                 </Badge>
               )}
-              {/* After deadline(s), all good */}
-              {anyDeadlinePassed && stats.missingConfCount === 0 && (stats.pendingConfCount ?? 0) === 0 && 
+              {/* After deadline(s), all good - quiet, not a celebration */}
+              {anyDeadlinePassed && stats.missingConfCount === 0 && (stats.pendingConfCount ?? 0) === 0 &&
                stats.missingPerfCount === 0 && !excuseStatus?.isConfExcused && !excuseStatus?.isPerfExcused && (
-                <Badge variant="secondary" className="bg-primary/10 text-primary gap-1">
-                  <CheckCircle2 className="h-3 w-3" />
+                <span
+                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
+                  style={chipStyle(COMPLETE_CHIP)}
+                >
+                  <CheckCircle2 className="h-4 w-4" />
                   On Track
-                </Badge>
+                </span>
               )}
             </>
           )}

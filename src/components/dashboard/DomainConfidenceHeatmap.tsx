@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
+import { scoreBucket, scoreBucketTokens, isTrailingCell } from '@/lib/confidenceScoreRamp';
 import { cn } from '@/lib/utils';
 
 const DOMAINS = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'] as const;
@@ -26,18 +27,18 @@ interface DomainConfidenceHeatmapProps {
   lookbackWeeks?: number;
 }
 
-function scoreColor(avg: number | undefined): string {
-  if (avg === undefined) return 'text-muted-foreground';
-  if (avg >= 3.0) return 'text-emerald-700 dark:text-emerald-400';
-  if (avg >= 2.5) return 'text-amber-700 dark:text-amber-400';
-  return 'text-rose-700 dark:text-rose-400';
+// DASH-1a: confidence scores use the 1-4 score ramp (a learning gradient),
+// never a traffic light. See src/lib/confidenceScoreRamp.ts.
+function scoreCellStyle(avg: number | undefined): React.CSSProperties {
+  if (avg === undefined) return {};
+  const tokens = scoreBucketTokens(scoreBucket(avg));
+  return { backgroundColor: tokens.bg };
 }
 
-function scoreBg(avg: number | undefined): string {
-  if (avg === undefined) return '';
-  if (avg >= 3.0) return 'bg-emerald-50 dark:bg-emerald-950/20';
-  if (avg >= 2.5) return 'bg-amber-50 dark:bg-amber-950/20';
-  return 'bg-rose-50 dark:bg-rose-950/20';
+function scoreTextStyle(avg: number | undefined): React.CSSProperties {
+  if (avg === undefined) return {};
+  const tokens = scoreBucketTokens(scoreBucket(avg));
+  return { color: tokens.text };
 }
 
 export function DomainConfidenceHeatmap({ locationIds, locationNames, lookbackWeeks = 6 }: DomainConfidenceHeatmapProps) {
@@ -149,7 +150,14 @@ export function DomainConfidenceHeatmap({ locationIds, locationNames, lookbackWe
         <div>
           <CardTitle className="text-base">Domain Confidence by Location</CardTitle>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Self-reported confidence averages · {lookbackWeeks}-week lookback · ≥3.0 good · 2.5–2.9 watch · &lt;2.5 needs attention
+            1 to 4 self-rated confidence, higher is more confident · {lookbackWeeks}-week lookback
+          </p>
+          <p className="text-2xs text-muted-foreground/80 mt-1 flex items-center gap-1.5">
+            <span
+              className="inline-block h-1.5 w-1.5 rounded-full shrink-0"
+              style={{ backgroundColor: 'hsl(var(--muted-foreground))' }}
+            />
+            Marked cells trail their row's group average by 0.5 or more
           </p>
         </div>
       </CardHeader>
@@ -182,11 +190,22 @@ export function DomainConfidenceHeatmap({ locationIds, locationNames, lookbackWe
                 </td>
                 {locationData.map(loc => {
                   const avg = loc.domainAvgs[domain];
+                  const groupAvg = groupAvgs[domain];
+                  const trailing = avg !== undefined && groupAvg !== undefined && isTrailingCell(avg, groupAvg);
                   return (
-                    <td key={loc.locationId} className={cn('text-center py-2 px-2', scoreBg(avg))}>
+                    <td key={loc.locationId} className="text-center py-2 px-2" style={scoreCellStyle(avg)}>
                       {avg !== undefined ? (
-                        <span className={cn('font-semibold text-sm', scoreColor(avg))}>
-                          {avg.toFixed(1)}
+                        <span className="inline-flex items-center gap-1">
+                          <span className="font-semibold text-sm" style={scoreTextStyle(avg)}>
+                            {avg.toFixed(1)}
+                          </span>
+                          {trailing && (
+                            <span
+                              className="inline-block h-1.5 w-1.5 rounded-full shrink-0"
+                              style={{ backgroundColor: 'hsl(var(--muted-foreground))' }}
+                              title="Trails this row's group average by 0.5 or more"
+                            />
+                          )}
                         </span>
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>
@@ -194,9 +213,9 @@ export function DomainConfidenceHeatmap({ locationIds, locationNames, lookbackWe
                     </td>
                   );
                 })}
-                <td className={cn('text-center py-2 px-2 font-bold', scoreBg(groupAvgs[domain]))}>
+                <td className="text-center py-2 px-2 font-bold" style={scoreCellStyle(groupAvgs[domain])}>
                   {groupAvgs[domain] !== undefined ? (
-                    <span className={cn('text-sm font-bold', scoreColor(groupAvgs[domain]))}>
+                    <span className="text-sm font-bold" style={scoreTextStyle(groupAvgs[domain])}>
                       {groupAvgs[domain]!.toFixed(1)}
                     </span>
                   ) : (

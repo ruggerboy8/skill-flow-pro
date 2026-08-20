@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getDomainPastelVar, getDomainColorVar } from '@/lib/domainColors';
+import { getDomainPastelVar, getDomainInk } from '@/lib/domainColors';
 import { getDomainSlug } from '@/lib/domainUtils';
 import { DOCTOR_ROLE_CONTENT, DOCTOR_DOMAIN_ORDER } from '@/lib/content/doctorRoleDefinitions';
 import { ChevronRight } from 'lucide-react';
@@ -83,7 +83,7 @@ export default function DoctorMyRole() {
         {domains?.map(domain => {
           const content = DOCTOR_ROLE_CONTENT[domain.domain_name];
           const domainColor = getDomainPastelVar(domain.domain_name);
-          const domainColorRich = getDomainColorVar(domain.domain_name);
+          const domainInk = getDomainInk(domain.domain_name);
 
           return (
             <div
@@ -102,7 +102,7 @@ export default function DoctorMyRole() {
               >
                 <span 
                   className="text-2xs font-bold tracking-widest uppercase"
-                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainColorRich }}
+                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainInk }}
                 >
                   {domain.domain_name}
                 </span>

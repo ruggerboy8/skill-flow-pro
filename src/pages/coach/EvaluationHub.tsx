@@ -25,7 +25,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, ChevronDown, P
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
-import { getDomainPastelVar } from '@/lib/domainColors';
+import { getDomainPastelVar, getDomainInk } from '@/lib/domainColors';
 import { supabase } from '@/integrations/supabase/client';
 import {
   getEvaluation,
@@ -1616,7 +1616,7 @@ export function EvaluationHub() {
                         className="text-xs"
                         style={{ 
                           backgroundColor: getDomainPastelVar(item.domain_name),
-                          color: '#000'
+                          color: getDomainInk(item.domain_name)
                         }}
                       >
                         {item.domain_name}

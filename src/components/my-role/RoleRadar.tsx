@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useMobileShell } from '@/hooks/useMobileShell';
 import { supabase } from '@/integrations/supabase/client';
-import { getDomainPastelVar, getDomainColorVar } from '@/lib/domainColors';
+import { getDomainPastelVar, getDomainInk } from '@/lib/domainColors';
 import { getDomainSlug } from '@/lib/domainUtils';
 import { ROLE_CONTENT, DOMAIN_ORDER, getRoleTypeFromArchetype, type RoleType } from '@/lib/content/roleDefinitions';
 import { ChevronRight, Compass } from 'lucide-react';
@@ -146,7 +146,7 @@ export default function RoleRadar() {
           const score = domainScores.get(domain);
           const isScored = score != null && score > 0;
           const domainColor = getDomainPastelVar(domain);
-          const domainColorRich = getDomainColorVar(domain);
+          const domainInk = getDomainInk(domain);
 
           return (
             <div
@@ -165,7 +165,7 @@ export default function RoleRadar() {
               >
                 <span 
                   className="text-2xs font-bold tracking-widest uppercase"
-                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainColorRich }}
+                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainInk }}
                 >
                   {domain}
                 </span>

@@ -73,6 +73,49 @@ export function calculateDistinctMissedCount(
   }).length;
 }
 
+export interface DueSubmissionTotals {
+  confSubmitted: number;
+  confExpected: number;
+  perfSubmitted: number;
+  perfExpected: number;
+}
+
+/**
+ * DASH-1a Codex fix (P1): raw conf/perf submitted & expected counts, but
+ * only for whichever metric is actually due (its deadline gate is true).
+ * Summing RAW counts across locations regardless of deadline state let a
+ * not-yet-due (or excused) location's full "expected" denominator drag
+ * down an org-wide colored rate that should only reflect participation
+ * that is actually owed yet. Pass gates with any excused metric already
+ * turned off, the same way calculateDistinctMissedCount is called, so an
+ * excused-but-due metric is treated as not due either.
+ */
+export function calculateDueSubmissionTotals(
+  staff: StaffWeekSummary[],
+  gates: SubmissionGates
+): DueSubmissionTotals {
+  let confSubmitted = 0;
+  let confExpected = 0;
+  let perfSubmitted = 0;
+  let perfExpected = 0;
+
+  if (gates.isPastConfidenceDeadline) {
+    staff.forEach(s => {
+      confSubmitted += s.conf_count;
+      confExpected += s.assignment_count;
+    });
+  }
+
+  if (gates.isPastPerformanceDeadline) {
+    staff.forEach(s => {
+      perfSubmitted += s.perf_count;
+      perfExpected += s.assignment_count;
+    });
+  }
+
+  return { confSubmitted, confExpected, perfSubmitted, perfExpected };
+}
+
 export function calculateLocationStats(
   staff: StaffWeekSummary[],
   gates: SubmissionGates

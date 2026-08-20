@@ -89,3 +89,28 @@ export const CLIP4_FEEDBACK_TEXT = optionalEnv(
     "step out loud, but rushed the post-op instructions at the end and didn't " +
     "confirm the guardian had them written down."
 );
+
+/**
+ * Which staff member's row Clip 4 opens on the coach dashboard. The
+ * dashboard's default row order is sort-by-submission-status, not "who owns
+ * the seeded draft evaluation" -- so Clip 4 searches for this identity by
+ * name/email (src/pages/coach/CoachDashboardV2.tsx's own "Search by name or
+ * email..." filter) instead of taking the first row. Defaults to the
+ * demo-staff login's email: a natural, already-known identity for DEMO-1c
+ * to attach the fabricated draft evaluation to. Override with
+ * DEMO_CLIP4_STAFF_SEARCH if the real draft evaluation ends up on a
+ * different cast member.
+ */
+export const CLIP4_STAFF_SEARCH = optionalEnv(
+  "DEMO_CLIP4_STAFF_SEARCH",
+  optionalEnv("DEMO_STAFF_EMAIL", "demo-staff@bluebird.demo")
+);
+
+/**
+ * Supabase project connection for the optional, gated Clip 1 auto-reset
+ * (see setup/reset-clip1.ts). Same var names scripts/demo-seed/.env.example
+ * uses, so one .env can serve both tools. No default: an empty value means
+ * "not configured," which the reset helper treats as "skip, don't fail."
+ */
+export const SUPABASE_URL = optionalEnv("SUPABASE_URL", "");
+export const SUPABASE_SERVICE_ROLE_KEY = optionalEnv("SUPABASE_SERVICE_ROLE_KEY", "");

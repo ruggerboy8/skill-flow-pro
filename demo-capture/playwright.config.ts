@@ -42,7 +42,16 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        // devices["Desktop Chrome"] ships its own 1280x720 viewport, which
+        // otherwise silently overrides the 1920x1080 set in the top-level
+        // `use` block above (project-level `use` wins on merge). Every clip
+        // needs the full 1080p frame, so pin it back explicitly here rather
+        // than dropping the device descriptor (it also sets sane
+        // defaults — isMobile: false, hasTouch: false, a real Chrome UA).
+        viewport: { width: 1920, height: 1080 },
+      },
     },
   ],
 });

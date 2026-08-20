@@ -44,3 +44,41 @@ export function credsFor(env: EnvLike, persona: Persona): PersonaCreds {
     password: requireEnv(env, `DEMO_${upper}_PASSWORD`),
   };
 }
+
+export interface ResetGateSkip {
+  shouldRun: false;
+  reason: string;
+}
+export interface ResetGateRun {
+  shouldRun: true;
+  url: string;
+  serviceRoleKey: string;
+}
+export type ResetGateResult = ResetGateSkip | ResetGateRun;
+
+/**
+ * Decides whether setup/reset-clip1.ts should attempt a live reset at all,
+ * without doing any I/O itself -- kept pure and separate so this decision
+ * (opt-out flag, missing credentials) is unit-testable without a database.
+ */
+export function resetClip1Gate(env: EnvLike): ResetGateResult {
+  if (env.DEMO_CLIP1_AUTO_RESET === "false") {
+    return { shouldRun: false, reason: "DEMO_CLIP1_AUTO_RESET=false" };
+  }
+
+  const url = env.SUPABASE_URL;
+  const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) {
+    return {
+      shouldRun: false,
+      reason:
+        "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set, so Clip 1 was not " +
+        "automatically reset. If the \"Rate Confidence\" CTA is missing on this " +
+        "run, either set both vars in demo-capture/.env (see .env.example) to " +
+        "let this run automatically next time, or run " +
+        "`npx tsx scripts/demo-seed/seed.ts --refresh` (DEMO-1a) before recording again.",
+    };
+  }
+
+  return { shouldRun: true, url, serviceRoleKey };
+}

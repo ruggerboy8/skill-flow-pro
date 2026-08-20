@@ -46,9 +46,54 @@ Copy `demo-capture/.env.example` to `demo-capture/.env` and fill it in
   notes" below for why you might need these.
 - `DEMO_CLIP4_FEEDBACK_TEXT` — optional, the observation typed into Clip 4's
   AI polish step. Defaults to a generic sample line.
+- `DEMO_CLIP4_STAFF_SEARCH` — optional, which staff member Clip 4 opens.
+  Defaults to `DEMO_STAFF_EMAIL` (the demo-staff login's email). See
+  "Clip 4 opens a specific staff member" below.
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — optional, same var names
+  `scripts/demo-seed/.env.example` uses. Only needed to let Clip 1's
+  automatic reset run — see "Clip 1 is re-runnable" below. Never required
+  just to record; without them, Clip 1 still runs once cleanly, it just
+  can't reset itself for a second take.
+- `DEMO_CLIP1_AUTO_RESET` — optional, `false` to disable Clip 1's automatic
+  reset even when the two Supabase vars above are set.
 
 None of this ever touches the repo's own `.env` — it's a separate file,
 separate variables, read only by the code under `demo-capture/`.
+
+## Clip 1 is re-runnable
+
+Clip 1 submits a real confidence score, which permanently completes
+demo-staff's current-week assignment. Left alone, that means recording this
+clip a second time — a manual retake, or Playwright's own `DEMO_CAPTURE_RETRIES`
+firing after a submit already landed — finds no "Rate Confidence" CTA and
+fails the first assertion instead of recording anything.
+
+`specs/01-staff-self-eval.spec.ts` has a `beforeEach` that clears
+demo-staff's current-week confidence fields before every attempt, via
+`setup/reset-clip1.ts`. That helper:
+
+- Only runs when `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are set (same
+  names `scripts/demo-seed/.env.example` uses — one `.env` can serve both
+  tools). Without them, it's a no-op, not a failure — the spec's own
+  assertion then explains what to do.
+- Nulls exactly the three columns (`confidence_score`, `confidence_date`,
+  `confidence_late`) that DEMO-1a's own live `--refresh` reset nulls for the
+  same reason (`scripts/demo-seed/seed.ts`, "Re-clear the participant
+  login's current-week score") — this reuses that column list and filter
+  shape rather than inventing a second, divergent reset.
+- Targets demo-staff's most recent `weekly_scores.week_of` row(s), which
+  DEMO-1a's seed guarantees is the current week. It does not shift any
+  dates the way `--refresh` does, so it's safe to run between every take
+  without drifting the seeded weeks.
+- Can be disabled with `DEMO_CLIP1_AUTO_RESET=false` if you'd rather manage
+  resets yourself.
+
+**Without those two Supabase vars configured**, the fallback is running
+`npx tsx scripts/demo-seed/seed.ts --refresh` (DEMO-1a) before recording
+Clip 1 again — that also re-clears demo-staff's current week (among other
+things), just manually instead of automatically. Either way, a second run
+with neither done fails loudly, on the very first assertion, with a message
+naming both options — never a silent pass or a generic timeout.
 
 ## How to run
 
@@ -90,6 +135,26 @@ own video so you can pick the clean one.
 Every spec waits on `networkidle` (see `demo-capture/lib/waitReady.ts`)
 before any scripted click or scroll, so live Supabase latency doesn't land
 mid-load in the recorded frame.
+
+**Viewport**: `playwright.config.ts`'s `chromium` project spreads
+Playwright's `devices["Desktop Chrome"]` descriptor for its other sane
+defaults (real Chrome UA, `isMobile: false`), but that descriptor ships its
+own 1280x720 viewport, which otherwise silently overrides the 1920x1080 set
+at the top level (project-level `use` wins on merge). The project pins
+`viewport` back to `{ width: 1920, height: 1080 }` explicitly after the
+spread — verified by importing the resolved config and inspecting
+`projects[0].use.viewport`, not just eyeballing the file.
+
+## Clip 4 opens a specific staff member
+
+The coach dashboard's default row order is a submission-status sort, not
+"who owns the seeded draft evaluation" — clicking the first row is
+unreliable and commonly opens the wrong person. Clip 4 instead fills the
+dashboard's own "Search by name or email..." filter with
+`CLIP4_STAFF_SEARCH` (`config.ts`, defaults to the demo-staff login's
+email — override with `DEMO_CLIP4_STAFF_SEARCH` if the real seeded draft
+evaluation ends up on a different cast member) and asserts the search
+narrows the table to exactly one row before opening it.
 
 ## Clip 4 hits live edge functions — dry run first
 
@@ -225,7 +290,9 @@ demo-capture/
   config.ts                           env/config loader — base URL, credentials, persona routing
   tsconfig.json                       standalone strict typecheck for this folder (not part of npm run check)
   setup/create-storage-states.ts      login/setup script — also runnable standalone via `npx tsx`
+  setup/reset-clip1.ts                gated Clip 1 reset helper (see "Clip 1 is re-runnable")
   lib/waitReady.ts                    shared networkidle wait helper
+  lib/env.ts, lib/env.test.ts         pure env-lookup helpers + unit tests
   specs/
     01-staff-self-eval.spec.ts
     02-coach-facilitation.spec.ts

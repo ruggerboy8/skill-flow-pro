@@ -16,6 +16,15 @@
  * "Quarterly Evaluations" tab or gets redirected, that's a DEMO-1c dry-run
  * finding — override with DEMO_CLIP4_LOGIN=admin, no code change needed.
  *
+ * WHICH STAFF ROW: the coach dashboard's default order is a submission-
+ * status sort, not "who owns the seeded draft evaluation" — taking the
+ * first row is unreliable. This spec instead searches the dashboard's own
+ * "Search by name or email..." filter (src/pages/coach/CoachDashboardV2.tsx)
+ * for CLIP4_STAFF_SEARCH (config.ts, defaults to the demo-staff login's
+ * email — override with DEMO_CLIP4_STAFF_SEARCH if the real draft
+ * evaluation ends up on a different cast member) and opens the row that
+ * search narrows down to.
+ *
  * Clip 4 and the microphone: the real coach-facing flow offers a voice
  * capture button (src/components/coach/VoiceCaptureButton.tsx) alongside a
  * plain textarea for typed notes. This spec types a canned observation
@@ -29,7 +38,7 @@
  * automated spec — flagging for DEMO-1c, not fixing here.
  */
 import { test, expect } from "@playwright/test";
-import { CLIP4_FEEDBACK_TEXT, CLIP_PERSONAS, storageStatePath } from "../config.ts";
+import { CLIP4_FEEDBACK_TEXT, CLIP4_STAFF_SEARCH, CLIP_PERSONAS, storageStatePath } from "../config.ts";
 import { waitReady } from "../lib/waitReady.ts";
 
 test.use({ storageState: storageStatePath(CLIP_PERSONAS.evaluationGlowsGrows) });
@@ -39,7 +48,20 @@ test("evaluation: type an observation and get a live glow/grow split", async ({ 
   await waitReady(page);
   await expect(page.getByRole("heading", { name: "Coach Dashboard" })).toBeVisible({ timeout: 15_000 });
 
-  await page.locator("table tbody tr").first().click();
+  // Filter to the specific seeded staff member instead of trusting row
+  // order (the dashboard sorts by submission status, not identity).
+  await page.getByPlaceholder("Search by name or email...").fill(CLIP4_STAFF_SEARCH);
+  await waitReady(page);
+
+  const staffRows = page.locator("table tbody tr");
+  await expect(
+    staffRows,
+    `expected exactly one staff row matching "${CLIP4_STAFF_SEARCH}" (CLIP4_STAFF_SEARCH) ` +
+      "on the coach dashboard — if this is 0, the demo org may not be seeded, or the " +
+      "search term needs DEMO_CLIP4_STAFF_SEARCH pointed at a different cast member; " +
+      "if this is >1, narrow the search term further"
+  ).toHaveCount(1, { timeout: 15_000 });
+  await staffRows.first().click();
   await waitReady(page);
 
   const evalsTab = page.getByRole("tab", { name: "Quarterly Evaluations" });
@@ -54,8 +76,9 @@ test("evaluation: type an observation and get a live glow/grow split", async ({ 
   await expect(
     continueDraft,
     "expected a draft (in-progress) evaluation to continue — DEMO-1a and " +
-      "DEMO-1c are responsible for making sure one exists; evaluations are " +
-      "fabricated fresh in the demo org, never copied from a real one"
+      "DEMO-1c are responsible for making sure one exists for " +
+      `"${CLIP4_STAFF_SEARCH}"; evaluations are fabricated fresh in the demo ` +
+      "org, never copied from a real one"
   ).toBeVisible({ timeout: 15_000 });
   await continueDraft.click();
   await waitReady(page);

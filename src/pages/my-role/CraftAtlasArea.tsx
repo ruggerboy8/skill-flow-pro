@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { MessageCircle, Volume2, Video, Link as LinkIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BackPill } from '@/components/mobile/BackPill';
+import { ExploreBreadcrumb, type ExploreBreadcrumbItem } from '@/components/mobile/ExploreBreadcrumb';
 import { useMobileShell } from '@/hooks/useMobileShell';
 import { useCraftAtlas } from '@/hooks/useCraftAtlas';
 import { useExploredMoves } from '@/hooks/useExploredMoves';
@@ -82,10 +83,18 @@ export default function CraftAtlasArea() {
   const ink = getDomainInk(competency.domainName);
   const colorVar = getDomainColorVarRaw(competency.domainName);
   const openedCount = countFor(actionIds);
+  const domainSlug = getDomainSlug(competency.domainName);
+
+  const breadcrumbItems: ExploreBreadcrumbItem[] = [
+    { label: 'Explore', to: '/my-role' },
+    { label: competency.domainName, to: `/my-role/domain/${domainSlug}` },
+    { label: competency.subtitle || competency.title },
+  ];
 
   return (
     <div className="space-y-4">
-      <BackPill label={competency.domainName} to={`/my-role/domain/${getDomainSlug(competency.domainName)}`} />
+      <BackPill label={competency.domainName} to={`/my-role/domain/${domainSlug}`} />
+      <ExploreBreadcrumb items={breadcrumbItems} domainName={competency.domainName} />
 
       <div>
         <h1 className="text-[22px] font-bold tracking-tight leading-tight">{competency.title}</h1>

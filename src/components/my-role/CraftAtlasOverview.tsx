@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Shuffle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCraftAtlas } from '@/hooks/useCraftAtlas';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { DOMAIN_ORDER, ROLE_CONTENT, getRoleTypeFromArchetype, type RoleType } from '@/lib/content/roleDefinitions';
 import { getDomainColorVar, getDomainColorVarRaw, getDomainPastelVar, getDomainInk } from '@/lib/domainColors';
 import { getDomainSlug } from '@/lib/domainUtils';
+import { pickRandomMoveActionId } from '@/lib/exploreNav';
 import { AtlasSearch } from '@/components/my-role/AtlasSearch';
 
 /**
@@ -24,10 +26,20 @@ export default function CraftAtlasOverview() {
   const navigate = useNavigate();
   const { data, isLoading } = useCraftAtlas();
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
+  const { resolve: resolveRoleName } = useRoleDisplayNames();
   const [searchActive, setSearchActive] = useState(false);
 
   const archetype = (staffProfile as any)?.roles?.archetype_code ?? null;
   const roleType: RoleType = getRoleTypeFromArchetype(archetype, staffProfile?.role_id);
+
+  // Eyebrow: the org-scoped role display name when we have both a role_id to
+  // resolve it against and a platform fallback name; otherwise fall back to
+  // the plain "Explore" label rather than showing nothing.
+  const platformRoleName = staffProfile?.roles?.role_name ?? null;
+  const roleEyebrow =
+    staffProfile?.role_id != null && platformRoleName
+      ? resolveRoleName(staffProfile.role_id, platformRoleName)
+      : platformRoleName ?? 'Explore';
 
   if (isLoading || !data) {
     return (
@@ -47,16 +59,35 @@ export default function CraftAtlasOverview() {
 
   const totalMoves = data.competencies.reduce((sum, c) => sum + c.proMoves.length, 0);
 
+  function handleSurpriseMe() {
+    const actionId = pickRandomMoveActionId(data.competencies);
+    if (actionId != null) navigate(`/my-role/move/${actionId}`);
+  }
+
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div>
-        <p className="text-2xs font-bold uppercase tracking-widest text-muted-foreground">Explore</p>
-        <h1 className="text-[22px] font-bold tracking-tight -mt-1">My Role</h1>
-        <p className="text-[13px] text-muted-foreground mt-1 leading-snug">
-          Wander the {DOMAIN_ORDER.length} domains of your craft. {data.competencies.length} skill areas,{' '}
-          {totalMoves} Pro Moves.
-        </p>
+      {/* Header — editorial serif title with the staff member's role as the
+          eyebrow, matching docs/prototypes/explore-drill-prototype.html's
+          landing treatment. */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-2xs font-bold uppercase tracking-widest text-muted-foreground">{roleEyebrow}</p>
+          <h1 className="font-serif text-[22px] font-semibold tracking-tight -mt-1">Explore your role</h1>
+          <p className="text-[13px] text-muted-foreground mt-1 leading-snug">
+            Wander the {DOMAIN_ORDER.length} domains of your craft. {data.competencies.length} skill areas,{' '}
+            {totalMoves} Pro Moves.
+          </p>
+        </div>
+        {totalMoves > 0 && (
+          <button
+            type="button"
+            onClick={handleSurpriseMe}
+            className="inline-flex flex-none items-center gap-1.5 rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground active:scale-95 transition-transform"
+          >
+            <Shuffle className="h-4 w-4" />
+            Surprise me
+          </button>
+        )}
       </div>
 
       {/* Search — kept on the landing at the founder's request (deviates

@@ -2,6 +2,7 @@ import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BackPill } from '@/components/mobile/BackPill';
+import { ExploreBreadcrumb, type ExploreBreadcrumbItem } from '@/components/mobile/ExploreBreadcrumb';
 import { useCraftAtlas, type AtlasCompetency } from '@/hooks/useCraftAtlas';
 import { useExploredMoves } from '@/hooks/useExploredMoves';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
@@ -50,9 +51,15 @@ export default function ExploreDomain() {
   const ink = getDomainInk(domainName);
   const colorVar = getDomainColorVarRaw(domainName);
 
+  const breadcrumbItems: ExploreBreadcrumbItem[] = [
+    { label: 'Explore', to: '/my-role' },
+    { label: domainName },
+  ];
+
   return (
     <div className="space-y-4">
       <BackPill label="Explore" to="/my-role" />
+      <ExploreBreadcrumb items={breadcrumbItems} domainName={domainName} />
 
       {/* Hero — traveling domain color starts here. */}
       <div

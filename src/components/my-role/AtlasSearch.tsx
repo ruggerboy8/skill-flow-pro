@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import type { AtlasCompetency } from '@/hooks/useCraftAtlas';
-import type { ProMoveDetail } from '@/hooks/useDomainDetail';
 import { searchAtlasMoves } from '@/lib/atlasSearch';
 import { getDomainColorVar } from '@/lib/domainColors';
-import { ProMoveDrawer } from './ProMoveDrawer';
 
 interface AtlasSearchProps {
   competencies: AtlasCompetency[];
@@ -16,12 +15,14 @@ interface AtlasSearchProps {
 /**
  * Search field + in-memory matcher + flat result list for the Craft Atlas
  * (see docs/specs/mob-6-craft-atlas.md). Client-side only, over the
- * already-loaded useCraftAtlas corpus — no query per keystroke. Reuses
- * ProMoveDrawer as the leaf, same as browsing does.
+ * already-loaded useCraftAtlas corpus — no query per keystroke. A tap on a
+ * result opens the new Explore move page (/my-role/move/:actionId) — the
+ * old ProMoveDrawer is the pre-redesign surface and must not appear on this
+ * mobile Explore search path (see docs/specs/mob-explore-rebuild.md).
  */
 export function AtlasSearch({ competencies, onActiveChange }: AtlasSearchProps) {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<{ move: ProMoveDetail; domainName: string } | null>(null);
 
   const trimmed = query.trim();
   const isActive = trimmed.length > 0;
@@ -75,7 +76,7 @@ export function AtlasSearch({ competencies, onActiveChange }: AtlasSearchProps) 
                 <button
                   key={move.action_id}
                   type="button"
-                  onClick={() => setSelected({ move, domainName: competency.domainName })}
+                  onClick={() => navigate(`/my-role/move/${move.action_id}`)}
                   className="w-full text-left rounded-xl border border-border bg-card p-3 active:scale-[0.99] transition-transform"
                 >
                   <div className="flex items-center gap-1.5 mb-1">
@@ -94,13 +95,6 @@ export function AtlasSearch({ competencies, onActiveChange }: AtlasSearchProps) 
           )}
         </div>
       )}
-
-      <ProMoveDrawer
-        open={!!selected}
-        onOpenChange={(open) => !open && setSelected(null)}
-        move={selected?.move ?? null}
-        domainName={selected?.domainName ?? ''}
-      />
     </div>
   );
 }

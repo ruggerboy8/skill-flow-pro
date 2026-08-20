@@ -32,7 +32,11 @@ export function AvatarMenu({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <button type="button" aria-label="Open menu" className="flex-none rounded-full">
+        <button
+          type="button"
+          aria-label="Open menu"
+          className="flex-none inline-flex min-h-11 min-w-11 items-center justify-center rounded-full"
+        >
           <Avatar className="h-8 w-8 border border-border">
             <AvatarFallback className="text-xs font-bold">{initialsFor(name)}</AvatarFallback>
           </Avatar>

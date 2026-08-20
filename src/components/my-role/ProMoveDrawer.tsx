@@ -196,11 +196,11 @@ export function ProMoveDrawer({
                 {content.script && (
                   <section>
                     <SectionHeader icon={MessageCircle} title="Suggested Verbiage" />
-                    <div 
-                      className="text-base md:text-lg leading-relaxed p-4 md:p-5 rounded-2xl border-2 border-dashed"
-                      style={{ 
+                    <div
+                      className="relative text-base md:text-lg leading-relaxed p-4 md:p-5 rounded-2xl border-2 border-dashed"
+                      style={{
                         backgroundColor: `hsl(${richColor} / 0.03)`,
-                        borderColor: `hsl(${richColor} / 0.2)` 
+                        borderColor: `hsl(${richColor} / 0.2)`
                       }}
                     >
                       <span className="absolute -top-3 left-4 px-2 bg-background text-xs text-muted-foreground font-medium">

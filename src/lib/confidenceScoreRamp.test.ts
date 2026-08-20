@@ -2,29 +2,33 @@ import { describe, expect, it } from 'vitest';
 import { isTrailingCell, scoreBucket, scoreBucketTokens } from './confidenceScoreRamp';
 
 describe('scoreBucket', () => {
-  it('buckets below 1.5 as 1', () => {
+  // DASH-3: color follows the displayed leading digit. A cell showing
+  // "2.6" must bucket as 2, not round up to 3, or the high 2s vanish
+  // into the bucket-3 color and the heatmap blends together.
+  it('buckets below 2.0 as 1', () => {
     expect(scoreBucket(0)).toBe(1);
-    expect(scoreBucket(1.49)).toBe(1);
+    expect(scoreBucket(1.9)).toBe(1);
   });
 
-  it('buckets 1.5 as 2 (boundary)', () => {
-    expect(scoreBucket(1.5)).toBe(2);
+  it('buckets 2.0 as 2 (boundary)', () => {
+    expect(scoreBucket(2.0)).toBe(2);
   });
 
-  it('buckets 2.49 as 2', () => {
-    expect(scoreBucket(2.49)).toBe(2);
+  it('buckets everything displayed as 2.x as 2, including the high 2s', () => {
+    expect(scoreBucket(2.5)).toBe(2);
+    expect(scoreBucket(2.6)).toBe(2);
+    expect(scoreBucket(2.9)).toBe(2);
   });
 
-  it('buckets 2.5 as 3 (boundary)', () => {
-    expect(scoreBucket(2.5)).toBe(3);
+  it('buckets 3.0 as 3 (boundary)', () => {
+    expect(scoreBucket(3.0)).toBe(3);
   });
 
-  it('buckets 3.49 as 3', () => {
-    expect(scoreBucket(3.49)).toBe(3);
+  it('buckets 3.9 as 3', () => {
+    expect(scoreBucket(3.9)).toBe(3);
   });
 
-  it('buckets 3.5 and above as 4 (boundary)', () => {
-    expect(scoreBucket(3.5)).toBe(4);
+  it('buckets 4.0 and above as 4 (boundary)', () => {
     expect(scoreBucket(4.0)).toBe(4);
     expect(scoreBucket(4.5)).toBe(4);
   });

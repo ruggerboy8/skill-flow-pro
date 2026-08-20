@@ -173,7 +173,13 @@ export function LocationHealthCard({
       const metric = confExcused ? 'Conf' : 'Perf';
       return <ExcusedChip label={`${metric} excused`} />;
     }
-    if (tier === 'watch' || tier === 'red') {
+    // Tier and distinctMissedCount are independent props - guard against
+    // upstream data landing a watch/red tier with a 0 count, which would
+    // otherwise render a nonsensical "0 missed" chip. The card's
+    // border/wash/number color still carry the tier on their own; only the
+    // chip is suppressed. Mirrors the same guard in
+    // locationStatusLine.ts's missingOrLatePhrases (DASH-2 QA fix 2).
+    if ((tier === 'watch' || tier === 'red') && stats.distinctMissedCount > 0) {
       const tokens = tierColorTokens(tier)!;
       return (
         <span

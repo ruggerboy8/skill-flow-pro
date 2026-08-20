@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
  */
 export function ProMovesLogo({ className }: { className?: string }) {
   return (
-    <span className={cn('font-semibold tracking-tight text-brand-600', className)}>
+    <span className={cn('font-semibold tracking-tight text-primary', className)}>
       ProMoves
     </span>
   );

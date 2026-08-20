@@ -9,15 +9,20 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-brand-600 text-white hover:bg-brand-900",
+        // DSN-3: migrated off the legacy hardcoded brand-600/900/50 numeric
+        // scale onto the shadcn primary token (which itself resolves to the
+        // brand navy color, see src/index.css --primary). Hover treatment
+        // follows the same "/90" and "/10" opacity convention already used
+        // by the destructive and secondary variants below.
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
-          "border border-brand-600 text-brand-600 hover:bg-brand-50/50",
+          "border border-primary text-primary hover:bg-primary/10",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-brand-600 underline-offset-4 hover:underline",
+        link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-4 py-2",

@@ -63,11 +63,11 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				brand: {
-					// Legacy numeric scale, still used by Button/ProMovesLogo/LandingPage.
-					// Left as-is (DSN-3 sweep territory), not part of DSN-5a's scope.
-					50: '#fdfefe',
-					600: '#124570',
-					900: '#080809',
+					// DSN-3: removed the legacy numeric scale (50/600/900) that used to
+					// back Button/ProMovesLogo/LandingPage. Those now consume the
+					// `primary` token, which resolves to brand navy (see src/index.css).
+					// Zero remaining consumers as of this migration; re-add if a future
+					// surface needs the raw hex again.
 					// DSN-5a: the six locked brand colors, sourced from
 					// promoves-brand/exports/README.md via the --brand-* CSS vars.
 					navy: 'hsl(var(--brand-navy))',

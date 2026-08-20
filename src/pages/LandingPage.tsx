@@ -64,7 +64,7 @@ export default function LandingPage() {
         <div className="grid gap-12 sm:grid-cols-3">
           {valueProps.map((vp) => (
             <div key={vp.title} className="flex flex-col items-center text-center sm:items-start sm:text-left gap-3">
-              <vp.icon className="h-8 w-8 text-brand-600" />
+              <vp.icon className="h-8 w-8 text-primary" />
               <h3 className="text-lg font-semibold text-foreground">
                 {vp.title}
               </h3>

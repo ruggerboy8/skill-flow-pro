@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
@@ -22,6 +22,7 @@ import { ALCAN_ORG_ID } from '@/lib/askAlcanAccess';
 import { useMobileShell } from '@/hooks/useMobileShell';
 import { MobileTabBar } from '@/components/mobile/MobileTabBar';
 import { AvatarMenu } from '@/components/mobile/AvatarMenu';
+import { RouteLoadingFallback } from '@/components/RouteLoadingFallback';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
@@ -306,7 +307,12 @@ export default function Layout() {
           <div className="mb-4 empty:mb-0">
             <PendingSurveysCard />
           </div>
-          <Outlet context={{ navigation }} />
+          {/* PRF-3: Suspense boundary lives here, around the Outlet, not up
+              in App.tsx -- so a lazy route suspending only replaces this
+              content area. The header and (below) the tab bar stay mounted. */}
+          <Suspense fallback={<RouteLoadingFallback fullScreen={false} />}>
+            <Outlet context={{ navigation }} />
+          </Suspense>
         </main>
 
         {!isRitualRoute && <MobileTabBar />}
@@ -371,7 +377,12 @@ export default function Layout() {
               <div className="mb-4 empty:mb-0">
                 <PendingSurveysCard />
               </div>
-              <Outlet context={{ navigation }} />
+              {/* PRF-3: same boundary placement as the mobile shell above --
+                  the sidebar/header stay mounted, only this content area
+                  shows the loader while a lazy route's chunk fetches. */}
+              <Suspense fallback={<RouteLoadingFallback fullScreen={false} />}>
+                <Outlet context={{ navigation }} />
+              </Suspense>
             </main>
           </div>
         </div>

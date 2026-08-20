@@ -8,7 +8,7 @@ import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { PwaManager } from "@/components/pwa/PwaManager";
 import { BatchProcessorProvider } from "@/contexts/BatchProcessorContext";
 import { SimProvider } from "@/devtools/SimProvider";
-import { SignalP } from "@/components/brand/SignalP";
+import { RouteLoadingFallback } from "@/components/RouteLoadingFallback";
 
 // Pages (same imports you already have)
 import Login from "@/pages/Login";
@@ -112,18 +112,6 @@ function RedirectToStepOne({ base }: { base: 'confidence' | 'performance' }) {
   return <Navigate to={`/${base}/${week}/step/1`} replace />;
 }
 
-// PRF-3: shared fallback for both the pre-auth loading gate and the
-// Suspense boundary around lazy-loaded routes below. Same brand loader,
-// same "waiting" mode (discrete laps, never a continuous spin) -- see the
-// DSN-5c note further down.
-function RouteLoadingFallback() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <SignalP mode="waiting" size={48} />
-    </div>
-  );
-}
-
 // App routes with pre-routing checks for public pages
 function AppRoutes() {
   const { user, loading, needsPasswordSetup } = useAuth();
@@ -154,10 +142,24 @@ function AppRoutes() {
   if (needsPasswordSetup) return <SetupPassword />;
 
   return (
-    <Suspense fallback={<RouteLoadingFallback />}>
     <Routes>
-      {/* Full-screen facilitator presentation (no app chrome) */}
-      <Route path="/facilitate" element={<RequireAccess allow={allowFacilitate}><FacilitatePage /></RequireAccess>} />
+      {/* Full-screen facilitator presentation (no app chrome). This route
+          renders outside Layout, so it's the one lazy route App.tsx still
+          needs its own Suspense boundary for -- a full-screen fallback is
+          correct here since there's no persistent shell to preserve.
+          Everything else lazy is nested under Layout below, where the
+          Suspense boundaries live around its <Outlet /> placements instead
+          (PRF-3 QA fix: a single top-level Suspense here was unmounting the
+          whole app shell -- sidebar, header, tab bar -- on every first visit
+          to a lazy route). */}
+      <Route
+        path="/facilitate"
+        element={
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <RequireAccess allow={allowFacilitate}><FacilitatePage /></RequireAccess>
+          </Suspense>
+        }
+      />
       <Route path="/" element={<Layout />}>
         <Route index element={<Index />} />
         <Route path="login" element={<Navigate to="/" replace />} />
@@ -270,7 +272,6 @@ function AppRoutes() {
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
-    </Suspense>
   );
 }
 

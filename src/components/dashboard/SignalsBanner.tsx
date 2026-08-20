@@ -47,7 +47,7 @@ export function SignalsBanner({ signals }: SignalsBannerProps) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground py-1">
         <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: 'hsl(var(--status-complete))' }} />
-        <span>No flags this week — all locations on track.</span>
+        <span>No flags this week, all locations on track.</span>
       </div>
     );
   }

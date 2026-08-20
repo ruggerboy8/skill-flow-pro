@@ -181,7 +181,7 @@ export default function RegionalDashboard() {
     };
   }, [summaries, locationGatesMap]);
 
-  // Compute signals — only fire when a deadline has actually passed, and
+  // Compute signals, only fire when a deadline has actually passed, and
   // use the same participationTier bands as the summary cards and location
   // cards so the banner never disagrees with them (DASH-1a).
   const signals = useMemo((): Signal[] => {
@@ -201,7 +201,7 @@ export default function RegionalDashboard() {
 
       result.push({
         type: 'participation_drop',
-        message: `${loc.name}: participation rate is ${Math.round(loc.submissionRate)}% this week — below 85%.`,
+        message: `${loc.name}: participation rate is ${Math.round(loc.submissionRate)}% this week, below 85%.`,
         locationName: loc.name,
         severity: tier === 'red' ? 'red' : 'watch',
       });
@@ -240,7 +240,7 @@ export default function RegionalDashboard() {
 
   const locationIdList = useMemo(() => locationStats.map(l => l.id), [locationStats]);
 
-  // Org-wide rates and tiers for the summary cards — same participationTier
+  // Org-wide rates and tiers for the summary cards, same participationTier
   // bands as the location cards and signals banner (DASH-1a).
   const summaryTiers = useMemo(() => {
     const confRate = totals.totalConfExpected > 0

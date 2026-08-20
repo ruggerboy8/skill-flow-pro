@@ -93,6 +93,16 @@ organizations (new — the tenant/top-level entity)
 
 ### The `organizations` Table (New)
 
+> **Correction, 2026-08-19 (DOC-3):** the `practice_type` values below
+> (`"pediatric" | "general"`) are the original design and are now stale. The
+> same 2026-03-11 migration that converted `pro_moves.practice_type` to an
+> array (see the correction further down this doc) also renamed the
+> organization-level values to `pediatric_us` and `general_us`, and added a
+> third value, `general_uk`. Current constraint:
+> `chk_org_practice_type CHECK (practice_type IN ('pediatric_us', 'general_us', 'general_uk'))`.
+> `organizations.practice_type` itself is still a single value, not an array;
+> only `pro_moves.practice_types` became an array.
+
 ```sql
 CREATE TABLE organizations (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),

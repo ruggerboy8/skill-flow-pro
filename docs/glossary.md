@@ -132,11 +132,16 @@ all part of the same now-defunct cluster:
   column** that still exists on `weekly_scores`; that is a legacy-named
   identifier column kept for ID-format compatibility, not a live reference to
   this table. See [data-model.md](data-model.md).
-- **Rollover** *(legacy, effectively dormant)*: A start-of-week process that
-  checked whether a participant completed the prior week's Pro Moves and, if
-  not, pushed them into a backlog. It only ran for cycles 1 through 3 and read
-  the now-archived `weekly_focus` data, so it has nothing to act on today.
-  (`src/v2/rollover.ts`, `sequencer-rollover`.)
+- **Rollover** *(retired 2026-07-24/25)*: A start-of-week process that checked
+  whether a participant completed the prior week's Pro Moves and, if not,
+  pushed them into a backlog. It only ran for cycles 1 through 3 and read the
+  now-archived `weekly_focus` data. On the src side this is gone, not merely
+  dormant: `src/v2/rollover.ts` was deleted (commit `735c83c4`, "2.4 Slice A:
+  retire rollover"), and the `ThisWeekPanel.tsx` call site was removed the
+  same day, with a comment there noting "missed weeks are simply missed" now.
+  Whether the deployed `sequencer-rollover` edge function is still gone from
+  production, or was recovered under a separate ticket, is outside what this
+  doc tracks; check the edge function's own state before assuming either way.
 - **Backlog** *(dropped 2026-07-25)*: There is currently **no backlog table
   at all**. `user_backlog` and `user_backlog_v2` were both dropped (migration
   `20260725120000`), along with the RPCs that wrote to them
@@ -175,11 +180,13 @@ all part of the same now-defunct cluster:
 - **Baseline assessment**: A starting-point assessment. **Two distinct
   types, do not conflate:**
   - **Doctor baseline**: performed only by clinical directors, part of the
-    doctor track. Tables: `doctor_baseline_assessments` / `_items`.
+    doctor track. Tables: `doctor_baseline_assessments`,
+    `doctor_baseline_items`.
   - **Coach baseline** *(Alcan-specific, candidate for removal)*: used only
     when Alcan onboards a brand-new practice, to capture that practice's
     staff baseline (not for individual new hires). Tables:
-    `coach_baseline_assessments` / `_items` / `coach_baseline_audit`.
+    `coach_baseline_assessments`, `coach_baseline_items`,
+    `coach_baseline_audit`.
 
 ## Doctor / clinical track
 
@@ -188,6 +195,25 @@ all part of the same now-defunct cluster:
 - **Coaching session**: A facilitated session between clinical director and
   doctor. Tables: `coaching_sessions`, `coaching_session_selections`,
   `coaching_meeting_records`, `coaching_agenda_templates`.
+
+## Feature flags
+
+Live flags found by grepping `src/` for `localStorage` and `import.meta.env`
+toggles, added here 2026-08-19 (DOC-3) because neither had a canonical doc
+entry before this:
+
+- **`eval_review_v2`** (localStorage, `src/lib/reviewRoute.ts`): gates the
+  rebuilt staff review wizard. When set to `1`, `reviewPath()` routes to
+  `/evaluation/:id/review-v2` instead of the classic `/review`; consumed by
+  `CurrentFocusCard`, `EvalReadyCard`, and `PerformancePage`. Default is V1
+  (`REVIEW_V2_DEFAULT = false`) until it is promoted for everyone.
+- **`VITE_ORG_LIBRARY_AUTHORING`** (env var, `src/lib/featureFlags.ts`):
+  intended to gate org-level Pro Move authoring (letting an org create/edit
+  its own custom moves). As of this pass it has **no consumers anywhere in
+  `src/`**; the exported `orgLibraryAuthoringEnabled` constant is defined but
+  not yet read by any UI or policy check. It is "live" in the sense that the
+  env var is wired up and would flip the constant, not in the sense that it
+  currently changes anything a user sees.
 
 ## Integrations & infrastructure
 

@@ -34,7 +34,7 @@ design (partly superseded by what actually shipped), see
 
 | Table | Purpose |
 |---|---|
-| `organizations` | **Tenant.** Top-level contracting entity, the data-isolation boundary. Has `practice_type` (`pediatric` \| `general` \| `all`, singular; this is the organization-level column and did **not** change). |
+| `organizations` | **Tenant.** Top-level contracting entity, the data-isolation boundary. Has `practice_type` (singular; this column stayed singular, it did not become an array like `pro_moves.practice_types` did). **Correction (2026-08-19):** the earlier version of this doc wrongly said the values were `pediatric` \| `general` \| `all`. The same migration that converted `pro_moves.practice_type` to an array (`20260311220946`) also renamed the organization-level values to `pediatric_us` and `general_us`, added `general_uk`, and installed constraint `chk_org_practice_type CHECK (practice_type IN ('pediatric_us', 'general_us', 'general_uk'))`. `'all'` was never a legal value for `organizations.practice_type`; that value only ever existed on `pro_moves`. |
 | `practice_groups` | **Group.** Sub-grouping of locations. FK `organization_id → organizations.id` (added 2026-03-06, migration `20260306190002`). |
 | `locations` | **Location.** Individual practice. Owns `program_start_date`, `cycle_length_weeks` (legacy, still read by the cycle calculation above), `timezone`, and per-step deadlines (`conf_due_day/time`, `perf_due_day/time`). FK `group_id → practice_groups.id`. |
 | `staff` | **Staff.** All users, linked to Supabase Auth via `user_id`. Holds legacy `is_*` role flags, `role_id`, `primary_location_id`, `hire_date`, pause fields. ~113 rows (2026-08-18 live count), 79 active participants. |
@@ -110,8 +110,8 @@ grep against both directories as part of this pass); `weekly_assignments` and
 | `evaluations` | Coach evaluation headers. |
 | `evaluation_items` | Per-evaluation line items. ~1,696 rows (2026-08-18 live count). |
 | `staging_prompts` | Prompt content used in the evaluation/AI flow *(purpose inferred from name; confirm in code before relying on it)*. |
-| `coach_baseline_assessments` / `_items` / `_audit` | **Doctor-track.** The clinical director's *observed* baseline of a doctor. Alcan-specific; a candidate for removal or Alcan-only gating (see [glossary.md](glossary.md)). |
-| `doctor_baseline_assessments` / `_items` | Doctor's own self-baseline. Distinct from the coach baseline above; do not conflate. |
+| `coach_baseline_assessments`, `coach_baseline_items`, `coach_baseline_audit` | **Doctor-track.** The clinical director's *observed* baseline of a doctor. Alcan-specific; a candidate for removal or Alcan-only gating (see [glossary.md](glossary.md)). |
+| `doctor_baseline_assessments`, `doctor_baseline_items` | Doctor's own self-baseline. Distinct from the coach baseline above; do not conflate. |
 
 ## 7. Doctor / clinical track
 

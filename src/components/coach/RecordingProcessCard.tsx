@@ -171,7 +171,7 @@ export function RecordingProcessCard({
             </div>
           </div>
         ) : hasRestoredRecording ? (
-          <div className="space-y-3 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <div className="space-y-3 p-4 bg-[hsl(var(--status-late-bg))] border border-[hsl(var(--status-late))]/30 rounded-lg">
             <div className="flex items-center gap-2">
               <Mic className="w-4 h-4 text-[hsl(var(--status-late))]" />
               <p className="text-sm font-medium text-[hsl(var(--status-late))]">

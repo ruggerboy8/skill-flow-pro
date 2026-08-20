@@ -82,10 +82,17 @@ utilities except where noted, so most call sites consume them via inline
 ### Domain colors
 
 Four domains: Clinical, Clerical, Cultural, Case Acceptance. Each has a rich
-(saturated) and pastel (background) variant, plus a dark-mode-only "ink"
-variant for text sitting on a tinted background.
+(saturated) and pastel (background) variant, plus an "ink" variant: the
+readable foreground for text sitting on that domain's tinted/pastel
+surface. Ink tokens are cross-theme, not dark-mode-only or mobile-shell-only
+— each is defined in both `:root` and `.dark` with different values (tuned
+for contrast against each mode's pastel), and `getDomainInk()` is consumed
+in light-mode contexts today, e.g. `RoleRadar.tsx` and
+`src/pages/coach/EvaluationHub.tsx` (also `ThisWeekPanel.tsx`,
+`TeamWeeklyFocus.tsx`, `DoctorTeamRoleDetail.tsx`, `DoctorMyRole.tsx`, and
+`CraftAtlasArea.tsx`), not restricted to mobile.
 
-| Domain | Rich token | Pastel token | Ink token (mobile shell only) |
+| Domain | Rich token | Pastel token | Ink token |
 |---|---|---|---|
 | Clinical | `--domain-clinical` | `--domain-clinical-pastel` | `--clinical-ink` |
 | Clerical | `--domain-clerical` | `--domain-clerical-pastel` | `--clerical-ink` |
@@ -100,26 +107,45 @@ a dark-mode toggle ships.
 Two access patterns exist in `src/lib/domainColors.ts`, and they are **not
 interchangeable**:
 
-- **`getDomainColor()` / `getDomainColorRich()` / `getDomainColorRichRaw()`**
-  — static, fallback-only HSL literals baked into the JS file. These
-  intentionally do **not** track the CSS vars or dark mode live.
-  `DomainDetail.tsx` is the one still-live consumer (it calls
-  `getDomainColorRichRaw()` directly for its alpha-blended gradient, which
-  needs closer review before migrating — see the comment in
-  `domainColors.ts` above `getDomainColorVar()`). `CompetencyAccordion.tsx`
-  imports nothing from this file. `RoleRadar.tsx` was already migrated
-  under DSN-1 and uses the live var-backed getters below, not these.
-- **`getDomainColorVar()` / `getDomainPastelVar()`** — resolve to
-  `hsl(var(--domain-*))`, so they track light/dark mode live via the CSS
-  cascade. Used by `RoleRadar.tsx` (via `getDomainPastelVar()` /
-  `getDomainInk()`) and every other DSN-1-migrated surface. Use these for
-  anything new, especially in the mobile shell.
+- **`getDomainColor()` / `getDomainColorRich()` / `getDomainColorRaw()` /
+  `getDomainColorRichRaw()`** — static, fallback-only HSL literals baked
+  into the JS file. These intentionally do **not** track the CSS vars or
+  dark mode live. This is still the majority pattern: an exhaustive grep of
+  every `from '@/lib/domainColors'` import in `src/` (2026-08-20) found 41
+  consumer files on the static family versus 21 on the live-var family
+  below. `DomainDetail.tsx` (`getDomainColorRichRaw()`, for its
+  alpha-blended gradient — see the comment in `domainColors.ts` above
+  `getDomainColorVar()`) is one of them, alongside `CompetencyGrid.tsx`,
+  `LibraryPanel.tsx`, `DoctorDomainDetail.tsx`, `ConfidenceWizard.tsx`,
+  `EvaluationViewer.tsx`, and most of the admin Pro Move library/picker
+  surfaces. `CompetencyAccordion.tsx` imports nothing from this file at
+  all (it doesn't render domain color).
+- **`getDomainColorVar()` / `getDomainPastelVar()` / `getDomainColorVarRaw()`
+  / `getDomainPastelVarRaw()`** — resolve to `hsl(var(--domain-*))` (or a
+  bare `var(--domain-*)` for the `*Raw` forms, for composing an alpha
+  value), so they track light/dark mode live via the CSS cascade.
+  `RoleRadar.tsx` is on this family (`getDomainPastelVar()` /
+  `getDomainInk()`) — it was migrated under DSN-1, unlike
+  `DomainDetail.tsx` and `CompetencyAccordion.tsx`, the two screens it was
+  historically grouped with (see below). Also used by the
+  `eval-results-v2` surface, the coach dashboard/evaluation screens
+  (`StaffOverviewTab.tsx`, `StaffPriorityFocusTab.tsx`,
+  `DomainConfidenceTrend.tsx`), `EvaluationHub.tsx`, and the mobile Craft
+  Atlas (`CraftAtlasOverview.tsx`, `CraftAtlasArea.tsx`, `AtlasSearch.tsx`).
+  Use these for anything new, especially in the mobile shell.
+
+**This is a real, current migration surface, not a two-file tail.** The 41
+static-family files are candidates for the same DSN-1 treatment RoleRadar
+already got, not a closed list — `src/lib/domainColors.ts`'s own comment
+only calls out `DomainDetail.tsx` and `CompetencyAccordion.tsx` by name
+because those were the two explicitly deferred by the DSN-1 ticket report;
+it was never a claim that everything else had already moved.
 
 The claim that swapping the static getters for the var-backed ones is a
 no-op in light mode today, and becomes correct the day a dark-mode toggle
 ships, is DSN-1's finding — see the byte-identical-render constraint in
 `docs/features/explore-my-role-build-instructions.md` section G
-(Acceptance), not a blanket rule that these three screens can never move.
+(Acceptance), not a blanket rule that any of these screens can never move.
 
 `getDomainInk()` returns the ink token for text on a domain's pastel
 background, falling back to `--foreground` for an unrecognized domain.

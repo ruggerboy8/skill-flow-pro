@@ -103,12 +103,12 @@ export default function Index() {
           {/* rank: eval-ready */}
           <EvalReadyCard />
 
+          {/* rank: recent-win — an earned win ranks above recognition */}
+          <RecentWinBanner />
+
           {/* rank: recognition (MOB-5) — the featured glow, or generic
               encouragement when there isn't one yet. Never empty. */}
           <RecognitionCard />
-
-          {/* rank: recent-win */}
-          <RecentWinBanner />
 
           {/* rank: current-focus */}
           <CurrentFocusCard />

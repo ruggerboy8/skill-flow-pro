@@ -6,10 +6,10 @@
  * stable across re-renders on the same day but not identical every day.
  */
 const ENCOURAGEMENT_LINES = [
-  "Keep showing up. Recognition catches up with consistency, and yours is building.",
-  "Nothing to show here yet, but that's about timing, not effort. Keep going.",
-  "Your coach is watching for moments worth calling out. One's coming.",
-  "The work you're putting in doesn't go unnoticed for long. Hang tight.",
+  "Every Pro Move you rate honestly is you getting a little better at this.",
+  "The work you put in this week adds up, one patient at a time.",
+  "Getting stronger at your craft is the whole point, and you're doing it.",
+  "Small moves, done consistently, are what great looks like here.",
 ] as const;
 
 function dayOfYear(date: Date): number {

@@ -204,10 +204,13 @@ All colors MUST be HSL.
     /* Win banner colors — dark-tuned so the Recognition/Recent Win cards don't
        glow near-white on dark backgrounds; same darkening approach as the
        pastel/score-bg tokens above (low-lightness background, slightly
-       lighter border), --win-growth/--win-perfect stay as-is (already vivid
-       enough to read on dark). */
+       lighter border). The foreground --win-growth/--win-perfect are also
+       lightened so the accent text/badge reads on the darkened surfaces
+       (e.g. the recognition card badge = --win-growth on --win-growth-border). */
+    --win-growth: 160 70% 55%;
     --win-growth-bg: 152 40% 16%;
     --win-growth-border: 149 45% 28%;
+    --win-perfect: 217 85% 68%;
     --win-perfect-bg: 214 45% 18%;
     --win-perfect-border: 213 50% 30%;
 

@@ -29,4 +29,11 @@ describe('HOME_FEED_ORDER', () => {
     expect(recognitionIndex).toBeGreaterThan(backfillIndex);
     expect(recognitionIndex).toBeLessThan(valueIndex);
   });
+
+  it('ranks a real recent win ABOVE the recognition card (wins louder than gaps)', () => {
+    const recentWinIndex = HOME_FEED_ORDER.indexOf('recent-win' as any);
+    const recognitionIndex = HOME_FEED_ORDER.indexOf('recognition' as any);
+    expect(recentWinIndex).toBeGreaterThanOrEqual(0);
+    expect(recentWinIndex).toBeLessThan(recognitionIndex);
+  });
 });

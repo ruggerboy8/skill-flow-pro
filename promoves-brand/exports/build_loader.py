@@ -2,10 +2,23 @@
 """PRO MOVES — motion prototype generator (promoves-loader.html).
 The dot is a component of the P that temporarily leaves home and is drawn back.
 Run-once semantics; never loops. Final frame is bit-identical to the static mark."""
-import re
+import os, re
 
-fonts = re.search(r"(@font-face\{.*?format\('opentype'\);\})\s*\n?body",
-                  open('/home/user/promoves-brand/congress/integrated.html').read(), re.S).group(1)
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+# The embedded Biondi @font-face block is lifted from a committed congress study
+# page (the original integrated.html workspace file was not preserved). Both
+# committed pages carry the identical block.
+def _fonts():
+    for name in ('v3-refine.html', 'm1-study.html'):
+        path = os.path.join(HERE, '..', 'congress', name)
+        if os.path.exists(path):
+            m = re.search(r"(@font-face\{.*format\('opentype'\);\})", open(path).read(), re.S)
+            if m:
+                return m.group(1)
+    raise SystemExit('No committed congress page with the Biondi @font-face block found.')
+
+fonts = _fonts()
 
 JS = r"""
 // ---- V3A canonical geometry (100-unit canvas) ----
@@ -173,5 +186,5 @@ input[type=range]{{accent-color:#4FA8DC}}
 <script>{JS}</script>
 </body></html>'''
 
-open('/home/user/promoves-brand/exports/promoves-loader.html', 'w').write(html)
+open(os.path.join(HERE, 'promoves-loader.html'), 'w').write(html)
 print('wrote promoves-loader.html', len(html))

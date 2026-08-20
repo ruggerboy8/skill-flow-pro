@@ -3,7 +3,7 @@
 import cairosvg, io, math, os
 from PIL import Image
 
-OUT = '/home/user/promoves-brand/exports'
+OUT = os.path.dirname(os.path.abspath(__file__))
 os.chdir(OUT)
 NAVY, CYAN, BONE, CHARCOAL = '#113B62', '#4FA8DC', '#F4F1EA', '#1A1D21'
 

@@ -14,8 +14,15 @@ import math, os, struct
 from fontTools.ttLib import TTFont
 from fontTools.pens.svgPathPen import SVGPathPen
 
-OUT = '/home/user/promoves-brand/exports'
-os.makedirs(OUT, exist_ok=True)
+OUT = os.path.dirname(os.path.abspath(__file__))
+
+# Biondi Sans is licensed and deliberately not committed. Point BIONDI_OTF at
+# your copy, or drop BiondiSansRg-Regular.otf next to this script (gitignored).
+FONT_PATH = os.environ.get('BIONDI_OTF', os.path.join(OUT, 'BiondiSansRg-Regular.otf'))
+if not os.path.exists(FONT_PATH):
+    raise SystemExit(
+        'BiondiSansRg-Regular.otf not found. Set BIONDI_OTF=/path/to/it or place '
+        'the file next to this script. The font is licensed and not in the repo.')
 
 CX, CY = 47.0, 37.0
 R, SW = 17.0, 12.0
@@ -52,7 +59,7 @@ def p_group(struct_col, dot_col, icon=False, gid='signal-p'):
             f'</g>')
 
 # ---------- outlined type ----------
-FONT = TTFont('/home/user/deck-sample/assets/fonts/BiondiSansRg-Regular.otf')
+FONT = TTFont(FONT_PATH)
 UPEM = FONT['head'].unitsPerEm            # 1000
 CAPH = FONT['OS/2'].sCapHeight            # 717
 S = 72.0 / CAPH                           # font-unit -> canvas-unit (cap = exactly 72u)
@@ -70,7 +77,7 @@ WORD_GAP = 38.0 * 100.0 / 148.0            # the approved 38px gap span
 PEN_R = (round(148 * 0.73) + 2) * 100.0 / 148.0   # snug: cropped P svg (73u) + 2px
 
 import uharfbuzz as hb
-_blob = hb.Blob.from_file_path('/home/user/deck-sample/assets/fonts/BiondiSansRg-Regular.otf')
+_blob = hb.Blob.from_file_path(FONT_PATH)
 _hbfont = hb.Font(hb.Face(_blob))
 
 def shaped(text):

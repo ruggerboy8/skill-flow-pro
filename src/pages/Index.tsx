@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useMobileShell } from '@/hooks/useMobileShell';
@@ -10,12 +11,19 @@ import { RecognitionCard } from '@/components/home/RecognitionCard';
 import { LeadFocusHomeCard } from '@/components/home/LeadFocusHomeCard';
 import { LeadMeetingRequestCard } from '@/components/home/LeadMeetingRequestCard';
 import { Skeleton } from '@/components/ui/skeleton';
-import RegionalDashboard from '@/pages/dashboard/RegionalDashboard';
+import { SignalP } from '@/components/brand/SignalP';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Wrench, ArrowRight, ChevronRight, Users } from 'lucide-react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { differenceInDays, format } from 'date-fns';
+
+// PRF-3: participants never render this branch, but Index is the eager
+// landing page every user's first load pulls in, so a static import here
+// would drag the whole regional dashboard (and everything it embeds) back
+// into the initial bundle. Lazy so it only loads for the coach/regional/admin
+// roles that actually take this branch.
+const RegionalDashboard = lazy(() => import('@/pages/dashboard/RegionalDashboard'));
 
 export default function Index() {
   const { isParticipant, showRegionalDashboard, isDoctor, isOrgAdmin, isSuperAdmin, isLoading } = useUserRole();
@@ -46,7 +54,17 @@ export default function Index() {
   // Admins / regional managers / coaches land on Command Center even if also a doctor.
   // They can reach /doctor via the sidebar "Doctor" link.
   if (showRegionalDashboard || isOrgAdmin || isSuperAdmin) {
-    return <RegionalDashboard />;
+    return (
+      <Suspense
+        fallback={
+          <div className="min-h-screen flex items-center justify-center bg-background">
+            <SignalP mode="waiting" size={48} />
+          </div>
+        }
+      >
+        <RegionalDashboard />
+      </Suspense>
+    );
   }
 
   // Pure doctors (no admin/coach role) → Doctor home (baseline assessment)

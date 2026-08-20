@@ -21,6 +21,7 @@ import { ProMovesLogo } from '@/components/ProMovesLogo';
 import { ALCAN_ORG_ID } from '@/lib/askAlcanAccess';
 import { useMobileShell } from '@/hooks/useMobileShell';
 import { MobileTabBar } from '@/components/mobile/MobileTabBar';
+import { AvatarMenu } from '@/components/mobile/AvatarMenu';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
@@ -257,17 +258,23 @@ export default function Layout() {
     return (
       <div className="h-screen supports-[height:100dvh]:h-[100dvh] bg-background flex flex-col">
         <header className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-card flex-none">
-          <img src={alcanLogo} alt="Alcan" className="h-6 object-contain dark:invert" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            Pro Moves
-          </span>
+          <div className="flex items-center gap-2 min-w-0">
+            <img src={alcanLogo} alt="Alcan" className="h-6 object-contain dark:invert flex-none" />
+            <span className="text-2xs font-bold uppercase tracking-widest text-muted-foreground truncate">
+              Pro Moves
+            </span>
+          </div>
+          {/* Former "More" tab's contents (Profile, Sign out, My evaluations,
+              Practice log, lead Team) plus a role-aware management section for
+              flagged non-participants — MOB-1. */}
+          <AvatarMenu name={staffProfile?.name} navigation={navigation} />
         </header>
 
         <main ref={mobileMainRef} className="flex-1 overflow-y-auto overflow-x-hidden w-full p-4">
           <div className="mb-4 empty:mb-0">
             <PendingSurveysCard />
           </div>
-          <Outlet />
+          <Outlet context={{ navigation }} />
         </main>
 
         {!isRitualRoute && <MobileTabBar />}
@@ -329,7 +336,7 @@ export default function Layout() {
               <div className="mb-4 empty:mb-0">
                 <PendingSurveysCard />
               </div>
-              <Outlet />
+              <Outlet context={{ navigation }} />
             </main>
           </div>
         </div>

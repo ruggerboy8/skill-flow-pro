@@ -17,39 +17,36 @@ function glowLabel(glow: StaffGlow): string | null {
 export function GlowHistory({ staffId }: { staffId: string | undefined }) {
   const { glows, isLoading } = useStaffGlows(staffId);
 
+  // Performance-only (MOB-ADJUST-1 item 5): show recognition only when it's
+  // real. No holding/encouragement text here — that stays on Home's
+  // RecognitionCard, which is a separate component and untouched.
+  if (isLoading || glows.length === 0) return null;
+
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
       <h2 className="text-[15px] font-semibold">Recognition</h2>
 
-      {!isLoading && glows.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-6">
-          No glows yet. When your coach notices something, it'll show up here.
-        </p>
-      )}
-
-      {glows.length > 0 && (
-        <div className="mt-2">
-          {glows.map((glow, idx) => {
-            const label = glowLabel(glow);
-            return (
-              <div key={`${glow.evaluationId}-${idx}`} className="flex items-start gap-2.5 py-3 border-b border-border last:border-none">
-                {glow.domainName && (
-                  <span
-                    className="w-2 h-5 rounded-sm flex-none mt-0.5"
-                    style={{ backgroundColor: getDomainColorRich(glow.domainName) }}
-                  />
+      <div className="mt-2">
+        {glows.map((glow, idx) => {
+          const label = glowLabel(glow);
+          return (
+            <div key={`${glow.evaluationId}-${idx}`} className="flex items-start gap-2.5 py-3 border-b border-border last:border-none">
+              {glow.domainName && (
+                <span
+                  className="w-2 h-5 rounded-sm flex-none mt-0.5"
+                  style={{ backgroundColor: getDomainColorRich(glow.domainName) }}
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                {label && (
+                  <p className="text-2xs font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
                 )}
-                <div className="flex-1 min-w-0">
-                  {label && (
-                    <p className="text-2xs font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
-                  )}
-                  <p className="text-[13px] leading-snug mt-0.5">{glow.observerGlow}</p>
-                </div>
+                <p className="text-[13px] leading-snug mt-0.5">{glow.observerGlow}</p>
               </div>
-            );
-          })}
-        </div>
-      )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { BackPill } from '@/components/mobile/BackPill';
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -38,13 +39,15 @@ function StatusPill({ pill }: { pill: Pill }) {
 export default function TeamPage() {
   const navigate = useNavigate();
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
+  const { resolve: resolveRole } = useRoleDisplayNames();
   const locationId = staffProfile?.primary_location_id ?? null;
   const leadStaffId = staffProfile?.id;
+  const leadRoleId = staffProfile?.role_id ?? null;
 
   const { data: rosterData } = useQuery({
-    queryKey: ['team-roster', locationId, leadStaffId],
+    queryKey: ['team-roster', locationId, leadStaffId, leadRoleId],
     queryFn: async () => {
-      if (!locationId || !leadStaffId) return null;
+      if (!locationId || !leadStaffId || leadRoleId == null) return null;
 
       const [{ data: location }, { data: rosterStaff }] = await Promise.all([
         supabase
@@ -57,6 +60,11 @@ export default function TeamPage() {
           .select('id, name, role_id')
           .eq('primary_location_id', locationId)
           .eq('is_participant', true)
+          // Roster is the lead's own role only (F.1 QA: mixed front desk/OM/RDA
+          // roster was confusing for an RDA lead). Generic on role_id rather than
+          // hardcoding RDA, since this surface only renders for leads and leads
+          // only exist for RDAs today.
+          .eq('role_id', leadRoleId)
           .neq('id', leadStaffId),
       ]);
 
@@ -72,11 +80,14 @@ export default function TeamPage() {
         roster: (rosterStaff ?? []).map((s) => ({
           id: s.id,
           name: s.name ?? 'Unnamed',
-          roleName: s.role_id != null ? roleNameById.get(s.role_id) ?? null : null,
+          roleId: s.role_id,
+          // Platform fallback name; the org-scoped label is resolved at render
+          // time via useRoleDisplayNames (org_id isn't available in this query).
+          roleNameFallback: s.role_id != null ? roleNameById.get(s.role_id) ?? null : null,
         })),
       };
     },
-    enabled: !!locationId && !!leadStaffId,
+    enabled: !!locationId && !!leadStaffId && leadRoleId != null,
   });
 
   // Current-week completion, reusing the coach-surface RPC/hook (same
@@ -135,7 +146,11 @@ export default function TeamPage() {
           >
             <div className="flex-1 min-w-0">
               <p className="text-[15px] font-semibold truncate">{member.name}</p>
-              {member.roleName && <p className="text-[11px] text-muted-foreground mt-0.5">{member.roleName}</p>}
+              {member.roleId != null && (
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {resolveRole(member.roleId, member.roleNameFallback ?? '')}
+                </p>
+              )}
             </div>
             <StatusPill pill={pillFor(member.id)} />
             <ChevronRight className="h-4 w-4 text-muted-foreground flex-none" />

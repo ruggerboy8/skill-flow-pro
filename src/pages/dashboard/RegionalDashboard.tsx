@@ -15,7 +15,7 @@ import { format as formatDate } from 'date-fns';
 import { StaffWeekSummary } from '@/types/coachV2';
 import { nowUtc } from '@/lib/centralTime';
 import { useLocationTimezone } from '@/hooks/useLocationTimezone';
-import { getLocationSubmissionGates, calculateLocationStats, calculateDistinctMissedCount, type SubmissionGates } from '@/lib/submissionStatus';
+import { getLocationSubmissionGates, calculateLocationStats, calculateDistinctMissedCount, calculateDueSubmissionTotals, type SubmissionGates } from '@/lib/submissionStatus';
 import { getSubmissionPolicy, getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
 import { participationTier, tierColorTokens } from '@/lib/participationTier';
 import { supabase } from '@/integrations/supabase/client';
@@ -111,6 +111,13 @@ export default function RegionalDashboard() {
       byLocation.get(s.location_id)!.push(s);
     });
 
+    // DASH-1a Codex fix (P1): raw conf/perf submitted & expected counts,
+    // but only for locations where that metric is actually due (and not
+    // excused) — see calculateDueSubmissionTotals. Collected alongside the
+    // per-location stats below so the org-wide colored rates can never be
+    // dragged down by a location that isn't due yet.
+    const dueTotalsList: ReturnType<typeof calculateDueSubmissionTotals>[] = [];
+
     const stats: LocationStats[] = Array.from(byLocation.entries()).map(([locId, staff]) => {
       // Use per-location gates if available, otherwise default to "nothing due yet"
       const gates = locationGatesMap.get(locId) ?? {
@@ -139,15 +146,17 @@ export default function RegionalDashboard() {
         adjustedSubmissionRate = 100;
       }
 
-      // DASH-1a QA fix: distinct people missed, honoring the same excuse
-      // adjustments applied to missingConf/missingPerf above (an excused
-      // metric is treated as not-yet-past-deadline, so it can never count
-      // someone as "missing").
-      const distinctMissedCount = calculateDistinctMissedCount(staff, {
+      // Gates with any excused metric turned off, so an excused-but-due
+      // metric is treated as not due either. Shared by distinctMissedCount
+      // (DASH-1a QA fix) and the due-only submission totals (DASH-1a Codex
+      // fix, P1) below.
+      const effectiveGates: SubmissionGates = {
         ...gates,
         isPastConfidenceDeadline: gates.isPastConfidenceDeadline && !excuseStatus.isConfExcused,
         isPastPerformanceDeadline: gates.isPastPerformanceDeadline && !excuseStatus.isPerfExcused,
-      });
+      };
+      const distinctMissedCount = calculateDistinctMissedCount(staff, effectiveGates);
+      dueTotalsList.push(calculateDueSubmissionTotals(staff, effectiveGates));
 
       return {
         id: locId,
@@ -174,14 +183,24 @@ export default function RegionalDashboard() {
     // sum across locations since a staff member belongs to exactly one.
     const totalDistinctMissed = stats.reduce((sum, s) => sum + s.distinctMissedCount, 0);
     const totalPendingConf = stats.reduce((sum, s) => sum + (s.pendingConfCount ?? 0), 0);
+    // Raw, deadline-unaware counts — used ONLY for the neutral pre-deadline
+    // progress display ("X/Y conf submitted" when nothing is due yet).
+    // Never feed these into a colored rate; see totalDue* below.
     const totalConfSubmitted = stats.reduce((sum, s) => sum + (s.confSubmitted ?? 0), 0);
     const totalConfExpected = stats.reduce((sum, s) => sum + (s.confExpected ?? 0), 0);
     const totalPerfSubmitted = stats.reduce((sum, s) => sum + (s.perfSubmitted ?? 0), 0);
     const totalPerfExpected = stats.reduce((sum, s) => sum + (s.perfExpected ?? 0), 0);
-    const avgRate = stats.length > 0 
-      ? stats.reduce((sum, s) => sum + s.submissionRate, 0) / stats.length 
-      : 0;
-    
+
+    // DASH-1a Codex fix (P1): due-only, excuse-aware totals that the
+    // colored confRate/perfRate/avgRate must be built from instead — a
+    // not-yet-due (or excused) location contributes nothing to either side
+    // of the ratio, rather than dragging the denominator down. See
+    // summaryTiers below, which is the only place these feed into.
+    const totalDueConfSubmitted = dueTotalsList.reduce((sum, d) => sum + d.confSubmitted, 0);
+    const totalDueConfExpected = dueTotalsList.reduce((sum, d) => sum + d.confExpected, 0);
+    const totalDuePerfSubmitted = dueTotalsList.reduce((sum, d) => sum + d.perfSubmitted, 0);
+    const totalDuePerfExpected = dueTotalsList.reduce((sum, d) => sum + d.perfExpected, 0);
+
     // Check if any location has passed a deadline
     const anyLocationPastDeadline = stats.some(s => {
       const gates = locationGatesMap.get(s.id);
@@ -190,8 +209,10 @@ export default function RegionalDashboard() {
 
     return {
       locationStats: stats,
-      totals: { totalStaff, totalMissingConf, totalMissingPerf, totalDistinctMissed, totalPendingConf, avgRate, locationCount: stats.length,
-        totalConfSubmitted, totalConfExpected, totalPerfSubmitted, totalPerfExpected, anyLocationPastDeadline }
+      totals: { totalStaff, totalMissingConf, totalMissingPerf, totalDistinctMissed, totalPendingConf, locationCount: stats.length,
+        totalConfSubmitted, totalConfExpected, totalPerfSubmitted, totalPerfExpected,
+        totalDueConfSubmitted, totalDueConfExpected, totalDuePerfSubmitted, totalDuePerfExpected,
+        anyLocationPastDeadline }
     };
   }, [summaries, locationGatesMap]);
 
@@ -264,18 +285,30 @@ export default function RegionalDashboard() {
   // rounded ONCE here and reused for both the tier decision and the
   // displayed percentage (DASH-1a QA fix for the rounding mismatch), so
   // the JSX below just renders these numbers directly.
+  //
+  // DASH-1a Codex fix (P1): these are built from totalDue*, not the raw
+  // totalConf*/totalPerf* sums, so a location that isn't due yet (or is
+  // excused) can never dilute a colored rate — it contributes to neither
+  // the numerator nor the denominator, the same way an individual
+  // LocationHealthCard treats a not-yet-due metric as 100%, not 0%.
   const summaryTiers = useMemo(() => {
     const confRate = Math.round(
-      totals.totalConfExpected > 0
-        ? (totals.totalConfSubmitted / totals.totalConfExpected) * 100
+      totals.totalDueConfExpected > 0
+        ? (totals.totalDueConfSubmitted / totals.totalDueConfExpected) * 100
         : 100
     );
     const perfRate = Math.round(
-      totals.totalPerfExpected > 0
-        ? (totals.totalPerfSubmitted / totals.totalPerfExpected) * 100
+      totals.totalDuePerfExpected > 0
+        ? (totals.totalDuePerfSubmitted / totals.totalDuePerfExpected) * 100
         : 100
     );
-    const avgRate = Math.round(totals.avgRate);
+    // Avg Completion pools due conf + due perf into one combined rate,
+    // mirroring how each location's own submissionRate is computed —
+    // this is the org's own due-participation rate, not an unweighted
+    // average of each location's percentage.
+    const dueExpected = totals.totalDueConfExpected + totals.totalDuePerfExpected;
+    const dueSubmitted = totals.totalDueConfSubmitted + totals.totalDuePerfSubmitted;
+    const avgRate = Math.round(dueExpected > 0 ? (dueSubmitted / dueExpected) * 100 : 100);
     return {
       confRate,
       perfRate,
@@ -410,7 +443,7 @@ export default function RegionalDashboard() {
                         {summaryTiers.confRate}%
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {totals.totalConfSubmitted}/{totals.totalConfExpected} conf submitted
+                        {totals.totalDueConfSubmitted}/{totals.totalDueConfExpected} conf submitted
                       </p>
                       {totals.totalMissingConf > 0 && (
                         <span
@@ -437,7 +470,7 @@ export default function RegionalDashboard() {
                         {summaryTiers.perfRate}%
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {totals.totalPerfSubmitted}/{totals.totalPerfExpected} perf submitted
+                        {totals.totalDuePerfSubmitted}/{totals.totalDuePerfExpected} perf submitted
                       </p>
                       <span
                         className="inline-flex items-center mt-1 rounded-full px-1.5 py-0.5 text-2xs font-medium"

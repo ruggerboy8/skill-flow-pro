@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { ROLE_CONTENT, DOMAIN_ORDER, type RoleType } from '@/lib/content/roleDefinitions';
-import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
+import { getDomainPastelVar, getDomainColorVar } from '@/lib/domainColors';
 import { getDomainSlug } from '@/lib/domainUtils';
 import { cn } from '@/lib/utils';
 
@@ -45,8 +45,8 @@ export default function DoctorTeamRoleDetail() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {DOMAIN_ORDER.map((domain) => {
           const content = roleContent[domain];
-          const domainColor = getDomainColor(domain);
-          const domainColorRich = `hsl(${getDomainColorRichRaw(domain)})`;
+          const domainColor = getDomainPastelVar(domain);
+          const domainColorRich = getDomainColorVar(domain);
 
           return (
             <div

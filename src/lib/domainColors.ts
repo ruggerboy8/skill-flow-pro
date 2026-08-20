@@ -66,13 +66,32 @@ export const getDomainColorRich = (domain: string): string => {
   return `hsl(${getDomainColorRichRaw(domain)})`;
 };
 
-// CSS-var-backed variants that track light/dark mode live (getDomainColor /
-// getDomainColorRich above intentionally stay static-fallback-only so
-// already-shipped surfaces — RoleRadar, DomainDetail, CompetencyAccordion —
-// render byte-identically; see
-// docs/features/explore-my-role-build-instructions.md section D). Use these
-// for anything new in the mobile-shell Craft Atlas, where dark mode must be
-// legible per the .dark overrides already defined for --domain-*-pastel.
+// CSS-var-backed variants that track light/dark mode live.
+//
+// DSN-1 (2026-08-19): this comment used to say getDomainColor/getDomainColorRich
+// "intentionally stay static-fallback-only" so RoleRadar, DomainDetail and
+// CompetencyAccordion "render byte-identically," citing
+// docs/features/explore-my-role-build-instructions.md section D. That
+// constraint was scoped to one build (E1+E2 of the Explore/Craft Atlas
+// rebuild): the instruction was "desktop is untouched" so the *mobile-only*
+// rebuild couldn't regress the *desktop* RoleRadar it wasn't supposed to
+// touch, not a standing rule that these three screens can never move to the
+// var-backed getters.
+//
+// Verified before migrating any call site: the :root (light) values of
+// every --domain-*/-pastel custom property in index.css are byte-identical
+// to the domainColors/domainColorsRich constants above, so swapping a call
+// site from getDomainColor()/getDomainColorRich() to
+// getDomainPastelVar()/getDomainColorVar() changes nothing in light mode —
+// same computed HSL, same rendered pixels. It only starts responding to the
+// .dark overrides, which today never activate (nothing in the app ever adds
+// a `dark` class — darkMode is class-based in tailwind.config.ts, and no
+// ThemeProvider/toggle sets it, even though next-themes is installed and
+// several screens already carry dormant `dark:` Tailwind classes). So this
+// migration is a no-op today and becomes correct the day a dark-mode toggle
+// ships, instead of needing another sweep then. RoleRadar, DomainDetail's
+// domain header and other high-traffic screens have been migrated under
+// DSN-1; see the ticket report for the full list migrated vs. deferred.
 export const getDomainColorVar = (domain: string): string => {
   const varName = DOMAIN_CSS_VARS[(domain || '').trim()];
   return varName ? `hsl(var(${varName}))` : getDomainColorRich(domain);
@@ -81,6 +100,21 @@ export const getDomainColorVar = (domain: string): string => {
 export const getDomainPastelVar = (domain: string): string => {
   const varName = DOMAIN_CSS_VARS_PASTEL[(domain || '').trim()];
   return varName ? `hsl(var(${varName}))` : getDomainColor(domain);
+};
+
+// Bare var() reference (no hsl() wrapper), for call sites that need to
+// compose an alpha value, e.g. `hsl(${getDomainColorVarRaw(domain)} / 0.3)`.
+// Mirrors getDomainColorRichRaw's fallback for an unrecognized domain.
+export const getDomainColorVarRaw = (domain: string): string => {
+  const varName = DOMAIN_CSS_VARS[(domain || '').trim()];
+  return varName ? `var(${varName})` : getDomainColorRichRaw(domain);
+};
+
+// Bare var() reference (no hsl() wrapper) for the pastel domain color.
+// Mirrors getDomainColorRaw's fallback for an unrecognized domain.
+export const getDomainPastelVarRaw = (domain: string): string => {
+  const varName = DOMAIN_CSS_VARS_PASTEL[(domain || '').trim()];
+  return varName ? `var(${varName})` : getDomainColorRaw(domain);
 };
 
 // Readable ink tokens for text sitting on a domain's pastel/tinted

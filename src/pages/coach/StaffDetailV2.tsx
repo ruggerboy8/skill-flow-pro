@@ -34,7 +34,7 @@ import OnTimeRateWidget from '@/components/coach/OnTimeRateWidget';
 import { QuarterlyEvalsTab } from '@/components/coach/QuarterlyEvalsTab';
 import { StaffOverviewTab } from '@/components/coach/StaffOverviewTab';
 import { RawScoreRow } from '@/types/coachV2';
-import { getDomainColor, getDomainColorRich } from '@/lib/domainColors';
+import { getDomainPastelVar, getDomainColorVar, getDomainPastelVarRaw } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { toast } from 'sonner';
 import { getLocationSubmissionGates, type SubmissionGates } from '@/lib/submissionStatus';
@@ -433,7 +433,7 @@ export default function StaffDetailV2() {
           </p>
           <div className="flex flex-wrap gap-2">
             {domainConfidenceStrip.map(({ domain, avg }) => {
-              const richColor = getDomainColorRich(domain);
+              const richColor = getDomainColorVar(domain);
               const bgColor = avg >= 3.0 ? 'bg-emerald-50 dark:bg-emerald-950/20' : avg >= 2.5 ? 'bg-amber-50 dark:bg-amber-950/20' : 'bg-rose-50 dark:bg-rose-950/20';
               const textColor = avg >= 3.0 ? 'text-emerald-700 dark:text-emerald-400' : avg >= 2.5 ? 'text-amber-700 dark:text-amber-400' : 'text-rose-700 dark:text-rose-400';
               return (
@@ -545,7 +545,7 @@ export default function StaffDetailV2() {
                                     className="flex items-center gap-3 p-3 rounded-lg border"
                                     style={{
                                       backgroundColor: score.domain_name
-                                        ? `hsl(${getDomainColor(score.domain_name).match(/hsl\((.+)\)/)?.[1]} / 0.3)`
+                                        ? `hsl(${getDomainPastelVarRaw(score.domain_name)} / 0.3)`
                                         : undefined,
                                     }}
                                   >
@@ -554,8 +554,8 @@ export default function StaffDetailV2() {
                                         variant="outline"
                                         className="shrink-0"
                                         style={{
-                                          backgroundColor: getDomainColor(score.domain_name),
-                                          borderColor: getDomainColor(score.domain_name),
+                                          backgroundColor: getDomainPastelVar(score.domain_name),
+                                          borderColor: getDomainPastelVar(score.domain_name),
                                         }}
                                       >
                                         {score.domain_name}

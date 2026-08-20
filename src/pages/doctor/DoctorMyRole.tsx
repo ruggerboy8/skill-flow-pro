@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
+import { getDomainPastelVar, getDomainColorVar } from '@/lib/domainColors';
 import { getDomainSlug } from '@/lib/domainUtils';
 import { DOCTOR_ROLE_CONTENT, DOCTOR_DOMAIN_ORDER } from '@/lib/content/doctorRoleDefinitions';
 import { ChevronRight } from 'lucide-react';
@@ -82,8 +82,8 @@ export default function DoctorMyRole() {
       <div className="grid grid-cols-1 gap-4 px-4 md:px-0">
         {domains?.map(domain => {
           const content = DOCTOR_ROLE_CONTENT[domain.domain_name];
-          const domainColor = getDomainColor(domain.domain_name);
-          const domainColorRich = `hsl(${getDomainColorRichRaw(domain.domain_name)})`;
+          const domainColor = getDomainPastelVar(domain.domain_name);
+          const domainColorRich = getDomainColorVar(domain.domain_name);
 
           return (
             <div

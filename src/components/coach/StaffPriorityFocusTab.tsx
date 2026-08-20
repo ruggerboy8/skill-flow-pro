@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { getDomainColorRich, getDomainColorRichRaw } from '@/lib/domainColors';
+import { getDomainColorVar, getDomainColorVarRaw } from '@/lib/domainColors';
 import { format, parseISO, subWeeks } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -81,8 +81,8 @@ export function StaffPriorityFocusTab({ rawData }: StaffPriorityFocusTabProps) {
         ) : (
           <div className="space-y-3">
             {lowConfidenceScores.map((score, idx) => {
-              const domainColorRich = getDomainColorRich(score.domain_name);
-              const richRaw = getDomainColorRichRaw(score.domain_name);
+              const domainColorRich = getDomainColorVar(score.domain_name);
+              const richRaw = getDomainColorVarRaw(score.domain_name);
               
               return (
                 <div

@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useMobileShell } from '@/hooks/useMobileShell';
 import { supabase } from '@/integrations/supabase/client';
-import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
+import { getDomainPastelVar, getDomainColorVar } from '@/lib/domainColors';
 import { getDomainSlug } from '@/lib/domainUtils';
 import { ROLE_CONTENT, DOMAIN_ORDER, getRoleTypeFromArchetype, type RoleType } from '@/lib/content/roleDefinitions';
 import { ChevronRight, Compass } from 'lucide-react';
@@ -145,8 +145,8 @@ export default function RoleRadar() {
           const content = roleContent[domain];
           const score = domainScores.get(domain);
           const isScored = score != null && score > 0;
-          const domainColor = getDomainColor(domain);
-          const domainColorRich = `hsl(${getDomainColorRichRaw(domain)})`;
+          const domainColor = getDomainPastelVar(domain);
+          const domainColorRich = getDomainColorVar(domain);
 
           return (
             <div

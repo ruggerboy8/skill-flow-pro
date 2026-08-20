@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
+import { getDomainPastelVar, getDomainColorVar } from '@/lib/domainColors';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, GraduationCap } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -150,8 +150,8 @@ function RoleSection({ roleId, label, assignments, isLoading, onOpenDrawer }: { 
 
 function AssignmentCard({ assignment, onOpenDrawer }: { assignment: SimpleAssignment; onOpenDrawer: () => void }) {
   const domainName = assignment.domain_name;
-  const domainColor = domainName ? getDomainColor(domainName) : 'hsl(var(--primary))';
-  const domainColorRich = domainName ? `hsl(${getDomainColorRichRaw(domainName)})` : 'hsl(var(--primary))';
+  const domainColor = domainName ? getDomainPastelVar(domainName) : 'hsl(var(--primary))';
+  const domainColorRich = domainName ? getDomainColorVar(domainName) : 'hsl(var(--primary))';
 
   return (
     <div className="flex bg-card rounded-xl overflow-hidden border border-border/50 shadow-sm">

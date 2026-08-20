@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { getDomainColor } from '@/lib/domainColors';
+import { getDomainPastelVar } from '@/lib/domainColors';
 import {
   Dialog,
   DialogContent,
@@ -146,7 +146,7 @@ export function DoctorProMoveForm({ proMove, onClose, competencies }: DoctorProM
                     <div className="flex items-center gap-2">
                       <div 
                         className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: getDomainColor(competency.domain_name || '') }}
+                        style={{ backgroundColor: getDomainPastelVar(competency.domain_name || '') }}
                       />
                       {competency.name}
                       {competency.domain_name && (

@@ -4,7 +4,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer,
 } from 'recharts';
-import { getDomainColorRich } from '@/lib/domainColors';
+import { getDomainColorVar } from '@/lib/domainColors';
 
 interface ScoreRow {
   week_of: string;
@@ -102,7 +102,7 @@ export function DomainConfidenceTrend({ rawData, lookbackWeeks = 13 }: DomainCon
               key={domain}
               type="monotone"
               dataKey={domain}
-              stroke={getDomainColorRich(domain)}
+              stroke={getDomainColorVar(domain)}
               strokeWidth={2}
               dot={{ r: 3 }}
               activeDot={{ r: 5 }}

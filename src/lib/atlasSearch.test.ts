@@ -20,7 +20,8 @@ function competency(overrides: Partial<AtlasCompetency> & { competency_id: numbe
     domainName: overrides.domainName ?? 'Clinical',
     title: overrides.title ?? 'Untitled competency',
     subtitle: overrides.subtitle ?? null,
-    description: overrides.description ?? null,
+    friendlyDescription: overrides.friendlyDescription ?? null,
+    formalDescription: overrides.formalDescription ?? null,
     observerScore: overrides.observerScore ?? null,
     observerNote: overrides.observerNote ?? null,
     proMoves: overrides.proMoves ?? [],
@@ -94,7 +95,7 @@ describe('searchAtlasMoves', () => {
       competency({
         competency_id: 2,
         title: 'Financial Conversations Follow-up',
-        description: 'How to talk through cost objections after the visit.',
+        friendlyDescription: 'How to talk through cost objections after the visit.',
         proMoves: [move(2, 'Follow up on unpaid balances')],
       }),
     ];

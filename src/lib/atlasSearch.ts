@@ -54,7 +54,7 @@ export function searchAtlasMoves(competencies: AtlasCompetency[], rawQuery: stri
     const competencyMatches =
       fieldMatches(competency.title, tokens) ||
       fieldMatches(competency.subtitle, tokens) ||
-      fieldMatches(competency.description, tokens) ||
+      fieldMatches(competency.friendlyDescription, tokens) ||
       fieldMatches(competency.domainName, tokens);
 
     for (const move of competency.proMoves) {

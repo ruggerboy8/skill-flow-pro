@@ -54,12 +54,21 @@ single-practice customer, the top three levels collapse into one.
 - **Clinical Director**: Manages one or more doctors' development.
 - **Super Admin / Platform Admin**: Skill Flow Pro staff with
   cross-organization powers.
-- **Capability toggle**: The newer, flexible permission model, per-user
+- **Capability toggle**: The permission model in active use, per-user
   booleans (`can_view_submissions`, `can_manage_users`, etc) in
-  `user_capabilities`, replacing the older `is_*` boolean flags on `staff`.
-  Both currently coexist; see [data-model.md](data-model.md).
-- **Scope**: Which locations/orgs a non-participant can see. Table:
-  `coach_scopes` (`scope_type` = `'org'` or `'location'`). Scope plus
+  `user_capabilities`. **Correction (2026-08-19): this fully replaced the
+  older `is_*` boolean flags on `staff` for permission decisions** on
+  2026-07-25; `src/hooks/deriveUserRole.ts` (which every route guard and
+  permission check goes through) reads only `user_capabilities` for
+  `isSuperAdmin`/`isOrgAdmin`/`isParticipant`. The old flags still exist on
+  `staff` and are still touched by some admin UI and a few SQL RPCs, but they
+  are no longer where the app decides what a user can do. See
+  [data-model.md](data-model.md).
+- **Scope**: Which locations/groups a non-participant can see. Table:
+  `coach_scopes` (`scope_type` = `'org'` or `'location'`). Despite the name,
+  a `'org'`-typed row's `scope_id` is a `practice_groups.id` (legacy naming
+  from before "Group" replaced "Organization" as the term for that level; see
+  [data-model.md](data-model.md)). Scope plus
   capabilities together define reach.
 
 ## The competency framework (what you learn)
@@ -83,10 +92,15 @@ single-practice customer, the top three levels collapse into one.
 
 ## The weekly loop (the core mechanic)
 
-- **Weekly assignment**: The set of Pro Moves a given staff member is
-  assigned for a given week. **This is the only live assignment path.**
-  Canonical table: `weekly_assignments`. Submission status (which scores are
-  in, on-time vs. late) is derived from `weekly_scores`.
+- **Weekly assignment**: The set of Pro Moves live for a given role, in a
+  given org (or globally, for the platform default), for a given week.
+  **This is the only live assignment path.** Canonical table:
+  `weekly_assignments`. **Correction (2026-08-19): this is not a per-staff
+  table.** It has no `staff_id` column; a row is shared by every staff member
+  matching its `role_id` + `week_start_date` + `org_id`/`location_id` scope.
+  What a specific staff member actually did with their role's assignments,
+  and their submission status (on-time vs. late), lives on `weekly_scores`,
+  which does have `staff_id`. See [data-model.md](data-model.md).
 - **Check-In**: The start-of-week moment when a participant rates
   **confidence** on each assigned Pro Move. UI: the Confidence wizard.
 - **Check-Out**: The end-of-week moment when a participant rates actual
@@ -178,14 +192,21 @@ all part of the same now-defunct cluster:
   org admins) that publishes the evaluation to the staff member;
   `notify-eval-release` handles notification.
 - **Baseline assessment**: A starting-point assessment. **Two distinct
-  types, do not conflate:**
-  - **Doctor baseline**: performed only by clinical directors, part of the
-    doctor track. Tables: `doctor_baseline_assessments`,
+  types, do not conflate. Correction (2026-08-19): an earlier version of
+  this entry had the two directions reversed; this is now checked against
+  both wizards' code.**
+  - **Doctor baseline**: the doctor's **own self-baseline**, authored by the
+    doctor about themselves. `src/pages/doctor/BaselineWizard.tsx` writes to
+    `doctor_baseline_assessments` with `doctor_staff_id: staff.id`, where
+    `staff` is the logged-in doctor. Tables: `doctor_baseline_assessments`,
     `doctor_baseline_items`.
-  - **Coach baseline** *(Alcan-specific, candidate for removal)*: used only
-    when Alcan onboards a brand-new practice, to capture that practice's
-    staff baseline (not for individual new hires). Tables:
-    `coach_baseline_assessments`, `coach_baseline_items`,
+  - **Coach baseline** *(Alcan-specific, candidate for removal)*: the
+    clinical director's **observed** baseline of a doctor, not a
+    self-assessment. `src/components/clinical/CoachBaselineWizard.tsx`
+    writes to `coach_baseline_assessments`, keyed by both `doctor_staff_id`
+    (who it's about) and `coach_staff_id` (who authored it, the clinical
+    director). Historically used when Alcan onboards a brand-new practice.
+    Tables: `coach_baseline_assessments`, `coach_baseline_items`,
     `coach_baseline_audit`.
 
 ## Doctor / clinical track

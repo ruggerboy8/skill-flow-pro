@@ -47,14 +47,40 @@ design (partly superseded by what actually shipped), see
 
 | Table | Purpose |
 |---|---|
-| `user_capabilities` | **Newer** capability-toggle model (`can_view_submissions`, `can_manage_users`, `is_org_admin`, `is_platform_admin`, etc). One row per staff. |
-| `coach_scopes` | Which orgs/locations a non-participant can see. `scope_type` = `'org'` \| `'location'`. |
+| `user_capabilities` | **The active permission source.** Capability-toggle model (`can_view_submissions`, `can_manage_users`, `is_org_admin`, `is_platform_admin`, etc). One row per staff. |
+| `coach_scopes` | Which locations/groups a non-participant can see. `scope_type` = `'org'` \| `'location'`. **Naming trap:** despite the name, a `'org'` row's `scope_id` is a `practice_groups.id`, not an `organizations.id` (see the correction below the table). |
 | `roles` | Job functions (DFI, RDA, Office Manager, etc). |
 
-> ⚠️ **Two permission systems still coexist.** Old boolean flags on `staff`
-> (`is_coach`, `is_org_admin`, `is_super_admin`, `is_doctor`, etc) are still
-> what `useUserRole` reads, while `user_capabilities` is the migration target.
-> Check both. Don't assume one supersedes the other in every code path.
+> ✅ **`user_capabilities` is the single source of truth for permissions**,
+> confirmed in `src/hooks/deriveUserRole.ts` (comment: "CAPS-ONLY since
+> 2026-07-25 ... The legacy staff.is_\* flags are no longer read here"). The
+> derived `isSuperAdmin`, `isOrgAdmin`, and `isParticipant` all come from
+> `user_capabilities` alone, and that function feeds `useUserRole`, which is
+> what route guards like `RequireAccess` and every permission check in the
+> app actually call. **Historical note:** the legacy boolean columns
+> (`staff.is_super_admin`, `staff.is_org_admin`, `staff.is_coach`, etc.) still
+> exist on `staff` and are still read/written by some admin UI (creating or
+> editing a user) and by a few SQL RPCs (e.g. `get_staff_weekly_scores` still
+> OR's in `s.is_coach` / `s.is_super_admin` alongside the capability columns),
+> so they are not fully dead, but they are not where the app decides what a
+> user can do.
+>
+> **Persona attributes are a separate, still-legacy-sourced thing.**
+> `is_office_manager`, `is_doctor`, `is_clinical_director`, and `is_lead` are
+> read straight off `staff` in `deriveUserRole.ts` and describe *who someone
+> is*, not *what they're allowed to do*. They have not been migrated into
+> `user_capabilities` and there is no indication they will be.
+
+> ⚠️ **`coach_scopes.scope_type = 'org'` is a legacy name for a group scope,
+> not an organization scope.** Migration `20260725100000` says so directly:
+> "coach_scopes.scope_type = 'org' actually references practice_groups.id
+> (legacy naming, 'org' was the old term for group)." That migration also
+> backfills a `'org'`-typed scope row for every active lead/OM, using
+> `locations.group_id`, i.e. a `practice_groups.id`. Every consumer that reads
+> `scope_id` for a `'org'`-typed row (`deriveUserRole.ts`'s `managedOrgIds`,
+> the `get_staff_weekly_scores` RPC) treats it as a `practice_groups.id`.
+> Putting an actual `organizations.id` in that column would match nothing and
+> silently grant the row's owner visibility into zero staff.
 
 ## 3. Competency framework (content)
 
@@ -74,7 +100,7 @@ design (partly superseded by what actually shipped), see
 
 | Table | Purpose |
 |---|---|
-| `weekly_assignments` | **The only live assignment source.** Per-staff weekly Pro Move assignments. ~1,414 rows (2026-08-18 live count). Note: `weekly_assignments.location_id` has no FK and 108 orphaned rows already exist (tracked as COR-3, not this ticket's concern). |
+| `weekly_assignments` | **The only live assignment source, but it is not per-staff.** ~1,414 rows (2026-08-18 live count). **Correction (2026-08-19):** this table has no `staff_id` column at all. A row is scoped by `role_id` + `week_start_date` + `org_id` (or a null `org_id` for the global/platform-wide default) + optional `location_id`, and is shared by every staff member who matches that role/week/org scope; `useWeeklyAssignments.tsx` queries it with `.eq('role_id', ...).eq('week_start_date', ...)` and an `org_id` filter, never a staff filter. Per-staff data (who actually got which assignment, and their scores) lives on `weekly_scores` below, which does have `staff_id`. Note: `weekly_assignments.location_id` has no FK and 108 orphaned rows already exist (tracked as COR-3, not this ticket's concern). |
 | `weekly_scores` | Confidence + performance scores. ~6,248 rows (2026-08-18 live count), the biggest functional table. Still has a `weekly_focus_id` column (kept for ID-format compatibility with old assignment IDs, matched via `assignment_id.eq.X,weekly_focus_id.eq.X` in query code). That is a **column name**, not a reference to the retired `weekly_focus` table. |
 | `staff_quarter_focus` | Quarterly focus selections per staff (made after receiving an evaluation, not tied to a calendar quarter). |
 
@@ -184,10 +210,16 @@ organizations
   └─< practice_groups (organization_id)
         └─< locations (group_id)
               └─< staff (primary_location_id, role_id → roles, user_id → auth.users)
-                    ├─< weekly_assignments ─< weekly_scores   (the weekly loop)
+                    ├─< weekly_scores (staff_id)   (per-staff scores; assignment_id
+                    │     is a soft match against weekly_assignments.id, no real FK)
                     ├─< user_capabilities / coach_scopes        (permissions)
                     ├─< evaluations ─< evaluation_items
                     └─< (doctor/coach baselines, coaching_sessions, …)
+
+weekly_assignments (role_id, week_start_date, org_id/location_id scope)
+  -- NOT per-staff: one row is shared by every staff member matching that
+  -- role + week + org scope. The weekly loop is roles/orgs to weekly_assignments,
+  -- crossed with staff to weekly_scores, not a single staff-rooted chain.
 
 roles ─< domains ─< competencies ─< pro_moves ─< pro_move_resources   (content framework)
 pro_moves ─< organization_pro_move_overrides / _content_overrides     (per-tenant library)

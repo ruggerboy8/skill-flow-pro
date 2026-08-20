@@ -1,14 +1,40 @@
+import type { LucideIcon } from 'lucide-react';
+import { Check, Star, Circle, Clock, CheckCircle2, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
+/** Staff submission / evaluation status (weekly check-in style screens). */
 export type SubmissionStatus = 'complete' | 'missing' | 'late' | 'excused' | 'pending' | 'exempt' | 'not_open';
 
+/** Eval hand-off status shown to admins/coaches tracking delivery to staff (DSN-4). */
+export type DeliveryStatus = 'no_eval' | 'draft' | 'not_released' | 'released' | 'viewed' | 'reviewed' | 'focus_set';
+
+/** Assessment-track progress (baseline/coach-baseline tiles on the doctor detail page). */
+export type TrackStatus = 'not_started' | 'in_progress' | 'completed' | 'locked';
+
+export type BadgeStatus = SubmissionStatus | DeliveryStatus | TrackStatus;
+
 interface StatusBadgeProps {
-  status: SubmissionStatus;
+  status: BadgeStatus;
+  /**
+   * Override the default label for this status, e.g. a dynamic "45d ago"
+   * string. The color/icon still come from the status's token config, so the
+   * badge still reads as the same status everywhere it appears.
+   */
+  label?: string;
   className?: string;
 }
 
-const statusConfig: Record<SubmissionStatus, { label: string; style: React.CSSProperties; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+interface StatusConfigEntry {
+  label: string;
+  style: React.CSSProperties;
+  variant: 'default' | 'secondary' | 'destructive' | 'outline';
+  icon?: LucideIcon;
+  iconFill?: boolean;
+}
+
+const statusConfig: Record<BadgeStatus, StatusConfigEntry> = {
+  // --- Submission / evaluation status ---
   complete: {
     label: 'Complete',
     variant: 'secondary',
@@ -64,26 +90,127 @@ const statusConfig: Record<SubmissionStatus, { label: string; style: React.CSSPr
     variant: 'secondary',
     style: {},
   },
+
+  // --- Delivery status (eval hand-off workflow) ---
+  no_eval: {
+    label: 'No eval',
+    variant: 'outline',
+    style: {},
+  },
+  draft: {
+    // Reuses the "late" token's amber hue — a warning/in-progress color,
+    // not literally about lateness.
+    label: 'Draft',
+    variant: 'outline',
+    style: {
+      backgroundColor: 'hsl(var(--status-late-bg))',
+      color: 'hsl(var(--status-late))',
+      borderColor: 'hsl(var(--status-late) / 0.3)',
+    },
+  },
+  not_released: {
+    label: 'Not released',
+    variant: 'outline',
+    style: {},
+  },
+  released: {
+    label: 'Released',
+    variant: 'outline',
+    style: {
+      backgroundColor: 'hsl(var(--status-released-bg))',
+      color: 'hsl(var(--status-released))',
+      borderColor: 'hsl(var(--status-released) / 0.3)',
+    },
+  },
+  viewed: {
+    // Reuses the "late" token's amber hue, same as draft.
+    label: 'Viewed',
+    variant: 'outline',
+    style: {
+      backgroundColor: 'hsl(var(--status-late-bg))',
+      color: 'hsl(var(--status-late))',
+      borderColor: 'hsl(var(--status-late) / 0.3)',
+    },
+  },
+  reviewed: {
+    label: 'Reviewed',
+    variant: 'outline',
+    icon: Check,
+    style: {
+      backgroundColor: 'transparent',
+      color: 'hsl(var(--status-complete))',
+      borderColor: 'hsl(var(--status-complete) / 0.5)',
+    },
+  },
+  focus_set: {
+    label: 'Focus set',
+    variant: 'outline',
+    icon: Star,
+    iconFill: true,
+    style: {
+      backgroundColor: 'hsl(var(--status-complete-bg))',
+      color: 'hsl(var(--status-complete))',
+      borderColor: 'hsl(var(--status-complete) / 0.3)',
+    },
+  },
+
+  // --- Assessment track progress ---
+  not_started: {
+    label: 'Not started',
+    variant: 'secondary',
+    icon: Circle,
+    style: {},
+  },
+  in_progress: {
+    // Reuses the "late" token's amber hue as an in-progress/attention color.
+    label: 'In progress',
+    variant: 'secondary',
+    icon: Clock,
+    style: {
+      backgroundColor: 'hsl(var(--status-late-bg))',
+      color: 'hsl(var(--status-late))',
+    },
+  },
+  completed: {
+    label: 'Complete',
+    variant: 'secondary',
+    icon: CheckCircle2,
+    style: {
+      backgroundColor: 'hsl(var(--status-complete-bg))',
+      color: 'hsl(var(--status-complete))',
+    },
+  },
+  locked: {
+    label: 'Locked',
+    variant: 'secondary',
+    icon: Lock,
+    style: {},
+  },
 };
 
 /**
- * Unified status badge for submission/evaluation status.
- * Uses CSS custom property tokens for consistent theming.
+ * Unified status badge. Originally just staff submission/evaluation status;
+ * DSN-4 extended it to also cover the eval-delivery workflow and assessment
+ * track progress so those screens stop hand-rolling their own pills. All
+ * colors come from the --status-* (and reused) CSS custom properties.
  */
-export function StatusBadge({ status, className }: StatusBadgeProps) {
+export function StatusBadge({ status, label, className }: StatusBadgeProps) {
   const config = statusConfig[status];
 
   if (status === 'exempt' || status === 'not_open') {
     return <span className="text-muted-foreground">—</span>;
   }
 
+  const Icon = config.icon;
+
   return (
     <Badge
       variant={config.variant}
-      className={cn('border', className)}
+      className={cn('border', Icon && 'gap-1', className)}
       style={config.style}
     >
-      {config.label}
+      {Icon && <Icon className={cn('h-4 w-4', config.iconFill && 'fill-current')} />}
+      {label ?? config.label}
     </Badge>
   );
 }

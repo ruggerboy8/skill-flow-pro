@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
-import { differenceInDays, parseISO, format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { differenceInDays, parseISO } from 'date-fns';
 import { ClipboardCheck } from 'lucide-react';
+import { cadenceStatus, cadenceLabel } from '@/lib/evalCadence';
 
 interface StaffEvalRecord {
   staffId: string;
@@ -16,20 +16,6 @@ interface StaffEvalRecord {
 
 interface EvalCadenceWidgetProps {
   locationId: string;
-}
-
-function cadenceColor(daysSince: number | null): string {
-  if (daysSince === null) return 'text-rose-700 dark:text-rose-400';
-  if (daysSince > 90) return 'text-rose-700 dark:text-rose-400';
-  if (daysSince > 60) return 'text-amber-700 dark:text-amber-400';
-  return 'text-emerald-700 dark:text-emerald-400';
-}
-
-function cadenceBadge(daysSince: number | null): { label: string; className: string } {
-  if (daysSince === null) return { label: 'No eval on record', className: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400' };
-  if (daysSince > 90) return { label: `${daysSince}d ago`, className: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400' };
-  if (daysSince > 60) return { label: `${daysSince}d ago`, className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' };
-  return { label: `${daysSince}d ago`, className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' };
 }
 
 export function EvalCadenceWidget({ locationId }: EvalCadenceWidgetProps) {
@@ -166,25 +152,22 @@ export function EvalCadenceWidget({ locationId }: EvalCadenceWidgetProps) {
             </p>
           </div>
           {overdueCount > 0 && (
-            <Badge className="bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400 shrink-0">
-              {overdueCount} overdue
-            </Badge>
+            <StatusBadge status="missing" label={`${overdueCount} overdue`} className="shrink-0" />
           )}
         </div>
       </CardHeader>
       <CardContent>
         <div className="divide-y">
-          {records.map(r => {
-            const badge = cadenceBadge(r.daysSince);
-            return (
-              <div key={r.staffId} className="flex items-center justify-between py-2 gap-3">
-                <span className="text-sm font-medium">{r.staffName}</span>
-                <Badge variant="secondary" className={cn('text-xs shrink-0', badge.className)}>
-                  {badge.label}
-                </Badge>
-              </div>
-            );
-          })}
+          {records.map(r => (
+            <div key={r.staffId} className="flex items-center justify-between py-2 gap-3">
+              <span className="text-sm font-medium">{r.staffName}</span>
+              <StatusBadge
+                status={cadenceStatus(r.daysSince)}
+                label={cadenceLabel(r.daysSince)}
+                className="text-xs shrink-0"
+              />
+            </div>
+          ))}
         </div>
         <p className="text-xs text-muted-foreground mt-3">
           ≤60 days — good · 60–90 days — due soon · &gt;90 days — overdue

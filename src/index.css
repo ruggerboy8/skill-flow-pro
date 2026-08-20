@@ -81,6 +81,9 @@ All colors MUST be HSL.
     --status-excused-bg: 210 40% 96%;
     --status-pending: 215 14% 55%;
     --status-pending-bg: 210 40% 96%;
+    /* DSN-4: added for the delivery-status pill (draft/released/… workflow) */
+    --status-released: 211 85% 45%;
+    --status-released-bg: 211 100% 94%;
 
     /* Win banner colors */
     --win-growth: 160 84% 39%;

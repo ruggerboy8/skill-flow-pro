@@ -407,7 +407,7 @@ function SessionCard({
             <div className="flex items-center gap-2">
               {!isOwner && (
                 <Badge variant="secondary" className="text-xs gap-1">
-                  <ShieldAlert className="h-3 w-3" />
+                  <ShieldAlert className="h-4 w-4" />
                   {session.coach_name || 'Another coach'}
                 </Badge>
               )}
@@ -420,7 +420,7 @@ function SessionCard({
                   className="gap-1.5"
                   onClick={(e) => { e.stopPropagation(); onBuildAgenda(); }}
                 >
-                  <FileText className="h-3.5 w-3.5" />
+                  <FileText className="h-4 w-4" />
                   Build Agenda
                 </Button>
               )}
@@ -432,7 +432,7 @@ function SessionCard({
                     className="gap-1.5"
                     onClick={(e) => { e.stopPropagation(); onEditAgenda(); }}
                   >
-                    <FileText className="h-3.5 w-3.5" />
+                    <FileText className="h-4 w-4" />
                     Edit Agenda
                   </Button>
                   <Button
@@ -440,7 +440,7 @@ function SessionCard({
                     className="gap-1.5"
                     onClick={(e) => { e.stopPropagation(); onInvite(); }}
                   >
-                    <Mail className="h-3.5 w-3.5" />
+                    <Mail className="h-4 w-4" />
                     Invite to Schedule
                   </Button>
                 </>
@@ -452,7 +452,7 @@ function SessionCard({
                   className="gap-1.5"
                   onClick={(e) => { e.stopPropagation(); onInvite(); }}
                 >
-                  <Mail className="h-3.5 w-3.5" />
+                  <Mail className="h-4 w-4" />
                   Resend Invite
                 </Button>
               )}
@@ -463,7 +463,7 @@ function SessionCard({
                   className="gap-1.5"
                   onClick={(e) => { e.stopPropagation(); onCapture(); }}
                 >
-                  <ClipboardEdit className="h-3.5 w-3.5" />
+                  <ClipboardEdit className="h-4 w-4" />
                   {/* "Start Meeting" only fits once the doctor has actually
                       prepped. At scheduling_invite_sent the session is still
                       "Awaiting doctor's response" — this button records
@@ -480,7 +480,7 @@ function SessionCard({
                       className="h-8 w-8 text-muted-foreground hover:text-destructive"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-5 w-5" />
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
@@ -503,7 +503,7 @@ function SessionCard({
                 <div onClick={(e) => e.stopPropagation()}>
                   <Select onValueChange={handleReassign} value={session.coach_staff_id}>
                     <SelectTrigger className="h-8 w-8 p-0 border-none [&>svg]:hidden">
-                      <UserCog className="h-3.5 w-3.5 text-muted-foreground" />
+                      <UserCog className="h-5 w-5 text-muted-foreground" />
                     </SelectTrigger>
                     <SelectContent>
                       {clinicalDirectors.map(cd => (
@@ -550,7 +550,7 @@ function SessionCard({
                 {experiments.length > 0 && (
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <FlaskConical className="h-3.5 w-3.5" />
+                      <FlaskConical className="h-4 w-4" />
                       Action Steps
                     </p>
                     <div className="space-y-2">
@@ -568,7 +568,7 @@ function SessionCard({
                   <Collapsible open={transcriptOpen} onOpenChange={setTranscriptOpen}>
                     <CollapsibleTrigger asChild>
                       <button className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground">
-                        <ChevronDown className={`h-3 w-3 transition-transform ${transcriptOpen ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`h-4 w-4 transition-transform ${transcriptOpen ? 'rotate-180' : ''}`} />
                         Transcript on file
                       </button>
                     </CollapsibleTrigger>

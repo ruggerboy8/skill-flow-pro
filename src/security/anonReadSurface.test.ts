@@ -88,29 +88,32 @@ export const CLOSED_FUNCTIONS: ClosedFunction[] = [
 ];
 
 /**
- * Positive control: a function that is genuinely anon-callable today, used
- * to prove this test discriminates a closed surface from a blanket network
- * outage rather than just failing to reach Supabase at all.
+ * Positive control: a function that is genuinely, *permanently*
+ * anon-callable by design, used to prove this test discriminates a closed
+ * surface from a blanket network outage rather than just failing to reach
+ * Supabase at all.
  *
- * `seq_latest_quarterly_evals(p_org_id, p_role_id)` returns competency-level
- * *aggregate* scores for the sequencer/recommender (no staff names, emails,
- * or per-person scores). It is not in SEC-1's closed list and is not
- * guarded by this test's other assertions.
+ * `is_super_admin(_user_id)` is one of the 16 RLS-predicate functions that
+ * SEC-2 batch A deliberately left untouched (see
+ * docs/specs/sec-2-lock-anon-callable-functions.md, "Batch C"): functions
+ * that RLS policies themselves call while evaluating a query, including
+ * anonymous-context queries made before a session exists. Revoking anon
+ * EXECUTE on any of them would break RLS evaluation itself, so they are a
+ * deliberate, documented carve-out, not an oversight. It returns a plain
+ * boolean (no PII) and was re-verified live against production after SEC-2
+ * batch A shipped.
  *
- * Note for a future ticket, not fixed here (out of SEC-1's scope): this
- * function is reachable by anon via Postgres's default PUBLIC-execute grant
- * on new functions, not an explicit `grant ... to anon`. Its earlier
- * single-arg signature was explicitly granted to anon (see
- * 20251105184418_52902e03-58f6-4448-b3db-ff6f97246de3.sql), but the current
- * two-arg signature is a different function object that inherited the
- * default grant when it was created, and nothing revoked it. It returns no
- * PII so this is not the same regression class SEC-1 fixed, but it is worth
- * a deliberate decision (explicit grant vs. revoke) rather than being open
- * by accident.
+ * This replaces an earlier choice, `seq_latest_quarterly_evals`, which
+ * SEC-2 batch A went on to lock down (both overloads, 2026-08-19),
+ * turning that choice into a false alarm here. Any function on SEC-2 batch
+ * A's locked list (21 signatures - see
+ * supabase/migrations/20260819232211_sec2a_revoke_anon_execute_leaking_functions.sql)
+ * is now closed and would reproduce the same false alarm if picked again;
+ * only the batch-C list is safe for this role.
  */
 export const POSITIVE_CONTROL: ClosedFunction = {
-  name: 'seq_latest_quarterly_evals',
-  params: { p_org_id: NIL_UUID, p_role_id: 1 },
+  name: 'is_super_admin',
+  params: { _user_id: NIL_UUID },
 };
 
 const RUN_LIVE = ['1', 'true'].includes((process.env.RUN_LIVE_SECURITY_TESTS ?? '').toLowerCase());
@@ -210,6 +213,8 @@ describe('SEC-1 anon read surface stays closed', () => {
     if (!shouldRun) return;
     const { data, error } = await anon.rpc(POSITIVE_CONTROL.name, POSITIVE_CONTROL.params);
     expect(error, `positive control RPC failed: ${JSON.stringify(error)}`).toBeNull();
-    expect(Array.isArray(data), 'positive control RPC did not return an array').toBe(true);
+    // is_super_admin returns a scalar boolean, not a row set - a defined
+    // boolean (true or false) proves the call actually executed.
+    expect(typeof data, 'positive control RPC did not return a boolean').toBe('boolean');
   });
 });

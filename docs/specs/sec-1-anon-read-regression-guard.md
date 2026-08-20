@@ -47,8 +47,8 @@ instead of during the next live audit.
    acceptable outcome.
 3. For every SECURITY DEFINER function SEC-1 revoked EXECUTE from, attempts
    an anon `.rpc()` call and asserts the same.
-4. Runs one **positive control** RPC that is genuinely anon-callable today
-   (`seq_latest_quarterly_evals`, aggregate competency scores, no PII) and
+4. Runs one **positive control** RPC that is genuinely, *permanently*
+   anon-callable by design (`is_super_admin`, a plain boolean, no PII) and
    asserts it still succeeds. This is what proves the other assertions are
    discriminating a closed surface from a dead network or a bad key, not
    just failing uniformly.
@@ -83,8 +83,26 @@ list without touching the test logic.
 - `compare_conf_perf_to_eval(uuid, integer, uuid[], integer[], text[], timestamptz, timestamptz)`
 
 **Positive control:**
-- `seq_latest_quarterly_evals(uuid, bigint)` - returns aggregate,
-  non-identifying competency scores; used by the sequencer/recommender.
+- `is_super_admin(uuid)` - returns a plain boolean, no PII. One of the 16
+  RLS-predicate functions ("Group 7" / "Batch C") that SEC-2 batch A
+  deliberately left anon-callable, because RLS policies call them while
+  evaluating queries made before a session exists; locking them down would
+  break RLS evaluation itself. See
+  `docs/specs/sec-2-lock-anon-callable-functions.md` (branch
+  `fix/sec-2a-lock-anon-functions`, commit `c4027d79`).
+
+  **Revised 2026-08-19, same day as the initial build.** The original
+  positive control was `seq_latest_quarterly_evals`, an RPC that was
+  anon-callable only by accident (Postgres's default PUBLIC-execute grant on
+  a function whose signature had changed, not an explicit `grant ... to
+  anon` - noted as a finding, not fixed, in this guard's first build). SEC-2
+  batch A closed that accidental opening the same day, which turned this
+  guard's own positive control into a false alarm: the test would fail
+  against current production even though the SEC-1 surface it actually
+  guards is still closed. Swapped to `is_super_admin`, which is closed
+  neither by SEC-1 nor SEC-2 and is documented as staying open on purpose,
+  so it will not be closed out from under this test by a future security
+  ticket the same way.
 
 ## Two run paths
 
@@ -117,8 +135,30 @@ relations + 8 functions + 1 positive control), confirming the SEC-1 surface
 is closed today and that the positive control still succeeds. Also
 confirmed with `curl` directly against the REST API that every closed
 object returns `42501 permission denied` (HTTP 401) for anon, and that
-`seq_latest_quarterly_evals` returns `200` with real (aggregate) output.
+`is_super_admin` returns `200` with a real boolean (`false` for a
+nonexistent user id).
 
 Ran the same test with no env var set: it skips all 14 assertions in ~3ms
 and the file still reports as passed, so `npm run check` stays green either
 way.
+
+### Re-verification after SEC-2 batch A landed (same day)
+
+SEC-2 batch A (branch `fix/sec-2a-lock-anon-functions`, not yet merged to
+`main` but applied to production ahead of that merge, the same pattern
+SEC-1 used) revoked anon/PUBLIC EXECUTE on 21 more function signatures,
+including both overloads of `seq_latest_quarterly_evals` - the original
+positive control here. Re-ran the live test against production after that
+change:
+
+- With the original positive control (`seq_latest_quarterly_evals`): 13/14
+  passed, 1 failed - the positive control itself, with `42501 permission
+  denied`. All 13 SEC-1 assertions still passed; the failure was
+  exclusively the now-stale positive control, confirming it as a false
+  alarm rather than a real regression.
+- After swapping to `is_super_admin`: 14/14 passed again.
+
+None of SEC-1's own 8 functions or 5 relations were affected by SEC-2 batch
+A (different function list; SEC-1's objects are not on it), so this was a
+positive-control-only fix. No changes to `CLOSED_RELATIONS` or
+`CLOSED_FUNCTIONS`.

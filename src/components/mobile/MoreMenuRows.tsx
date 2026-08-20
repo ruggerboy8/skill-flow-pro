@@ -1,11 +1,14 @@
 import { useEffect, useState, type ComponentType } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Download } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { getManagementLinks } from '@/lib/managementNavigation';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { InstallInstructions } from '@/components/pwa/InstallInstructions';
+import { isStandalone, isDeviceOptedOut, setDeviceOptOut } from '@/lib/pwa';
 
 export interface ManagementNavItem {
   name: string;
@@ -77,14 +80,23 @@ function useTeamRowSub(locationId: string | null, staffId: string | undefined) {
  * (AvatarMenu.tsx) — MOB-1. Kept in exactly one place so the two surfaces
  * cannot drift apart.
  *
- * Base rows (My evaluations, Practice log, Profile, Sign out) are the same
- * for every mobile-shell user. The lead-gated Team row keeps its existing
- * "{location} · N teammates" subtitle. The management section is built from
- * `navigation` — the SAME role-derived array Layout.tsx's desktop sidebar
- * uses (via useUserRole()) — filtered down to non-tab destinations, so a
- * flagged coach/office manager/admin reaches exactly what their role grants
- * on desktop, with no second role map. Renders nothing when there are no
- * management destinations (a plain participant/lead).
+ * Base rows (My evaluations, Practice log, Profile, Install the app, Sign
+ * out) are the same for every mobile-shell user. "Install the app" (MOB-2)
+ * only shows outside standalone mode and only until the "shared device"
+ * opt-out is set — tapping it opens the same install instructions as the
+ * first-run bottom banner (InstallBanner), reachable here at any time
+ * regardless of whether that banner was dismissed. It carries no telemetry:
+ * both gates are read from localStorage only, nothing is written except the
+ * two existing localStorage flags dismissBanner()/setDeviceOptOut() already
+ * used.
+ *
+ * The lead-gated Team row keeps its existing "{location} · N teammates"
+ * subtitle. The management section is built from `navigation` — the SAME
+ * role-derived array Layout.tsx's desktop sidebar uses (via useUserRole())
+ * — filtered down to non-tab destinations, so a flagged coach/office
+ * manager/admin reaches exactly what their role grants on desktop, with no
+ * second role map. Renders nothing when there are no management
+ * destinations (a plain participant/lead).
  */
 export function MoreMenuRows({
   navigation,
@@ -99,10 +111,19 @@ export function MoreMenuRows({
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
   const teamSub = useTeamRowSub(isLead ? staffProfile?.primary_location_id ?? null : null, staffProfile?.id);
   const managementLinks = getManagementLinks(navigation);
+  const [installOpen, setInstallOpen] = useState(false);
+  const [installOptedOut, setInstallOptedOut] = useState(false);
+  const showInstallRow = !isStandalone() && !isDeviceOptedOut() && !installOptedOut;
 
   const go = (to: string) => {
     navigate(to);
     onNavigate?.();
+  };
+
+  const handleInstallSharedDevice = () => {
+    setDeviceOptOut();
+    setInstallOptedOut(true);
+    setInstallOpen(false);
   };
 
   return (
@@ -111,6 +132,9 @@ export function MoreMenuRows({
         <Row label="My evaluations" onClick={() => go('/my-role/evaluations')} />
         <Row label="Practice log" onClick={() => go('/my-role/practice-log')} />
         <Row label="Profile" onClick={() => go('/profile')} />
+        {showInstallRow && (
+          <Row label="Install the app" icon={Download} onClick={() => setInstallOpen(true)} />
+        )}
         <Row
           label="Sign out"
           onClick={() => {
@@ -119,6 +143,22 @@ export function MoreMenuRows({
           }}
         />
       </div>
+
+      <Dialog open={installOpen} onOpenChange={setInstallOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Install the app</DialogTitle>
+          </DialogHeader>
+          <InstallInstructions />
+          <button
+            type="button"
+            onClick={handleInstallSharedDevice}
+            className="text-left text-2xs text-muted-foreground underline underline-offset-2"
+          >
+            Shared device? Never show app prompts here
+          </button>
+        </DialogContent>
+      </Dialog>
 
       {isLead && (
         <div className="mt-3 rounded-2xl border border-border bg-card px-4">

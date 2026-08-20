@@ -479,6 +479,7 @@ function SessionCard({
                       variant="ghost"
                       className="h-8 w-8 text-muted-foreground hover:text-destructive"
                       onClick={(e) => e.stopPropagation()}
+                      aria-label={`Delete ${typeLabel}`}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>

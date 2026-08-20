@@ -317,10 +317,10 @@ export default function EvaluationReview() {
       {step === 1 && (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
               <MessageSquare className="w-6 h-6" />
               A note from {evaluatorName || 'your coach'}
-            </h1>
+            </h2>
             <p className="text-sm text-muted-foreground mt-2">
               {hasEvaluatorNote
                 ? "Before we dig into scores, here's a personal message left for you."
@@ -355,7 +355,7 @@ export default function EvaluationReview() {
       {/* ─── Step 2: View Full Evaluation ─────────────────── */}
       {step === 2 && (
         <div className="space-y-6">
-          <h1 className="text-2xl font-bold">Review Your Full Evaluation</h1>
+          <h2 className="text-2xl font-bold">Review Your Full Evaluation</h2>
           <Card>
             <CardContent className="py-8 space-y-5">
               <p className="text-muted-foreground text-sm">
@@ -388,7 +388,7 @@ export default function EvaluationReview() {
       {/* ─── Step 3: Highlights ─────────────────────────────── */}
       {step === 3 && (
         <div className="space-y-6">
-          <h1 className="text-2xl font-bold">Highlights</h1>
+          <h2 className="text-2xl font-bold">Highlights</h2>
 
           {payload.sparse ? (
             <Card>
@@ -462,9 +462,9 @@ export default function EvaluationReview() {
       {step === 4 && (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold">
+            <h2 className="text-2xl font-bold">
               {payload.top_used_fallback ? 'Your Strongest Areas' : 'Keep Crushing'}
-            </h1>
+            </h2>
             <p className="text-sm text-muted-foreground mt-2">
               {payload.top_used_fallback
                 ? "These were some of your strongest areas this quarter."
@@ -497,7 +497,7 @@ export default function EvaluationReview() {
       {step === 5 && (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold">Grow This Quarter</h1>
+            <h2 className="text-2xl font-bold">Grow This Quarter</h2>
             <p className="text-sm text-muted-foreground mt-2">
               These are some competencies that could really benefit from a little extra attention — even small improvements here can make a real difference.
             </p>
@@ -546,10 +546,10 @@ export default function EvaluationReview() {
       {step === 7 && (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
               <PenLine className="w-6 h-6" />
               Note to Self
-            </h1>
+            </h2>
             <p className="text-sm text-muted-foreground mt-2">
               Before you wrap up, take a moment to write yourself a quick reminder. What do you want to make sure you keep in mind this quarter?
             </p>
@@ -644,7 +644,7 @@ function Step5ProMoves({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Choose Your ProMoves</h1>
+        <h2 className="text-2xl font-bold">Choose Your ProMoves</h2>
         <p className="text-sm text-muted-foreground mt-2">
           From the two areas you chose to grow in, which ProMoves feel most important for you right now? Pick 1 to 3 that you want to focus on this quarter.
         </p>

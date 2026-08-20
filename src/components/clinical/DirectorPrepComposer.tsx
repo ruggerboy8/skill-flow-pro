@@ -727,7 +727,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack}>
+        <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
@@ -831,12 +831,23 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                     ] as const).map(opt => (
                       <Badge
                         key={opt.key}
+                        role="button"
+                        tabIndex={0}
                         variant={status === opt.key ? 'default' : 'outline'}
                         className={`cursor-pointer text-xs ${status === opt.key ? '' : 'opacity-60 hover:opacity-100'}`}
                         onClick={() => setPriorActionStatuses(prev => ({
                           ...prev,
                           [i]: prev[i] === opt.key ? undefined! : opt.key,
                         }))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setPriorActionStatuses(prev => ({
+                              ...prev,
+                              [i]: prev[i] === opt.key ? undefined! : opt.key,
+                            }));
+                          }
+                        }}
                       >
                         {opt.label}
                       </Badge>
@@ -901,32 +912,44 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
               <div className="flex flex-wrap items-center gap-1.5">
                 <Filter className="h-3.5 w-3.5 text-muted-foreground" />
                 <Badge
+                  role="button"
+                  tabIndex={0}
                   variant={filterLowSelf ? 'default' : 'outline'}
                   className="cursor-pointer text-xs"
                   onClick={() => setFilterLowSelf(v => !v)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilterLowSelf(v => !v); } }}
                 >
                   Low Self (1–2)
                 </Badge>
                 {isBaselineReview && (
                   <>
                     <Badge
+                      role="button"
+                      tabIndex={0}
                       variant={filterLowCoach ? 'default' : 'outline'}
                       className="cursor-pointer text-xs"
                       onClick={() => setFilterLowCoach(v => !v)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilterLowCoach(v => !v); } }}
                     >
                       Low Coach (1–2)
                     </Badge>
                     <Badge
+                      role="button"
+                      tabIndex={0}
                       variant={filterGap === 'gap1' ? 'default' : 'outline'}
                       className="cursor-pointer text-xs"
                       onClick={() => setFilterGap(v => v === 'gap1' ? 'none' : 'gap1')}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilterGap(v => v === 'gap1' ? 'none' : 'gap1'); } }}
                     >
                       Gap ≥1
                     </Badge>
                     <Badge
+                      role="button"
+                      tabIndex={0}
                       variant={filterGap === 'gap2' ? 'default' : 'outline'}
                       className="cursor-pointer text-xs"
                       onClick={() => setFilterGap(v => v === 'gap2' ? 'none' : 'gap2')}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilterGap(v => v === 'gap2' ? 'none' : 'gap2'); } }}
                     >
                       Gap ≥2
                     </Badge>
@@ -1041,6 +1064,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                       size="icon"
                       className="h-6 w-6 shrink-0"
                       onClick={() => toggleAction(item.action_id)}
+                      aria-label={`Remove ${pm?.action_statement ?? 'Pro Move'} from agenda`}
                     >
                       <X className="h-3.5 w-3.5" />
                     </Button>

@@ -289,9 +289,9 @@ export default function EvaluationReviewV2() {
       {step === 1 && (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
               <MessageSquare className="w-6 h-6" /> A note from {evaluatorName || 'your coach'}
-            </h1>
+            </h2>
             <p className="text-sm text-muted-foreground mt-2">
               {hasEvaluatorNote
                 ? "Before anything else, here's a personal message from your coach."
@@ -313,7 +313,7 @@ export default function EvaluationReviewV2() {
       {step === 2 && (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold">Your evaluation, domain by domain</h1>
+            <h2 className="text-2xl font-bold">Your evaluation, domain by domain</h2>
             <p className="text-sm text-muted-foreground mt-2">
               Here's what your coach saw in each area. Scores sit next to the why, so the number always has a story.
             </p>
@@ -328,12 +328,12 @@ export default function EvaluationReviewV2() {
       {/* Step 3: Highlights (strengths first) */}
       {step === 3 && (
         <div className="space-y-6">
-          <h1 className="text-2xl font-bold">Your highlights</h1>
+          <h2 className="text-2xl font-bold">Your highlights</h2>
           {payload.top_candidates.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Star className="w-5 h-5" style={{ color: 'hsl(var(--score-4))' }} />
-                <h2 className="text-lg font-semibold">Where you shone</h2>
+                <h3 className="text-lg font-semibold">Where you shone</h3>
               </div>
               {payload.top_candidates.slice(0, 3).map(item => (
                 <CompetencyCard key={item.competency_id} item={item} readOnly hideGap />
@@ -344,7 +344,7 @@ export default function EvaluationReviewV2() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Target className="w-5 h-5" style={{ color: 'hsl(var(--score-2))' }} />
-                <h2 className="text-lg font-semibold">Where focus pays off</h2>
+                <h3 className="text-lg font-semibold">Where focus pays off</h3>
               </div>
               {payload.bottom_candidates.slice(0, 3).map(item => (
                 <CompetencyCard key={item.competency_id} item={item} readOnly hideGap />
@@ -361,7 +361,7 @@ export default function EvaluationReviewV2() {
       {step === 4 && (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold">Keep crushing</h1>
+            <h2 className="text-2xl font-bold">Keep crushing</h2>
             <p className="text-sm text-muted-foreground mt-2">
               Pick one strength you want to keep performing at a high level. The others are still yours, this is just
               your headline.
@@ -386,7 +386,7 @@ export default function EvaluationReviewV2() {
       {step === 5 && (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold">Grow this quarter</h1>
+            <h2 className="text-2xl font-bold">Grow this quarter</h2>
             <p className="text-sm text-muted-foreground mt-2">
               Choose one or two areas to focus on. Even a small, steady push here makes a real difference.
             </p>
@@ -412,7 +412,7 @@ export default function EvaluationReviewV2() {
       {step === 6 && (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold">Choose your Pro Moves</h1>
+            <h2 className="text-2xl font-bold">Choose your Pro Moves</h2>
             <p className="text-sm text-muted-foreground mt-2">
               From the areas you chose, pick one to three concrete Pro Moves to focus on. These will show up in your
               weekly check-ins.
@@ -466,7 +466,7 @@ export default function EvaluationReviewV2() {
       {step === 7 && (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2"><PenLine className="w-6 h-6" /> Note to self</h1>
+            <h2 className="text-2xl font-bold flex items-center gap-2"><PenLine className="w-6 h-6" /> Note to self</h2>
             <p className="text-sm text-muted-foreground mt-2">
               Write yourself a quick reminder for the quarter ahead. What do you want to keep in mind?
             </p>
@@ -510,7 +510,7 @@ export default function EvaluationReviewV2() {
             <CardContent className="py-8 space-y-5 text-center">
               <PartyPopper className="w-12 h-12 mx-auto" style={{ color: 'hsl(var(--score-4))' }} />
               <div>
-                <h1 className="text-2xl font-bold">You're all set</h1>
+                <h2 className="text-2xl font-bold">You're all set</h2>
                 <p className="text-sm text-muted-foreground mt-2">Here's your plan for the quarter.</p>
               </div>
               <div className="text-left space-y-3 max-w-md mx-auto">

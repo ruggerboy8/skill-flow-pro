@@ -9,7 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { DoctorMaterialsSheet } from '@/components/doctor/DoctorMaterialsSheet';
 import { ReflectionSection } from '@/components/doctor/ReflectionSection';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { getDomainColorRichRaw } from '@/lib/domainColors';
@@ -317,15 +317,15 @@ export function ClinicalBaselineResults({
   if (status !== 'completed') {
     return (
       <Card className="border-0 shadow-lg overflow-hidden">
-        <div className="bg-gradient-to-br from-amber-50 via-amber-50/50 to-background dark:from-amber-950/30 dark:via-amber-950/10 p-6">
+        <div className="bg-gradient-to-br from-[hsl(var(--status-late-bg))] to-background p-6">
           <div className="flex items-start gap-4">
-            <div className="p-3 rounded-xl bg-amber-100 dark:bg-amber-900/30">
-              <Clock className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+            <div className="p-3 rounded-xl" style={{ backgroundColor: 'hsl(var(--status-late-bg))' }}>
+              <Clock className="h-8 w-8" style={{ color: 'hsl(var(--status-late))' }} />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-3">
                 <h2 className="text-xl font-semibold">Baseline Assessment</h2>
-                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/50 dark:text-amber-300">In Progress</Badge>
+                <StatusBadge status="in_progress" label="In Progress" />
               </div>
               <div className="mt-4 space-y-2">
                 <div className="flex justify-between text-sm">
@@ -347,15 +347,15 @@ export function ClinicalBaselineResults({
     <Collapsible defaultOpen className="space-y-4">
       <Card className="overflow-hidden border-0 shadow-lg">
         <CollapsibleTrigger className="w-full">
-          <div className="bg-gradient-to-br from-emerald-50 via-emerald-50/50 to-background dark:from-emerald-950/30 dark:via-emerald-950/10 p-5">
+          <div className="bg-gradient-to-br from-[hsl(var(--status-complete-bg))] to-background p-5">
             <div className="flex items-center gap-4">
-              <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
-                <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+              <div className="p-2.5 rounded-xl" style={{ backgroundColor: 'hsl(var(--status-complete-bg))' }}>
+                <CheckCircle2 className="h-6 w-6" style={{ color: 'hsl(var(--status-complete))' }} />
               </div>
               <div className="flex-1 text-left">
                 <div className="flex items-center gap-3">
                   <h2 className="text-lg font-semibold">Baseline Self-Assessment</h2>
-                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-300">Complete</Badge>
+                  <StatusBadge status="completed" label="Complete" />
                 </div>
                 {completedAt && (
                   <p className="text-sm text-muted-foreground mt-0.5">
@@ -535,7 +535,7 @@ export function ClinicalBaselineResults({
                                   setSelectedItem(item);
                                 }
                               }}
-                              className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left group ${hasBigDiff ? 'ring-1 ring-inset ring-amber-300 dark:ring-amber-700' : ''}`}
+                              className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left group ${hasBigDiff ? 'ring-1 ring-inset ring-[hsl(var(--status-late))]' : ''}`}
                               style={{ backgroundColor: hasBigDiff ? 'hsl(38 90% 97%)' : colors.bg }}
                             >
                               {(() => {

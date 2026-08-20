@@ -17,6 +17,7 @@ import { nowUtc } from '@/lib/centralTime';
 import { useLocationTimezone } from '@/hooks/useLocationTimezone';
 import { getLocationSubmissionGates, calculateLocationStats, type SubmissionGates } from '@/lib/submissionStatus';
 import { getSubmissionPolicy, getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
+import { participationTier, tierColorTokens } from '@/lib/participationTier';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LocationConfig {
@@ -180,20 +181,30 @@ export default function RegionalDashboard() {
     };
   }, [summaries, locationGatesMap]);
 
-  // Compute signals — only fire when a deadline has actually passed
+  // Compute signals — only fire when a deadline has actually passed, and
+  // use the same participationTier bands as the summary cards and location
+  // cards so the banner never disagrees with them (DASH-1a).
   const signals = useMemo((): Signal[] => {
     const result: Signal[] = [];
     locationStats.forEach(loc => {
       const gates = locationGatesMap.get(loc.id);
-      // Only signal if at least one deadline has passed for this location
-      const anyDeadlinePassed = gates?.isPastConfidenceDeadline || gates?.isPastPerformanceDeadline;
-      if (anyDeadlinePassed && loc.submissionRate < 70 && loc.staffCount > 0) {
-        result.push({
-          type: 'participation_drop',
-          message: `${loc.name}: participation rate is ${Math.round(loc.submissionRate)}% this week — below 70%.`,
-          locationName: loc.name,
-        });
-      }
+      const anyDeadlinePassed = !!(gates?.isPastConfidenceDeadline || gates?.isPastPerformanceDeadline);
+      if (!anyDeadlinePassed || loc.staffCount === 0) return;
+      if (loc.submissionRate >= 85) return;
+
+      const tier = participationTier({
+        rate: loc.submissionRate,
+        missedCount: loc.missingConfCount + loc.missingPerfCount,
+        teamSize: loc.staffCount,
+        anyDeadlinePassed,
+      });
+
+      result.push({
+        type: 'participation_drop',
+        message: `${loc.name}: participation rate is ${Math.round(loc.submissionRate)}% this week — below 85%.`,
+        locationName: loc.name,
+        severity: tier === 'red' ? 'red' : 'watch',
+      });
     });
     return result;
   }, [locationStats, locationGatesMap]);
@@ -228,6 +239,39 @@ export default function RegionalDashboard() {
   }, [locationStats]);
 
   const locationIdList = useMemo(() => locationStats.map(l => l.id), [locationStats]);
+
+  // Org-wide rates and tiers for the summary cards — same participationTier
+  // bands as the location cards and signals banner (DASH-1a).
+  const summaryTiers = useMemo(() => {
+    const confRate = totals.totalConfExpected > 0
+      ? (totals.totalConfSubmitted / totals.totalConfExpected) * 100
+      : 100;
+    const perfRate = totals.totalPerfExpected > 0
+      ? (totals.totalPerfSubmitted / totals.totalPerfExpected) * 100
+      : 100;
+    return {
+      confRate,
+      perfRate,
+      confTier: participationTier({
+        rate: confRate,
+        missedCount: totals.totalMissingConf,
+        teamSize: totals.totalStaff,
+        anyDeadlinePassed: totals.anyLocationPastDeadline,
+      }),
+      perfTier: participationTier({
+        rate: perfRate,
+        missedCount: totals.totalMissingPerf,
+        teamSize: totals.totalStaff,
+        anyDeadlinePassed: totals.anyLocationPastDeadline,
+      }),
+      avgTier: participationTier({
+        rate: totals.avgRate,
+        missedCount: totals.totalMissingConf + totals.totalMissingPerf,
+        teamSize: totals.totalStaff,
+        anyDeadlinePassed: totals.anyLocationPastDeadline,
+      }),
+    };
+  }, [totals]);
 
   if (loading) {
     return (
@@ -317,34 +361,63 @@ export default function RegionalDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-4">
-                {totals.totalMissingConf > 0 && (
-                  <div>
-                    <div className="text-2xl font-bold text-destructive">{totals.totalMissingConf}</div>
-                    <p className="text-xs text-muted-foreground">Late Conf</p>
-                  </div>
-                )}
-                {totals.totalPendingConf > 0 && (
-                  <div>
-                    <div className="text-2xl font-bold text-primary">{totals.totalPendingConf}</div>
-                    <p className="text-xs text-muted-foreground">Pending Conf</p>
-                  </div>
-                )}
-                {totals.totalMissingPerf > 0 && (
-                  <div>
-                    <div className="text-2xl font-bold text-warning">{totals.totalMissingPerf}</div>
-                    <p className="text-xs text-muted-foreground">Missing Perf</p>
-                  </div>
-                )}
-              {totals.totalMissingConf === 0 && totals.totalPendingConf === 0 && totals.totalMissingPerf === 0 && (
-                  <div>
-                    <div className="text-sm text-muted-foreground">All on track!</div>
-                    {nextDeadlineLabel && (
-                      <p className="text-xs text-muted-foreground/70 mt-1">Next: {nextDeadlineLabel}</p>
-                    )}
-                  </div>
-                )}
-              </div>
+              {totals.totalMissingConf === 0 && totals.totalPendingConf === 0 && totals.totalMissingPerf === 0 ? (
+                <div>
+                  <div className="text-sm text-muted-foreground">All on track!</div>
+                  {nextDeadlineLabel && (
+                    <p className="text-xs text-muted-foreground/70 mt-1">Next: {nextDeadlineLabel}</p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex gap-4">
+                  {totals.totalConfExpected > 0 && (
+                    <div>
+                      <div
+                        className="text-2xl font-bold"
+                        style={{ color: tierColorTokens(summaryTiers.confTier)?.text ?? 'hsl(var(--foreground))' }}
+                      >
+                        {Math.round(summaryTiers.confRate)}%
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {totals.totalConfSubmitted}/{totals.totalConfExpected} conf submitted
+                      </p>
+                      {totals.totalMissingConf > 0 && (
+                        <span
+                          className="inline-flex items-center mt-1 rounded-full px-1.5 py-0.5 text-2xs font-medium"
+                          style={{ backgroundColor: 'hsl(var(--status-late-bg))', color: 'hsl(var(--status-late))' }}
+                        >
+                          {totals.totalMissingConf} late
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {totals.totalPendingConf > 0 && (
+                    <div>
+                      <div className="text-2xl font-bold text-foreground">{totals.totalPendingConf}</div>
+                      <p className="text-xs text-muted-foreground">Pending Conf</p>
+                    </div>
+                  )}
+                  {totals.totalMissingPerf > 0 && (
+                    <div>
+                      <div
+                        className="text-2xl font-bold"
+                        style={{ color: tierColorTokens(summaryTiers.perfTier)?.text ?? 'hsl(var(--foreground))' }}
+                      >
+                        {Math.round(summaryTiers.perfRate)}%
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {totals.totalPerfSubmitted}/{totals.totalPerfExpected} perf submitted
+                      </p>
+                      <span
+                        className="inline-flex items-center mt-1 rounded-full px-1.5 py-0.5 text-2xs font-medium"
+                        style={{ backgroundColor: 'hsl(var(--status-late-bg))', color: 'hsl(var(--status-late))' }}
+                      >
+                        {totals.totalMissingPerf} late
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -357,7 +430,12 @@ export default function RegionalDashboard() {
             </CardHeader>
             <CardContent>
               {totals.anyLocationPastDeadline ? (
-                <div className="text-3xl font-bold">{Math.round(totals.avgRate)}%</div>
+                <div
+                  className="text-3xl font-bold"
+                  style={{ color: tierColorTokens(summaryTiers.avgTier)?.text ?? 'hsl(var(--foreground))' }}
+                >
+                  {Math.round(totals.avgRate)}%
+                </div>
               ) : (
                 <div>
                   <div className="text-2xl font-bold text-foreground">

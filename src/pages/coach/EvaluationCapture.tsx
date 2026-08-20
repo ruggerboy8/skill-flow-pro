@@ -16,9 +16,11 @@ import {
   buildObserverNote,
   convertLegacyNotes,
   findLegacyNoteItems,
+  missingGlowItems,
   type CaptureData,
   type CaptureCompetency,
 } from "@/lib/evalCaptureData";
+import { useStaffProfile } from "@/hooks/useStaffProfile";
 import { VoiceCaptureButton } from "@/components/coach/VoiceCaptureButton";
 import { getDomainPastelVarRaw, getDomainColorVar, getDomainColorVarRaw } from "@/lib/domainColors";
 import { submitEvaluation } from "@/lib/evaluations";
@@ -52,6 +54,11 @@ export default function EvaluationCapture() {
   const { staffId, evalId } = useParams<{ staffId: string; evalId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  // Who is stamped as the glow's source (MOB-4): the acting user today, since
+  // a future source may not be this eval's evaluator at all. Falls back to
+  // the eval's own evaluator_id so a real glow is never left with no source
+  // if the profile hasn't loaded yet.
+  const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
 
   const [data, setData] = useState<CaptureData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -247,11 +254,25 @@ export default function EvaluationCapture() {
     patchCompetency(domainId, comp.competencyId, { [field]: value } as Partial<CaptureCompetency>);
   }
 
+  // MOB-4: the acting user's staff id, falling back to the eval's own
+  // evaluator_id so a real glow is never left with no source at all if the
+  // profile hasn't loaded yet. In practice today these are the same person.
+  const actingStaffId = staffProfile?.id ?? data?.evaluatorId ?? null;
+
   function handleNoteBlur(comp: CaptureCompetency) {
+    const hasGlow = Boolean(comp.glow?.trim());
     persist(comp.competencyId, {
-      observer_glow: comp.glow?.trim() ? comp.glow : null,
+      observer_glow: hasGlow ? comp.glow : null,
       observer_grow: comp.grow?.trim() ? comp.grow : null,
       observer_note: buildObserverNote(comp.glow, comp.grow),
+      // MOB-4: stamp who gave the glow only when a glow is actually saved;
+      // clearing the glow clears the source too, so the two never drift.
+      // Only include these keys at all when there's a real glow, so a
+      // grow-only or empty save never references the new columns (those
+      // don't exist yet on a DB where the MOB-4 migration hasn't landed).
+      ...(hasGlow
+        ? { glow_source_staff_id: actingStaffId, glow_source_type: "evaluator", glow_source_name: staffProfile?.name ?? null }
+        : {}),
     });
   }
 
@@ -283,7 +304,18 @@ export default function EvaluationCapture() {
         avoid: Array.from(new Set(avoid)).slice(0, 24),
       });
       patchCompetency(domainId, comp.competencyId, { glow, grow });
-      await persist(comp.competencyId, { observer_glow: glow, observer_grow: grow, observer_note: buildObserverNote(glow, grow) });
+      const hasGlow = Boolean(glow?.trim());
+      await persist(comp.competencyId, {
+        observer_glow: glow,
+        observer_grow: grow,
+        observer_note: buildObserverNote(glow, grow),
+        // MOB-4: same source stamping as handleNoteBlur, and the same
+        // conditional-keys guard so a glow-less polish never touches the
+        // new columns.
+        ...(hasGlow
+          ? { glow_source_staff_id: actingStaffId, glow_source_type: "evaluator", glow_source_name: staffProfile?.name ?? null }
+          : {}),
+      });
       setDrafts((p) => ({ ...p, [comp.competencyId]: "" }));
       toast({ title: "Polished", description: "Split into a glow and a grow below. Tweak if you like." });
     } catch (e) {
@@ -338,6 +370,9 @@ export default function EvaluationCapture() {
   const unscored = data.domains.flatMap((d) => d.competencies.filter((c) => c.observerScore == null && !c.observerIsNA));
   const lowMissingNote = data.domains.flatMap((d) =>
     d.competencies.filter((c) => c.observerScore != null && c.observerScore <= 2 && !c.glow?.trim() && !c.grow?.trim()));
+  // MOB-4: a glow is expected, not required — this is informational only and
+  // deliberately does NOT factor into canSubmit.
+  const missingGlow = missingGlowItems(data.domains);
   const canSubmit = unscored.length === 0 && lowMissingNote.length === 0;
 
   async function handleSubmit() {
@@ -579,23 +614,27 @@ export default function EvaluationCapture() {
                   </Button>
                 </div>
 
-                {/* Polished result (editable) */}
-                {(selectedComp.glow?.trim() || selectedComp.grow?.trim()) && (
+                {/* Glow: expected, not required — always visible once the competency has
+                    a score, so recognition is a first-class field rather than a hidden
+                    by-product of Polish (MOB-4). Grow's own visibility is unchanged. */}
+                {selectedComp.observerScore != null && (
                   <div className="space-y-2">
                     <div className="flex items-start gap-2">
                       <Sun className="mt-2.5 h-4 w-4 shrink-0" style={{ color: "hsl(var(--score-4))" }} />
-                      <Textarea className="bg-background" rows={2} placeholder="Glow"
+                      <Textarea className="bg-background" rows={2} placeholder="What did they do well here?"
                         value={selectedComp.glow ?? ""}
                         onChange={(e) => handleNoteChange(activeDomain.domainId, selectedComp, "glow", e.target.value)}
                         onBlur={() => handleNoteBlur(selectedComp)} />
                     </div>
-                    <div className="flex items-start gap-2">
-                      <Sprout className="mt-2.5 h-4 w-4 shrink-0" style={{ color: "hsl(var(--score-2))" }} />
-                      <Textarea className="bg-background" rows={2} placeholder="Grow"
-                        value={selectedComp.grow ?? ""}
-                        onChange={(e) => handleNoteChange(activeDomain.domainId, selectedComp, "grow", e.target.value)}
-                        onBlur={() => handleNoteBlur(selectedComp)} />
-                    </div>
+                    {(selectedComp.glow?.trim() || selectedComp.grow?.trim()) && (
+                      <div className="flex items-start gap-2">
+                        <Sprout className="mt-2.5 h-4 w-4 shrink-0" style={{ color: "hsl(var(--score-2))" }} />
+                        <Textarea className="bg-background" rows={2} placeholder="Grow"
+                          value={selectedComp.grow ?? ""}
+                          onChange={(e) => handleNoteChange(activeDomain.domainId, selectedComp, "grow", e.target.value)}
+                          onBlur={() => handleNoteBlur(selectedComp)} />
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -629,6 +668,15 @@ export default function EvaluationCapture() {
                 : <MessageSquare className="h-4 w-4 shrink-0" style={{ color: "hsl(var(--status-missing))" }} />}
               <span>{lowMissingNote.length === 0 ? "Low scores include a note"
                 : `${lowMissingNote.length} low score${lowMissingNote.length === 1 ? "" : "s"} need a note`}</span>
+            </div>
+            {/* MOB-4: a soft nudge, never a blocker — a glow is expected, not
+                required, so this never disables Submit below. */}
+            <div className="flex items-center gap-2 text-muted-foreground">
+              {missingGlow.length === 0
+                ? <Check className="h-4 w-4 shrink-0" style={{ color: "hsl(var(--status-complete))" }} />
+                : <Sun className="h-4 w-4 shrink-0" style={{ color: "hsl(var(--status-pending))" }} />}
+              <span>{missingGlow.length === 0 ? "Every scored competency has a glow"
+                : `${missingGlow.length} competenc${missingGlow.length === 1 ? "y" : "ies"} don't have a glow yet. Recognition is the one thing staff actually want back.`}</span>
             </div>
           </div>
 

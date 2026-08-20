@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { GraduationCap, Video, MessageCircle, Link as LinkIcon, PlayCircle, Clock, CheckCircle2 } from "lucide-react";
+import { GraduationCap, Video, MessageCircle, Link as LinkIcon, PlayCircle, Clock, CheckCircle2, Compass } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,13 +47,24 @@ export function ProMoveDrawer({
     
     async function loadResources() {
       setLoading(true);
-      
-      // 1. Fetch description from pro_moves
-      const { data: moveData } = await supabase
-        .from('pro_moves')
-        .select('description')
-        .eq('action_id', move!.action_id)
-        .single();
+
+      // 1. Description: useCraftAtlas preloads pro_moves.description onto
+      //    the move (see docs/specs/mob-6-craft-atlas.md) so the drawer can
+      //    render instantly and this becomes a resource-only fetch. Older
+      //    callers (useDomainDetail) don't select that column, so `move`
+      //    carries description === undefined there and this falls back to
+      //    the original per-move fetch.
+      const descriptionPreloaded = move!.description !== undefined;
+      let description: string | null = descriptionPreloaded ? move!.description ?? null : null;
+
+      if (!descriptionPreloaded) {
+        const { data: moveData } = await supabase
+          .from('pro_moves')
+          .select('description')
+          .eq('action_id', move!.action_id)
+          .single();
+        description = moveData?.description || null;
+      }
 
       // 2. Fetch Resources
       const { data: resources } = await supabase
@@ -80,7 +91,7 @@ export function ProMoveDrawer({
       }
 
       setContent({
-        description: moveData?.description || null,
+        description,
         script,
         video_id: videoUrl ? extractYouTubeId(videoUrl) : null,
         audio_url: audioUrl,
@@ -90,7 +101,7 @@ export function ProMoveDrawer({
     }
 
     loadResources();
-  }, [open, move?.action_id]);
+  }, [open, move?.action_id, move?.description]);
 
   if (!move) return null;
 
@@ -109,7 +120,15 @@ export function ProMoveDrawer({
     </div>
   );
 
-  const hasContent = content.description || content.script || content.audio_url || content.video_id || content.links.length > 0;
+  // Lead with the tool: script/audio/video/link if the move has one, else
+  // the description is the tool (see docs/specs/mob-6-craft-atlas.md "Lead
+  // with tools"). ~84% of active moves have no script/audio, so for most
+  // moves the description IS the content — it renders as a primary,
+  // deliberately styled block below, not a muted afterthought under an
+  // empty-media frame. Labels here never say "listen" or "script" for text.
+  const hasTool = !!content.script || !!content.audio_url || !!content.video_id || content.links.length > 0;
+  const hasDescription = !!content.description;
+  const hasContent = hasDescription || hasTool;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -155,22 +174,33 @@ export function ProMoveDrawer({
               </div>
             ) : (
               <>
-                {/* Description (The Why) */}
-                {content.description && (
-                  <div className="text-sm text-muted-foreground leading-relaxed">
-                    {content.description}
-                  </div>
+                {/* Description as the primary tool — the universal fallback
+                    for moves with no script/audio, styled as intentional
+                    teaching content, not a "no media" degraded state. */}
+                {!hasTool && hasDescription && (
+                  <section>
+                    <SectionHeader icon={Compass} title="The Move" />
+                    <div
+                      className="text-[15px] leading-relaxed p-4 md:p-5 rounded-2xl border"
+                      style={{
+                        backgroundColor: `hsl(${richColor} / 0.04)`,
+                        borderColor: `hsl(${richColor} / 0.15)`,
+                      }}
+                    >
+                      {content.description}
+                    </div>
+                  </section>
                 )}
 
                 {/* Script */}
                 {content.script && (
                   <section>
                     <SectionHeader icon={MessageCircle} title="Suggested Verbiage" />
-                    <div 
-                      className="text-base md:text-lg leading-relaxed p-4 md:p-5 rounded-2xl border-2 border-dashed"
-                      style={{ 
+                    <div
+                      className="relative text-base md:text-lg leading-relaxed p-4 md:p-5 rounded-2xl border-2 border-dashed"
+                      style={{
                         backgroundColor: `hsl(${richColor} / 0.03)`,
-                        borderColor: `hsl(${richColor} / 0.2)` 
+                        borderColor: `hsl(${richColor} / 0.2)`
                       }}
                     >
                       <span className="absolute -top-3 left-4 px-2 bg-background text-xs text-muted-foreground font-medium">
@@ -230,6 +260,18 @@ export function ProMoveDrawer({
                           </a>
                         </Button>
                       ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Description as secondary context — when a script/audio
+                    tool already leads, the description backs it up rather
+                    than repeating as the hero. */}
+                {hasTool && hasDescription && (
+                  <section>
+                    <SectionHeader icon={GraduationCap} title="Why It Matters" />
+                    <div className="text-sm text-muted-foreground leading-relaxed">
+                      {content.description}
                     </div>
                   </section>
                 )}

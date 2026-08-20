@@ -79,17 +79,29 @@ export default function CraftAtlasArea() {
         )}
       </div>
 
-      {/* Coach card — only when there is something to show */}
+      {/* Moves — the craft leads here, not the grade. */}
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+          {competency.proMoves.length} move{competency.proMoves.length === 1 ? '' : 's'} in this area
+        </h2>
+        <div className="space-y-1">
+          {competency.proMoves.map((move) => (
+            <ProMoveRow key={move.action_id} move={move} onClick={() => setSelectedMove(move)} />
+          ))}
+        </div>
+      </div>
+
+      {/* Coach card — de-emphasized: grading is reachable but secondary,
+          so it sits below the moves in a muted style rather than leading
+          the page (see docs/specs/mob-6-craft-atlas.md "De-emphasize the
+          graded tiles"). Only when there is something to show. */}
       {showCoachCard && (
-        <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="rounded-2xl border border-border/60 bg-muted/20 p-3.5">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             {level && (
               <span
-                className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold whitespace-nowrap"
-                style={{
-                  backgroundColor: `hsl(var(--score-${SCORE_LEVEL_BUCKET[level]}-bg))`,
-                  color: `hsl(var(--score-${SCORE_LEVEL_BUCKET[level]}-ink))`,
-                }}
+                className="text-2xs font-semibold whitespace-nowrap opacity-80"
+                style={{ color: `hsl(var(--score-${SCORE_LEVEL_BUCKET[level]}-ink))` }}
               >
                 Coach level: {level}
               </span>
@@ -105,18 +117,6 @@ export default function CraftAtlasArea() {
           )}
         </div>
       )}
-
-      {/* Moves */}
-      <div>
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-          {competency.proMoves.length} move{competency.proMoves.length === 1 ? '' : 's'} in this area
-        </h2>
-        <div className="space-y-1">
-          {competency.proMoves.map((move) => (
-            <ProMoveRow key={move.action_id} move={move} onClick={() => setSelectedMove(move)} />
-          ))}
-        </div>
-      </div>
 
       {/* Study Drawer — same component/props DomainDetail.tsx uses */}
       <ProMoveDrawer

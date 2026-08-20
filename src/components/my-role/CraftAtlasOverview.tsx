@@ -1,24 +1,25 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCraftAtlas, type AtlasCompetency } from '@/hooks/useCraftAtlas';
 import { DOMAIN_ORDER } from '@/lib/content/roleDefinitions';
 import { getDomainColorVar, getDomainPastelVar } from '@/lib/domainColors';
 import { levelForScore, SCORE_LEVEL_BUCKET, type ScoreLevel } from '@/lib/scoreLevel';
+import { AtlasSearch } from '@/components/my-role/AtlasSearch';
 
-function LevelPill({ score }: { score: number | null }) {
+// De-emphasized: grading belongs to Performance, so this stays a small,
+// muted secondary marker rather than the tile's dominant visual (see
+// docs/specs/mob-6-craft-atlas.md "De-emphasize the graded tiles"). Not yet
+// rated collapses to nothing rather than a pill — there's nothing to
+// de-emphasize about an absence of a grade.
+function LevelMarker({ score }: { score: number | null }) {
   const level = levelForScore(score);
-  if (!level) {
-    return (
-      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold bg-muted text-muted-foreground whitespace-nowrap">
-        Not yet rated
-      </span>
-    );
-  }
+  if (!level) return null;
   const bucket = SCORE_LEVEL_BUCKET[level];
   return (
     <span
-      className="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-bold whitespace-nowrap"
-      style={{ backgroundColor: `hsl(var(--score-${bucket}-bg))`, color: `hsl(var(--score-${bucket}-ink))` }}
+      className="text-2xs font-semibold whitespace-nowrap opacity-70"
+      style={{ color: `hsl(var(--score-${bucket}-ink))` }}
     >
       {level}
     </span>
@@ -34,6 +35,7 @@ function LevelPill({ score }: { score: number | null }) {
 export default function CraftAtlasOverview() {
   const navigate = useNavigate();
   const { data, isLoading } = useCraftAtlas();
+  const [searchActive, setSearchActive] = useState(false);
 
   if (isLoading || !data) {
     return (
@@ -75,78 +77,99 @@ export default function CraftAtlasOverview() {
         </p>
       </div>
 
-      {/* Snapshot strip. TODO(build-review): the spec only names two states
-          here (pills when levels exist, the fallback line when no
-          evaluation exists at all) — an evaluation that exists but scores
-          none of this person's merged competencies falls through to
-          neither and renders nothing, which matches "no empty chrome" but
-          hasn't been asked for explicitly. Not expected in practice since
-          an evaluation normally covers every domain. */}
-      {hasEvaluation ? (
-        snapshotPills.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2.5">
-            {snapshotPills.map((label) => (
-              <span
-                key={label}
-                className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold whitespace-nowrap"
-                style={{
-                  backgroundColor: `hsl(var(--score-${SCORE_LEVEL_BUCKET[label]}-bg))`,
-                  color: `hsl(var(--score-${SCORE_LEVEL_BUCKET[label]}-ink))`,
-                }}
-              >
-                {label} ×{levelCounts[label]}
-              </span>
-            ))}
-          </div>
-        )
-      ) : (
-        <p className="text-[13px] text-muted-foreground">
-          Your coach levels appear here after your first evaluation.
-        </p>
-      )}
+      {/* Search — client-side over the corpus useCraftAtlas already loaded.
+          An active query collapses the bands below into a flat result
+          list; clearing it restores the structured browse view. */}
+      <AtlasSearch competencies={data.competencies} onActiveChange={setSearchActive} />
 
-      {/* Domain bands */}
-      <div className="space-y-6">
-        {DOMAIN_ORDER.map((domain) => {
-          const list = data.competencies.filter((c) => c.domainName === domain);
-          if (list.length === 0) return null;
-          const moveCount = list.reduce((sum, c) => sum + c.proMoves.length, 0);
+      {!searchActive && (
+        <>
+          {/* Domain bands — the default browse view. Not flattened. */}
+          <div className="space-y-6">
+            {DOMAIN_ORDER.map((domain) => {
+              const list = data.competencies.filter((c) => c.domainName === domain);
+              if (list.length === 0) return null;
+              const moveCount = list.reduce((sum, c) => sum + c.proMoves.length, 0);
 
-          return (
-            <div key={domain}>
-              <div className="flex items-center gap-2 mb-2">
-                <span
-                  className="h-2.5 w-2.5 flex-none"
-                  style={{ backgroundColor: getDomainColorVar(domain), borderRadius: 3 }}
-                />
-                <h2 className="text-[13px] font-extrabold tracking-wide">{domain}</h2>
-                <span className="ml-auto text-xs font-semibold text-muted-foreground">
-                  {list.length} area{list.length === 1 ? '' : 's'} · {moveCount} move{moveCount === 1 ? '' : 's'}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {list.map((c: AtlasCompetency) => (
-                  <button
-                    key={c.competency_id}
-                    type="button"
-                    onClick={() => navigate(`/my-role/area/${c.competency_id}`)}
-                    className="text-left rounded-2xl p-3 min-h-[74px] flex flex-col justify-between active:scale-[0.97] transition-transform"
-                    style={{ backgroundColor: getDomainPastelVar(domain) }}
-                  >
-                    <span className="text-[13.5px] font-semibold leading-snug text-foreground">{c.title}</span>
-                    <span className="flex items-center justify-between gap-2 mt-2">
-                      <LevelPill score={c.observerScore} />
-                      <span className="text-2xs font-semibold text-muted-foreground whitespace-nowrap">
-                        {c.proMoves.length} move{c.proMoves.length === 1 ? '' : 's'}
-                      </span>
+              return (
+                <div key={domain}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span
+                      className="h-2.5 w-2.5 flex-none"
+                      style={{ backgroundColor: getDomainColorVar(domain), borderRadius: 3 }}
+                    />
+                    <h2 className="text-[13px] font-extrabold tracking-wide">{domain}</h2>
+                    <span className="ml-auto text-xs font-semibold text-muted-foreground">
+                      {list.length} area{list.length === 1 ? '' : 's'} · {moveCount} move{moveCount === 1 ? '' : 's'}
                     </span>
-                  </button>
-                ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {list.map((c: AtlasCompetency) => (
+                      <button
+                        key={c.competency_id}
+                        type="button"
+                        onClick={() => navigate(`/my-role/area/${c.competency_id}`)}
+                        className="text-left rounded-2xl p-3 min-h-[74px] flex flex-col justify-between active:scale-[0.97] transition-transform"
+                        style={{ backgroundColor: getDomainPastelVar(domain) }}
+                      >
+                        <span className="text-[13.5px] font-semibold leading-snug text-foreground">{c.title}</span>
+                        <span className="flex items-center justify-between gap-2 mt-2">
+                          <span className="text-2xs font-semibold text-muted-foreground whitespace-nowrap">
+                            {c.proMoves.length} move{c.proMoves.length === 1 ? '' : 's'}
+                          </span>
+                          <LevelMarker score={c.observerScore} />
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Grading — de-emphasized: a collapsed secondary section below
+              the craft, not the entry point (see docs/specs/mob-6-craft-atlas.md
+              "De-emphasize the graded tiles"). Grading is still reachable,
+              just not the first thing the eye lands on. TODO(build-review):
+              the spec only names two states here (pills when levels exist,
+              the fallback line when no evaluation exists at all) — an
+              evaluation that exists but scores none of this person's merged
+              competencies falls through to neither and renders nothing,
+              which matches "no empty chrome" but hasn't been asked for
+              explicitly. Not expected in practice since an evaluation
+              normally covers every domain. */}
+          {(hasEvaluation ? snapshotPills.length > 0 : true) && (
+            <details className="group rounded-2xl border border-border/60">
+              <summary className="cursor-pointer list-none px-3 py-2.5 text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                How I'm graded
+                <span className="text-2xs transition-transform group-open:rotate-180">▾</span>
+              </summary>
+              <div className="px-3 pb-3">
+                {hasEvaluation ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {snapshotPills.map((label) => (
+                      <span
+                        key={label}
+                        className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold whitespace-nowrap"
+                        style={{
+                          backgroundColor: `hsl(var(--score-${SCORE_LEVEL_BUCKET[label]}-bg))`,
+                          color: `hsl(var(--score-${SCORE_LEVEL_BUCKET[label]}-ink))`,
+                        }}
+                      >
+                        {label} ×{levelCounts[label]}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[13px] text-muted-foreground">
+                    Your coach levels appear here after your first evaluation.
+                  </p>
+                )}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            </details>
+          )}
+        </>
+      )}
     </div>
   );
 }

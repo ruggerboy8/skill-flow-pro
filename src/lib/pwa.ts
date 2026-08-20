@@ -6,8 +6,7 @@
 
 const LOCAL_FLAG_KEY = 'pwa_v1';
 const DEVICE_OPTOUT_KEY = 'pwa_device_optout';
-const BANNER_DISMISSED_KEY = 'pwa_banner_dismissed_at';
-const BANNER_REDISPLAY_DAYS = 7;
+const BANNER_DISMISSED_KEY = 'pwa_banner_dismissed';
 
 let registered = false;
 let updateServiceWorker: ((reloadPage?: boolean) => Promise<void>) | null = null;
@@ -99,12 +98,16 @@ export async function triggerInstallPrompt(): Promise<void> {
   deferredInstallPrompt = null;
 }
 
+/**
+ * Whether the first-run bottom banner has been dismissed. Permanent once set
+ * (MOB-2) — there is no re-nag timer, because the persistent "Install the
+ * app" row in the avatar menu (MoreMenuRows) now guarantees the install
+ * help is never lost, so dismissing the banner doesn't need to chase the
+ * user again later.
+ */
 export function isBannerDismissed(): boolean {
   try {
-    const at = localStorage.getItem(BANNER_DISMISSED_KEY);
-    if (!at) return false;
-    const elapsedDays = (Date.now() - Number(at)) / (1000 * 60 * 60 * 24);
-    return elapsedDays < BANNER_REDISPLAY_DAYS;
+    return localStorage.getItem(BANNER_DISMISSED_KEY) === 'on';
   } catch {
     return false;
   }
@@ -112,10 +115,33 @@ export function isBannerDismissed(): boolean {
 
 export function dismissBanner(): void {
   try {
-    localStorage.setItem(BANNER_DISMISSED_KEY, String(Date.now()));
+    localStorage.setItem(BANNER_DISMISSED_KEY, 'on');
   } catch {
     /* storage unavailable — nothing to do */
   }
+}
+
+export type InstallPathway = 'ios-safari' | 'ios-other-browser' | 'android-prompt' | 'manual';
+
+/**
+ * Pure selection of which install-instructions branch to show (MOB-2).
+ * Extracted out of what was inline JSX in InstallBanner so it can be unit
+ * tested without mounting a component, and so the banner and the avatar-menu
+ * entry point (InstallInstructions) can never select different branches.
+ *
+ * Order matters: iOS is checked before the captured `beforeinstallprompt`
+ * flag because iOS Safari never fires that event, and iOS non-Safari
+ * browsers cannot install a PWA at all regardless of the flag.
+ */
+export function getInstallPathway(opts: {
+  isIosSafari: boolean;
+  isIos: boolean;
+  canPrompt: boolean;
+}): InstallPathway {
+  if (opts.isIosSafari) return 'ios-safari';
+  if (opts.isIos) return 'ios-other-browser';
+  if (opts.canPrompt) return 'android-prompt';
+  return 'manual';
 }
 
 /**

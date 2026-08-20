@@ -5,6 +5,7 @@ import { useMyWeeklyScores } from '@/hooks/useMyWeeklyScores';
 import { getDomainColorRich, getDomainColorRichRaw } from '@/lib/domainColors';
 import { getDomainSlug } from '@/lib/domainUtils';
 import { DOMAIN_ORDER } from '@/lib/content/roleDefinitions';
+import { computeDomainAverages } from '@/lib/lowestConfidenceDomain';
 import { format, parseISO, subWeeks } from 'date-fns';
 
 type Window = '3w' | '6w' | 'quarter';
@@ -52,17 +53,10 @@ export function ConfidenceCard({ staffId, subject }: { staffId: string | undefin
     [rawData, cutoff]
   );
 
-  const domainAverages = useMemo(() => {
-    const map = new Map<string, { sum: number; count: number }>();
-    for (const row of inWindow) {
-      if (row.confidence_score == null) continue;
-      const entry = map.get(row.domain_name) ?? { sum: 0, count: 0 };
-      entry.sum += row.confidence_score;
-      entry.count += 1;
-      map.set(row.domain_name, entry);
-    }
-    return map;
-  }, [inWindow]);
+  // Shared with useLowestConfidenceDomain (MOB-5) so this card and the
+  // recognition-card glow selector can't compute the domain average
+  // differently. See src/lib/lowestConfidenceDomain.ts.
+  const domainAverages = useMemo(() => computeDomainAverages(inWindow), [inWindow]);
 
   const stillBuilding = useMemo(() => {
     return inWindow

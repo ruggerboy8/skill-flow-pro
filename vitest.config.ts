@@ -14,6 +14,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': new URL('./src', import.meta.url).pathname,
+      // src/lib/pwa.ts dynamically imports the VitePWA plugin's virtual
+      // module in production builds only; this test-only stand-in lets that
+      // file (and anything importing it) transform under vitest, which
+      // doesn't load vite.config.ts's VitePWA() plugin. See the stub file's
+      // header comment for the full explanation.
+      'virtual:pwa-register': new URL('./src/test/virtualPwaRegisterStub.ts', import.meta.url).pathname,
     },
   },
 });

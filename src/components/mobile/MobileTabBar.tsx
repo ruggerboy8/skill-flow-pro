@@ -1,16 +1,21 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Compass, TrendingUp, MoreHorizontal } from 'lucide-react';
+import { Home, Compass, TrendingUp } from 'lucide-react';
 
-type TabKey = 'home' | 'my-role' | 'performance' | 'more';
+type TabKey = 'home' | 'my-role' | 'performance';
 
 // Tab label is "Explore" (an encyclopedia you explore, not a book you read);
 // the pillar inside keeps the name "My Role". Route is unchanged — see
 // docs/features/explore-my-role-build-instructions.md section A.
+//
+// Three tabs, not four (MOB-1, 2026-08-20) — the former "More" tab's rows
+// (Profile, Sign out, My evaluations, Practice log, Team) now live behind the
+// header avatar menu (see AvatarMenu.tsx / MoreMenuRows.tsx). `/more` stays a
+// routable fallback (App.tsx), it just isn't a tab, so it — and `/profile` —
+// resolve to no tab below rather than a now-nonexistent 'more' key.
 const TABS: { key: TabKey; label: string; to: string; icon: typeof Home }[] = [
   { key: 'home', label: 'Home', to: '/', icon: Home },
   { key: 'my-role', label: 'Explore', to: '/my-role', icon: Compass },
   { key: 'performance', label: 'Performance', to: '/performance', icon: TrendingUp },
-  { key: 'more', label: 'More', to: '/more', icon: MoreHorizontal },
 ];
 
 /**
@@ -38,7 +43,9 @@ export function ownerTabFor(pathname: string): TabKey | null {
     return 'home';
   }
 
-  if (pathname === '/more' || pathname === '/profile') return 'more';
+  // `/more` (routable fallback, no longer a tab) and `/profile` (an avatar-menu
+  // destination) don't own a tab — no tab highlights for them.
+  if (pathname === '/more' || pathname === '/profile') return null;
 
   return null;
 }
@@ -72,7 +79,7 @@ export function MobileTabBar() {
             style={active ? { color: 'hsl(var(--primary))', fontWeight: 700 } : undefined}
           >
             <Icon className="h-6 w-6" strokeWidth={1.9} />
-            <span style={{ fontSize: '10px', fontWeight: active ? 700 : 500 }}>{label}</span>
+            <span className="text-xs" style={{ fontWeight: active ? 700 : 500 }}>{label}</span>
           </button>
         );
       })}

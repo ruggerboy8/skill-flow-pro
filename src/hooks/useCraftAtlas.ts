@@ -4,6 +4,7 @@ import { useResolvedRoleIds } from '@/hooks/useResolvedRoleIds';
 import { mergeLeadCompetencies } from '@/lib/roleCompetencyMerge';
 import { DOMAIN_ID_TO_NAME } from '@/lib/domainUtils';
 import { format, parseISO } from 'date-fns';
+import { quarterNum } from '@/lib/reviewPayload';
 import type { ProMoveDetail } from '@/hooks/useDomainDetail';
 
 export interface AtlasCompetency {
@@ -23,6 +24,38 @@ export interface CraftAtlasData {
   /** Non-null only when a released+visible evaluation was found. */
   periodLabel: string | null;
   evaluatorFirstName: string | null;
+}
+
+export interface EvalPeriodCandidate {
+  eval_id: string;
+  visible: boolean;
+  program_year: number;
+  quarter: string | null;
+}
+
+/**
+ * Picks the eval_id of the most recently-visible evaluation by period
+ * (program_year desc, then quarter desc) — NOT by any submitted/updated
+ * timestamp. Extracted as a pure function so the ordering (the fix for the
+ * "stale most-recent eval" bug) can be unit tested without mocking Supabase.
+ */
+export function pickMostRecentVisibleEvalId(candidates: EvalPeriodCandidate[]): string | null {
+  let mostRecentEvalId: string | null = null;
+  let mostRecentPeriod: { program_year: number; quarter: string | null } | null = null;
+
+  for (const c of candidates) {
+    if (!c.visible) continue;
+    const isNewer =
+      !mostRecentPeriod ||
+      c.program_year > mostRecentPeriod.program_year ||
+      (c.program_year === mostRecentPeriod.program_year && quarterNum(c.quarter) > quarterNum(mostRecentPeriod.quarter));
+    if (isNewer) {
+      mostRecentPeriod = { program_year: c.program_year, quarter: c.quarter };
+      mostRecentEvalId = c.eval_id;
+    }
+  }
+
+  return mostRecentEvalId;
 }
 
 /**
@@ -69,7 +102,6 @@ export function useCraftAtlas() {
 
       const competencyScores = new Map<number, number>();
       const competencyNotes = new Map<number, string>();
-      let mostRecentDate: Date | null = null;
       let mostRecentEvalId: string | null = null;
       let periodLabel: string | null = null;
       let evaluatorFirstName: string | null = null;
@@ -98,14 +130,23 @@ export function useCraftAtlas() {
           });
         }
 
+        // Pick the most recent eval by period (program_year, then quarter),
+        // NOT by row.submitted_at — that field is actually evaluations.updated_at
+        // (see get_evaluations_summary), which bumps whenever the staff member
+        // opens/acknowledges ANY older evaluation and would surface stale data.
+        // Same ordering as PerformancePage.tsx and useCurrentFocus.ts.
+        const candidates: EvalPeriodCandidate[] = [];
         for (const row of evalData) {
-          if (!visibilityMap.get(row.eval_id)) continue;
-          const dt = new Date(row.submitted_at);
-          if (!mostRecentDate || dt > mostRecentDate) {
-            mostRecentDate = dt;
-            mostRecentEvalId = row.eval_id;
-          }
+          const meta = metaMap.get(row.eval_id);
+          if (!meta) continue;
+          candidates.push({
+            eval_id: row.eval_id,
+            visible: !!visibilityMap.get(row.eval_id),
+            program_year: meta.program_year,
+            quarter: meta.quarter,
+          });
         }
+        mostRecentEvalId = pickMostRecentVisibleEvalId(candidates);
 
         if (mostRecentEvalId) {
           const meta = metaMap.get(mostRecentEvalId);
@@ -145,7 +186,7 @@ export function useCraftAtlas() {
       if (compIds.length > 0) {
         const { data: allProMoves } = await supabase
           .from('pro_moves')
-          .select('action_id, action_statement, competency_id')
+          .select('action_id, action_statement, description, competency_id')
           .in('competency_id', compIds)
           .eq('active', true);
 
@@ -187,6 +228,7 @@ export function useCraftAtlas() {
             const detail: ProMoveDetail = {
               action_id: pm.action_id,
               action_statement: pm.action_statement || '',
+              description: pm.description || null,
               lastPracticed,
               avgConfidence,
             };

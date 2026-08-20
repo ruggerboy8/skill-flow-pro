@@ -40,6 +40,13 @@ export interface CaptureData {
   staffId: string;
   roleId: number;
   staffStatus: string;
+  /**
+   * evaluations.evaluator_id for this eval. Not used to attribute a glow's
+   * source by default (the acting user is), but kept as the fallback so a
+   * saved glow is never left with no source at all if the acting user's own
+   * staff id is unavailable. See MOB-4.
+   */
+  evaluatorId: string | null;
   domains: CaptureDomain[];
 }
 
@@ -113,6 +120,7 @@ export async function loadCaptureData(evalId: string): Promise<CaptureData | nul
     staffId: (evaluation as { staff_id: string }).staff_id,
     roleId,
     staffStatus: (evaluation as { status: string }).status,
+    evaluatorId: (evaluation as { evaluator_id?: string | null }).evaluator_id ?? null,
     domains,
   };
 }
@@ -125,6 +133,26 @@ export interface CaptureItemPatch {
   // Kept in sync with glow/grow for backward compatibility: the classic
   // EvaluationHub and the insights pipeline still read observer_note.
   observer_note?: string | null;
+  // MOB-4: who gave this glow, and how loosely. Written only alongside a
+  // non-empty observer_glow, and cleared (null) alongside a cleared glow, so
+  // the two never drift out of sync. See supabase/migrations/20260820200000_mob4_glow_source_columns.sql.
+  glow_source_staff_id?: string | null;
+  glow_source_type?: string | null;
+  // MOB-4 fix: denormalized giver display name, captured alongside
+  // glow_source_staff_id since a plain participant's RLS can't resolve a
+  // staff id to a name via a live join. See useStaffGlows.ts.
+  glow_source_name?: string | null;
+}
+
+/**
+ * Competencies that are scored (and not marked N/A) but have no glow yet.
+ * Pure/UI-agnostic so the Review & submit dialog's soft "N competencies don't
+ * have a glow yet" nudge (MOB-4) is unit-testable without mounting the page.
+ * Deliberately NOT part of canSubmit — a glow is expected, not required.
+ */
+export function missingGlowItems(domains: Pick<CaptureData, "domains">["domains"]): CaptureCompetency[] {
+  return domains.flatMap((d) =>
+    d.competencies.filter((c) => c.observerScore != null && !c.observerIsNA && !c.glow?.trim()));
 }
 
 /** Compose the legacy combined observer_note from Glow/Grow so classic readers stay populated. */
@@ -154,7 +182,7 @@ export async function saveCaptureItem(
   const update = () =>
     supabase
       .from("evaluation_items")
-      // Cast: observer_glow/observer_grow are newly added and not yet in generated types.
+      // Cast: observer_glow/observer_grow/glow_source_* are newly added and not yet in generated types.
       .update(patch as never)
       .eq("evaluation_id", evalId)
       .eq("competency_id", competencyId)

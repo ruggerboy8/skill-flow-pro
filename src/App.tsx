@@ -59,6 +59,7 @@ import RoleRadar from "@/components/my-role/RoleRadar";
 import PracticeLog from "@/pages/my-role/PracticeLog";
 import DomainDetail from "@/pages/my-role/DomainDetail";
 import CraftAtlasArea from "@/pages/my-role/CraftAtlasArea";
+import ExploreMove from "@/pages/my-role/ExploreMove";
 
 // Clinical Director pages
 import ClinicalLayout from "@/pages/clinical/ClinicalLayout";
@@ -149,6 +150,11 @@ function AppRoutes() {
             redirects to the domain page on desktop). See
             docs/features/explore-my-role-build-instructions.md section C. */}
         <Route path="my-role/area/:competencyId" element={<CraftAtlasArea />} />
+
+        {/* Explore atlas — Pro Move page (Explore drill level 4, new;
+            mobile-shell primary, redirects to the move's domain page on
+            desktop). See docs/specs/mob-explore-rebuild.md §1/§4. */}
+        <Route path="my-role/move/:actionId" element={<ExploreMove />} />
 
         <Route path="profile" element={<Profile />} />
         <Route path="reset-password" element={<ResetPassword />} />

@@ -8,8 +8,10 @@ import { useDomainDetail, type ProMoveDetail } from '@/hooks/useDomainDetail';
 import { getDomainColorRichRaw } from '@/lib/domainColors';
 import { ROLE_CONTENT, getRoleTypeFromArchetype, type RoleType } from '@/lib/content/roleDefinitions';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { useMobileShell } from '@/hooks/useMobileShell';
 import CompetencyAccordion from '@/components/my-role/CompetencyAccordion';
 import { ProMoveDrawer } from '@/components/my-role/ProMoveDrawer';
+import ExploreDomain from '@/pages/my-role/ExploreDomain';
 
 // DSN-4: this is a competency SCORE badge, not a submission/delivery
 // STATUS — reads from the --score-* tokens (same family CompetencyAccordion
@@ -54,12 +56,29 @@ function getAverageBadge(score: number | null): { label: string; icon: typeof Tr
   };
 }
 
+/**
+ * Route entry for /my-role/domain/:domainSlug. Mobile shell renders the
+ * Explore drill's domain level (ExploreDomain — competency list, hero,
+ * discovery dots) instead of the desktop accordion below. This has to be a
+ * thin wrapper, not an early return inside DomainDetailDesktop: that
+ * component calls useDomainDetail() (a live query) unconditionally, and an
+ * early return before that hook call would violate the rules of hooks /
+ * needlessly fire the desktop-only query on mobile. Splitting into two
+ * components keeps desktop's hook sequence and rendering byte-identical.
+ * See docs/specs/mob-explore-rebuild.md §2 level 2.
+ */
 export default function DomainDetail() {
+  const isMobileShell = useMobileShell();
+  if (isMobileShell) return <ExploreDomain />;
+  return <DomainDetailDesktop />;
+}
+
+function DomainDetailDesktop() {
   const { domainSlug = '' } = useParams<{ domainSlug: string }>();
   const navigate = useNavigate();
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
   const [selectedMove, setSelectedMove] = useState<ProMoveDetail | null>(null);
-  
+
   const { data, isLoading, error } = useDomainDetail(domainSlug);
 
   const archetype = (staffProfile as any)?.roles?.archetype_code ?? null;

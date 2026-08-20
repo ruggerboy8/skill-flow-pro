@@ -1,13 +1,11 @@
-import { useState, useEffect } from "react";
 import { GraduationCap, Video, MessageCircle, Link as LinkIcon, PlayCircle, Clock, CheckCircle2, Compass } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { supabase } from "@/integrations/supabase/client";
 import { getDomainColorRichRaw } from "@/lib/domainColors";
-import { extractYouTubeId } from "@/lib/youtubeHelpers";
+import { useProMoveResources } from "@/hooks/useProMoveResources";
 import type { ProMoveDetail } from "@/hooks/useDomainDetail";
 
 interface ProMoveDrawerProps {
@@ -17,91 +15,19 @@ interface ProMoveDrawerProps {
   domainName: string;
 }
 
-interface ContentState {
-  description: string | null;
-  script: string | null;
-  audio_url: string | null;
-  video_id: string | null;
-  links: Array<{ id: string; url: string | null; title: string | null }>;
-}
-
 export function ProMoveDrawer({
   open,
   onOpenChange,
   move,
   domainName,
 }: ProMoveDrawerProps) {
-  const [loading, setLoading] = useState(true);
-  const [content, setContent] = useState<ContentState>({
-    description: null,
-    script: null,
-    audio_url: null,
-    video_id: null,
-    links: []
-  });
-
   const richColor = getDomainColorRichRaw(domainName);
 
-  useEffect(() => {
-    if (!open || !move?.action_id) return;
-    
-    async function loadResources() {
-      setLoading(true);
-
-      // 1. Description: useCraftAtlas preloads pro_moves.description onto
-      //    the move (see docs/specs/mob-6-craft-atlas.md) so the drawer can
-      //    render instantly and this becomes a resource-only fetch. Older
-      //    callers (useDomainDetail) don't select that column, so `move`
-      //    carries description === undefined there and this falls back to
-      //    the original per-move fetch.
-      const descriptionPreloaded = move!.description !== undefined;
-      let description: string | null = descriptionPreloaded ? move!.description ?? null : null;
-
-      if (!descriptionPreloaded) {
-        const { data: moveData } = await supabase
-          .from('pro_moves')
-          .select('description')
-          .eq('action_id', move!.action_id)
-          .single();
-        description = moveData?.description || null;
-      }
-
-      // 2. Fetch Resources
-      const { data: resources } = await supabase
-        .from('pro_move_resources')
-        .select('*')
-        .eq('action_id', move!.action_id)
-        .eq('status', 'active')
-        .order('display_order');
-
-      // Process Resources
-      const script = resources?.find(r => r.type === 'script')?.content_md || null;
-      const videoUrl = resources?.find(r => r.type === 'video')?.url;
-      const links = resources?.filter(r => r.type === 'link').map(r => ({
-        id: r.id,
-        url: r.url,
-        title: r.title
-      })) || [];
-      
-      let audioUrl = null;
-      const audioRes = resources?.find(r => r.type === 'audio');
-      if (audioRes?.url) {
-        const { data } = supabase.storage.from('pro-move-audio').getPublicUrl(audioRes.url);
-        audioUrl = data.publicUrl;
-      }
-
-      setContent({
-        description,
-        script,
-        video_id: videoUrl ? extractYouTubeId(videoUrl) : null,
-        audio_url: audioUrl,
-        links
-      });
-      setLoading(false);
-    }
-
-    loadResources();
-  }, [open, move?.action_id, move?.description]);
+  // Resource fetch is shared with the mobile Explore move page — see
+  // src/hooks/useProMoveResources.ts (extracted from this file's original
+  // inline fetch, MOB-Explore-rebuild). `enabled: open` preserves the
+  // original behavior of only fetching while the sheet is open.
+  const { loading, content } = useProMoveResources(move?.action_id, move?.description, open);
 
   if (!move) return null;
 

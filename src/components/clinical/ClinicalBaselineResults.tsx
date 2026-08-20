@@ -43,11 +43,19 @@ interface GroupedData {
 
 const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
 
+// DSN-3 QA fix: this map was invisible to the hardcoded-color ratchet (raw
+// hsl() literals, not Tailwind classes) but hardcoded the same red/amber/
+// blue/green traffic light the ratchet-visible fixes elsewhere in this file
+// removed. Band 1 now shares --score-1 (orange), matching RatingBandCollapsible
+// and the rest of the DASH-1a score ramp: confidence/skill scores never
+// render red. bg/text use the -bg/-ink pair (tuned for tinted-surface
+// contrast); border/activeBorder derive from the vivid --score-N at two
+// opacities rather than inventing separate light/dark shades.
 const SCORE_COLORS: Record<number, { bg: string; border: string; text: string; activeBorder: string }> = {
-  4: { bg: 'hsl(160 60% 95%)', border: 'hsl(160 50% 80%)', text: 'hsl(160 80% 25%)', activeBorder: 'hsl(160 60% 40%)' },
-  3: { bg: 'hsl(210 80% 95%)', border: 'hsl(210 60% 80%)', text: 'hsl(210 80% 30%)', activeBorder: 'hsl(210 70% 45%)' },
-  2: { bg: 'hsl(38 90% 95%)', border: 'hsl(38 70% 75%)', text: 'hsl(38 80% 30%)', activeBorder: 'hsl(38 80% 45%)' },
-  1: { bg: 'hsl(0 70% 95%)', border: 'hsl(0 60% 80%)', text: 'hsl(0 70% 35%)', activeBorder: 'hsl(0 65% 45%)' },
+  4: { bg: 'hsl(var(--score-4-bg))', border: 'hsl(var(--score-4) / 0.3)', text: 'hsl(var(--score-4-ink))', activeBorder: 'hsl(var(--score-4))' },
+  3: { bg: 'hsl(var(--score-3-bg))', border: 'hsl(var(--score-3) / 0.3)', text: 'hsl(var(--score-3-ink))', activeBorder: 'hsl(var(--score-3))' },
+  2: { bg: 'hsl(var(--score-2-bg))', border: 'hsl(var(--score-2) / 0.3)', text: 'hsl(var(--score-2-ink))', activeBorder: 'hsl(var(--score-2))' },
+  1: { bg: 'hsl(var(--score-1-bg))', border: 'hsl(var(--score-1) / 0.3)', text: 'hsl(var(--score-1-ink))', activeBorder: 'hsl(var(--score-1))' },
   0: { bg: 'hsl(0 0% 95%)', border: 'hsl(0 0% 80%)', text: 'hsl(0 0% 40%)', activeBorder: 'hsl(0 0% 50%)' },
 };
 
@@ -536,7 +544,7 @@ export function ClinicalBaselineResults({
                                 }
                               }}
                               className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left group ${hasBigDiff ? 'ring-1 ring-inset ring-[hsl(var(--status-late))]' : ''}`}
-                              style={{ backgroundColor: hasBigDiff ? 'hsl(38 90% 97%)' : colors.bg }}
+                              style={{ backgroundColor: hasBigDiff ? 'hsl(var(--status-late-bg))' : colors.bg }}
                             >
                               {(() => {
                                 const selfColors = SCORE_COLORS[item.score];

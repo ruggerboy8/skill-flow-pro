@@ -27,5 +27,13 @@ dist-ssr
 supabase/.temp/
 .mcp.json
 
+# DEMO-1b capture harness: local secrets, live login sessions, and raw
+# recorded footage. Never commit any of these.
+demo-capture/.env
+demo-capture/.auth/
+demo-capture/recordings/
+demo-capture/test-results/
+demo-capture/playwright-report/
+
 # Claude Code local worktree copies (large, machine-local; not for git)
 .claude/worktrees/

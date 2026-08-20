@@ -22,7 +22,17 @@ interface CompetencyAccordionProps {
 // directly rather than being forced through StatusBadge.
 function getScoreBadge(score: number | null): { label: string; style: React.CSSProperties } {
   if (score === null) {
-    return { label: 'Exploration', style: {} }; // bg-muted/text-muted-foreground via Badge default
+    // Badge's outline variant (used below) renders NO fill and
+    // text-foreground, not the muted-gray pill this is meant to be —
+    // pin it explicitly so it doesn't inherit the wrong look.
+    return {
+      label: 'Exploration',
+      style: {
+        backgroundColor: 'hsl(var(--muted))',
+        color: 'hsl(var(--muted-foreground))',
+        borderColor: 'hsl(var(--muted-foreground) / 0.2)',
+      },
+    };
   }
   if (score === 4) {
     return {

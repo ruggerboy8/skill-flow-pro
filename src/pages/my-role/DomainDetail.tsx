@@ -17,7 +17,21 @@ import { ProMoveDrawer } from '@/components/my-role/ProMoveDrawer';
 // this screen agree with each other.
 function getAverageBadge(score: number | null): { label: string; icon: typeof TrendingUp; style: React.CSSProperties } {
   if (score === null) {
-    return { label: 'Exploration Mode', icon: TrendingUp, style: {} }; // bg-muted/text-muted-foreground via Badge default
+    // The Badge below has no `variant` prop, so it defaults to "default"
+    // (solid bg-primary/brand color) unless we pin the fill and text
+    // explicitly — this must never fall back to that default.
+    return {
+      label: 'Exploration Mode',
+      icon: TrendingUp,
+      // Matches the original bg-muted/80 (80% opacity) with no visible
+      // border (the Badge here has no variant, so its default border is
+      // already transparent unless a color class overrides it — none did).
+      style: {
+        backgroundColor: 'hsl(var(--muted) / 0.8)',
+        color: 'hsl(var(--muted-foreground))',
+        borderColor: 'transparent',
+      },
+    };
   }
   if (score >= 3.5) {
     return {

@@ -33,6 +33,18 @@ interface StatusConfigEntry {
   iconFill?: boolean;
 }
 
+// A neutral/muted GRAY pill — used for states that mean "nothing to
+// report" (no eval yet, not started, locked). Badge's outline variant
+// renders no fill and text-foreground; secondary renders bg-secondary
+// with near-black secondary-foreground text. Neither matches the
+// original hand-rolled bg-muted/text-muted-foreground pill, so these
+// states get their fill and text pinned explicitly via inline style,
+// which always wins over the Badge variant's classes.
+const NEUTRAL_FILLED: React.CSSProperties = {
+  backgroundColor: 'hsl(var(--muted))',
+  color: 'hsl(var(--muted-foreground))',
+};
+
 const statusConfig: Record<BadgeStatus, StatusConfigEntry> = {
   // --- Submission / evaluation status ---
   complete: {
@@ -94,8 +106,8 @@ const statusConfig: Record<BadgeStatus, StatusConfigEntry> = {
   // --- Delivery status (eval hand-off workflow) ---
   no_eval: {
     label: 'No eval',
-    variant: 'outline',
-    style: {},
+    variant: 'secondary',
+    style: NEUTRAL_FILLED,
   },
   draft: {
     // Reuses the "late" token's amber hue — a warning/in-progress color,
@@ -109,9 +121,11 @@ const statusConfig: Record<BadgeStatus, StatusConfigEntry> = {
     },
   },
   not_released: {
+    // Slightly more visible border than no_eval, matching the
+    // original DeliveryStatusPill's border-muted-foreground/30.
     label: 'Not released',
-    variant: 'outline',
-    style: {},
+    variant: 'secondary',
+    style: { ...NEUTRAL_FILLED, borderColor: 'hsl(var(--muted-foreground) / 0.3)' },
   },
   released: {
     label: 'Released',
@@ -156,10 +170,13 @@ const statusConfig: Record<BadgeStatus, StatusConfigEntry> = {
 
   // --- Assessment track progress ---
   not_started: {
+    // Original AssessmentTrackCard pill had no visible border at all
+    // (variant="secondary" -> border-transparent); cancel the 'border'
+    // class's global border-border default to match.
     label: 'Not started',
     variant: 'secondary',
     icon: Circle,
-    style: {},
+    style: { ...NEUTRAL_FILLED, borderColor: 'transparent' },
   },
   in_progress: {
     // Reuses the "late" token's amber hue as an in-progress/attention color.
@@ -181,10 +198,11 @@ const statusConfig: Record<BadgeStatus, StatusConfigEntry> = {
     },
   },
   locked: {
+    // Same as not_started: original had no visible border.
     label: 'Locked',
     variant: 'secondary',
     icon: Lock,
-    style: {},
+    style: { ...NEUTRAL_FILLED, borderColor: 'transparent' },
   },
 };
 

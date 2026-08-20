@@ -113,7 +113,7 @@ export default function RegionalDashboard() {
 
     // DASH-1a Codex fix (P1): raw conf/perf submitted & expected counts,
     // but only for locations where that metric is actually due (and not
-    // excused) — see calculateDueSubmissionTotals. Collected alongside the
+    // excused), see calculateDueSubmissionTotals. Collected alongside the
     // per-location stats below so the org-wide colored rates can never be
     // dragged down by a location that isn't due yet.
     const dueTotalsList: ReturnType<typeof calculateDueSubmissionTotals>[] = [];
@@ -183,7 +183,7 @@ export default function RegionalDashboard() {
     // sum across locations since a staff member belongs to exactly one.
     const totalDistinctMissed = stats.reduce((sum, s) => sum + s.distinctMissedCount, 0);
     const totalPendingConf = stats.reduce((sum, s) => sum + (s.pendingConfCount ?? 0), 0);
-    // Raw, deadline-unaware counts — used ONLY for the neutral pre-deadline
+    // Raw, deadline-unaware counts, used ONLY for the neutral pre-deadline
     // progress display ("X/Y conf submitted" when nothing is due yet).
     // Never feed these into a colored rate; see totalDue* below.
     const totalConfSubmitted = stats.reduce((sum, s) => sum + (s.confSubmitted ?? 0), 0);
@@ -192,7 +192,7 @@ export default function RegionalDashboard() {
     const totalPerfExpected = stats.reduce((sum, s) => sum + (s.perfExpected ?? 0), 0);
 
     // DASH-1a Codex fix (P1): due-only, excuse-aware totals that the
-    // colored confRate/perfRate/avgRate must be built from instead — a
+    // colored confRate/perfRate/avgRate must be built from instead, a
     // not-yet-due (or excused) location contributes nothing to either side
     // of the ratio, rather than dragging the denominator down. See
     // summaryTiers below, which is the only place these feed into.
@@ -288,7 +288,7 @@ export default function RegionalDashboard() {
   //
   // DASH-1a Codex fix (P1): these are built from totalDue*, not the raw
   // totalConf*/totalPerf* sums, so a location that isn't due yet (or is
-  // excused) can never dilute a colored rate — it contributes to neither
+  // excused) can never dilute a colored rate, it contributes to neither
   // the numerator nor the denominator, the same way an individual
   // LocationHealthCard treats a not-yet-due metric as 100%, not 0%.
   const summaryTiers = useMemo(() => {
@@ -303,7 +303,7 @@ export default function RegionalDashboard() {
         : 100
     );
     // Avg Completion pools due conf + due perf into one combined rate,
-    // mirroring how each location's own submissionRate is computed —
+    // mirroring how each location's own submissionRate is computed,
     // this is the org's own due-participation rate, not an unweighted
     // average of each location's percentage.
     const dueExpected = totals.totalDueConfExpected + totals.totalDuePerfExpected;

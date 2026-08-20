@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { getDomainColorRich, getDomainColorRichRaw, getDomainColorRaw } from '@/lib/domainColors';
+import { getDomainColorVar, getDomainPastelVar } from '@/lib/domainColors';
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -563,7 +563,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                           <span className="flex w-full min-w-0 items-start gap-2 whitespace-normal">
                             <span
                               className="mt-1 h-2 w-2 shrink-0 rounded-full"
-                              style={{ backgroundColor: getDomainColorRich(m.domain_name) }}
+                              style={{ backgroundColor: getDomainColorVar(m.domain_name) }}
                             />
                             <span className="min-w-0 flex-1 whitespace-normal break-words">{m.statement}</span>
                           </span>
@@ -575,11 +575,11 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                     <SelectGroup key={group.domain}>
                       <SelectLabel
                         className="sticky top-0 z-10 flex items-center gap-2 text-foreground"
-                        style={{ backgroundColor: `hsl(${getDomainColorRaw(group.domain)})` }}
+                        style={{ backgroundColor: getDomainPastelVar(group.domain) }}
                       >
                         <span
                           className="h-2 w-2 shrink-0 rounded-full"
-                          style={{ backgroundColor: getDomainColorRich(group.domain) }}
+                          style={{ backgroundColor: getDomainColorVar(group.domain) }}
                         />
                         {group.domain}
                       </SelectLabel>
@@ -592,7 +592,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                           <span className="flex w-full min-w-0 items-start gap-2 whitespace-normal">
                             <span
                               className="mt-1 h-2 w-2 shrink-0 rounded-full"
-                              style={{ backgroundColor: getDomainColorRich(group.domain) }}
+                              style={{ backgroundColor: getDomainColorVar(group.domain) }}
                             />
                             <span className="min-w-0 flex-1 whitespace-normal break-words">{m.action_statement}</span>
                           </span>

@@ -19,7 +19,7 @@ import {
 } from '@/types/evalMetricsV2';
 import { cn } from '@/lib/utils';
 import { getDomainOrderIndex } from '@/lib/domainUtils';
-import { getDomainColor } from '@/lib/domainColors';
+import { getDomainPastelVar } from '@/lib/domainColors';
 
 interface DomainSnapshotTableProps {
   data: EvalDistributionRow[];
@@ -58,7 +58,7 @@ export function DomainSnapshotTable({ data }: DomainSnapshotTableProps) {
                 <div className="flex items-center gap-2">
                   <span 
                     className="inline-block w-2 h-2 rounded-full" 
-                    style={{ backgroundColor: getDomainColor(domain.domainName) }}
+                    style={{ backgroundColor: getDomainPastelVar(domain.domainName) }}
                   />
                   {domain.domainName}
                   {isLowN && (

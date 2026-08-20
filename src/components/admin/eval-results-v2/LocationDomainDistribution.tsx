@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { getDomainColorRich } from '@/lib/domainColors';
+import { getDomainColorVar } from '@/lib/domainColors';
 import { getDomainOrderIndex } from '@/lib/domainUtils';
 import { 
   calcRate, 
@@ -142,7 +142,7 @@ function DomainChart({ domain }: { domain: DomainData }) {
 }
 
 function DomainHeader({ name, avg }: { name: string; avg: number | null }) {
-  const domainColor = getDomainColorRich(name);
+  const domainColor = getDomainColorVar(name);
   const avgColor = getScoreColor(avg);
   
   return (

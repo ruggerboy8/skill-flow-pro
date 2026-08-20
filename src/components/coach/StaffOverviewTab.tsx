@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { subWeeks } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { getDomainColorRich, getDomainColorRichRaw } from '@/lib/domainColors';
+import { getDomainColorVar, getDomainColorVarRaw } from '@/lib/domainColors';
 import { DomainConfidenceTrend } from '@/components/coach/DomainConfidenceTrend';
 import { ClipboardList } from 'lucide-react';
 
@@ -79,8 +79,8 @@ export function StaffOverviewTab({ rawData, evalCount = 0 }: StaffOverviewTabPro
           <CardContent className="px-0 md:px-6">
             <div className="flex flex-wrap gap-3">
               {lowestDomains.map(({ domain, avg }) => {
-                const richRaw = getDomainColorRichRaw(domain);
-                const richColor = getDomainColorRich(domain);
+                const richRaw = getDomainColorVarRaw(domain);
+                const richColor = getDomainColorVar(domain);
                 return (
                   <div
                     key={domain}

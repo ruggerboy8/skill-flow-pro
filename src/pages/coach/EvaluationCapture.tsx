@@ -20,7 +20,7 @@ import {
   type CaptureCompetency,
 } from "@/lib/evalCaptureData";
 import { VoiceCaptureButton } from "@/components/coach/VoiceCaptureButton";
-import { getDomainColorRaw, getDomainColorRich, getDomainColorRichRaw } from "@/lib/domainColors";
+import { getDomainPastelVarRaw, getDomainColorVar, getDomainColorVarRaw } from "@/lib/domainColors";
 import { submitEvaluation } from "@/lib/evaluations";
 import { CaptureTour, TOUR_DISMISSED_KEY } from "@/components/coach/CaptureTour";
 import {
@@ -323,8 +323,8 @@ export default function EvaluationCapture() {
   }
 
   const activeDomain = data.domains[activeIdx];
-  const richColor = getDomainColorRich(activeDomain.domainName);
-  const richRaw = getDomainColorRaw(activeDomain.domainName);
+  const richColor = getDomainColorVar(activeDomain.domainName);
+  const richRaw = getDomainPastelVarRaw(activeDomain.domainName);
   const tint = `hsl(${richRaw} / 0.18)`;
   // Selected competency falls back to the first in the active domain, so
   // switching domains auto-selects a fresh one without extra state.
@@ -423,16 +423,16 @@ export default function EvaluationCapture() {
           const { rated, total } = domainProgress(d.domainId);
           const complete = rated === total && total > 0;
           const active = i === activeIdx;
-          const raw = getDomainColorRaw(d.domainName);
+          const raw = getDomainPastelVarRaw(d.domainName);
           return (
             <button key={d.domainId} onClick={() => { setActiveIdx(i); setSelectedId(null); }} aria-pressed={active}
               className="group inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-sm border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
               style={active
-                ? { backgroundColor: `hsl(${raw} / 0.45)`, borderColor: getDomainColorRich(d.domainName), color: "hsl(var(--foreground))", fontWeight: 600, boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.05)" }
+                ? { backgroundColor: `hsl(${raw} / 0.45)`, borderColor: getDomainColorVar(d.domainName), color: "hsl(var(--foreground))", fontWeight: 600, boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.05)" }
                 : { backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }}>
               <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full"
                 style={complete ? { background: "hsl(var(--status-complete))", color: "white" }
-                  : { background: `hsl(${getDomainColorRichRaw(d.domainName)})`, opacity: active ? 1 : 0.55 }} aria-hidden>
+                  : { background: `hsl(${getDomainColorVarRaw(d.domainName)})`, opacity: active ? 1 : 0.55 }} aria-hidden>
                 {complete && <Check className="h-3 w-3" />}
               </span>
               {d.domainName}
@@ -635,7 +635,7 @@ export default function EvaluationCapture() {
           <div className="space-y-4">
             {data.domains.map((d) => (
               <div key={d.domainId} className="space-y-1.5">
-                <p className="text-sm font-semibold" style={{ color: getDomainColorRich(d.domainName) }}>{d.domainName}</p>
+                <p className="text-sm font-semibold" style={{ color: getDomainColorVar(d.domainName) }}>{d.domainName}</p>
                 <div className="space-y-1">
                   {d.competencies.map((c) => {
                     const needsScore = c.observerScore == null && !c.observerIsNA;

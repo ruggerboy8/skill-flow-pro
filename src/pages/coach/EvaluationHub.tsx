@@ -25,7 +25,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, ChevronDown, P
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
-import { getDomainColor } from '@/lib/domainColors';
+import { getDomainPastelVar, getDomainInk } from '@/lib/domainColors';
 import { supabase } from '@/integrations/supabase/client';
 import {
   getEvaluation,
@@ -1588,7 +1588,7 @@ export function EvaluationHub() {
             <CardContent className="space-y-6">
               {evaluation.items.map((item) => {
                 const isActive = recordingState.isRecording && activeCompetencyId === item.competency_id;
-                const domainColor = item.domain_name ? getDomainColor(item.domain_name) : undefined;
+                const domainColor = item.domain_name ? getDomainPastelVar(item.domain_name) : undefined;
                 return (
                 <div 
                   key={item.competency_id} 
@@ -1615,8 +1615,8 @@ export function EvaluationHub() {
                         variant="secondary" 
                         className="text-xs"
                         style={{ 
-                          backgroundColor: getDomainColor(item.domain_name),
-                          color: '#000'
+                          backgroundColor: getDomainPastelVar(item.domain_name),
+                          color: getDomainInk(item.domain_name)
                         }}
                       >
                         {item.domain_name}

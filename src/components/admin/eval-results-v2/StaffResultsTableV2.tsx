@@ -26,7 +26,7 @@ import {
 import type { EvalFilters } from '@/types/analytics';
 import { cn } from '@/lib/utils';
 import { DOMAIN_ORDER, getDomainOrderIndex } from '@/lib/domainUtils';
-import { getDomainColor } from '@/lib/domainColors';
+import { getDomainPastelVar } from '@/lib/domainColors';
 
 interface StaffResultsTableV2Props {
   data: EvalDistributionRow[];
@@ -115,8 +115,8 @@ export function StaffResultsTableV2({ data, filters, onRowClick }: StaffResultsT
                   key={domain} 
                   className="text-center text-xs"
                   style={{ 
-                    backgroundColor: getDomainColor(domain) + '20',
-                    borderBottom: `2px solid ${getDomainColor(domain)}`
+                    backgroundColor: getDomainPastelVar(domain) + '20',
+                    borderBottom: `2px solid ${getDomainPastelVar(domain)}`
                   }}
                 >
                   <div>{domain}</div>

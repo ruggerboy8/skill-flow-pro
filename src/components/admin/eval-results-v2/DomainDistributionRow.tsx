@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TrendingUp } from 'lucide-react';
-import { getDomainColorRich } from '@/lib/domainColors';
+import { getDomainColorVar } from '@/lib/domainColors';
 import { formatMean } from '@/types/evalMetricsV2';
 
 interface DomainDistribution {
@@ -117,7 +117,7 @@ function DomainChart({ domain }: { domain: DomainDistribution }) {
 }
 
 function DomainHeader({ name, avg }: { name: string; avg: number | null }) {
-  const domainColor = getDomainColorRich(name);
+  const domainColor = getDomainColorVar(name);
   const avgColor = getScoreColor(avg);
   
   return (

@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getWeekAnchors } from '@/v2/time';
 import { useNow } from '@/providers/NowProvider';
-import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
+import { getDomainPastelVar, getDomainColorVar, getDomainInk } from '@/lib/domainColors';
 import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
 import { computeWeekState, StaffStatus, getLocationWeekContext, LocationWeekContext } from '@/lib/locationState';
 import { useSim } from '@/devtools/SimProvider';
@@ -452,8 +452,8 @@ export default function ThisWeekPanel() {
         {/* Pro Moves list - Spine Layout */}
         {displayAssignments.map((assignment) => {
           const domainName = assignment.domain_name;
-          const domainColor = domainName ? getDomainColor(domainName) : 'hsl(var(--primary))';
-          const domainColorRich = domainName ? `hsl(${getDomainColorRichRaw(domainName)})` : 'hsl(var(--primary))';
+          const domainColor = domainName ? getDomainPastelVar(domainName) : 'hsl(var(--primary))';
+          const domainInk = domainName ? getDomainInk(domainName) : 'hsl(var(--primary-foreground))';
           
           const scores = weeklyScores.find(s => 
             s.assignment_id === assignment.weekly_focus_id || s.weekly_focus_id === assignment.weekly_focus_id
@@ -494,7 +494,7 @@ export default function ThisWeekPanel() {
                 {/* Vertical domain text */}
                 <span 
                   className="text-2xs font-bold tracking-widest uppercase"
-                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainColorRich }}
+                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainInk }}
                 >
                   {domainName}
                 </span>
@@ -563,8 +563,8 @@ export default function ThisWeekPanel() {
             </p>
             {parentWeekAssignments.map((assignment) => {
               const domainName = assignment.domain_name;
-              const domainColor = domainName ? getDomainColor(domainName) : 'hsl(var(--primary))';
-              const domainColorRich = domainName ? `hsl(${getDomainColorRichRaw(domainName)})` : 'hsl(var(--primary))';
+              const domainColor = domainName ? getDomainPastelVar(domainName) : 'hsl(var(--primary))';
+              const domainInk = domainName ? getDomainInk(domainName) : 'hsl(var(--primary-foreground))';
               const scores = weeklyScores.find(s =>
                 s.assignment_id === assignment.weekly_focus_id || s.weekly_focus_id === assignment.weekly_focus_id
               );
@@ -601,7 +601,7 @@ export default function ThisWeekPanel() {
                   tabIndex={resourceCount > 0 ? 0 : undefined}
                 >
                   <div className="w-8 shrink-0 flex flex-col items-center justify-center" style={{ backgroundColor: domainColor }}>
-                    <span className="text-2xs font-bold tracking-widest uppercase" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainColorRich }}>
+                    <span className="text-2xs font-bold tracking-widest uppercase" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainInk }}>
                       {domainName}
                     </span>
                   </div>
@@ -699,7 +699,7 @@ function MobileMovesAndBanner({
     <>
       {shown.map((assignment) => {
         const domainName = assignment.domain_name;
-        const domainColorRich = domainName ? `hsl(${getDomainColorRichRaw(domainName)})` : 'hsl(var(--primary))';
+        const domainColorRich = domainName ? getDomainColorVar(domainName) : 'hsl(var(--primary))';
         const scores = weeklyScores.find(
           (s) => s.assignment_id === assignment.weekly_focus_id || s.weekly_focus_id === assignment.weekly_focus_id
         );

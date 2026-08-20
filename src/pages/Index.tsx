@@ -6,6 +6,7 @@ import { RecentWinBanner } from '@/components/home/RecentWinBanner';
 import { EvalReadyCard } from '@/components/home/EvalReadyCard';
 import { CurrentFocusCard } from '@/components/home/CurrentFocusCard';
 import { FocusMoveValueCard } from '@/components/home/FocusMoveValueCard';
+import { RecognitionCard } from '@/components/home/RecognitionCard';
 import { LeadFocusHomeCard } from '@/components/home/LeadFocusHomeCard';
 import { LeadMeetingRequestCard } from '@/components/home/LeadMeetingRequestCard';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -101,6 +102,10 @@ export default function Index() {
 
           {/* rank: eval-ready */}
           <EvalReadyCard />
+
+          {/* rank: recognition (MOB-5) — the featured glow, or generic
+              encouragement when there isn't one yet. Never empty. */}
+          <RecognitionCard />
 
           {/* rank: recent-win */}
           <RecentWinBanner />

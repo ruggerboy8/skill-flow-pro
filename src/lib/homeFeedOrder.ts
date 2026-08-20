@@ -14,6 +14,9 @@ export const HOME_FEED_ORDER = [
   'ritual-hero', // ThisWeekPanel — pinned first, always. Never move this rank.
   'backfill-alert', // conditional: only while a backfill window is active
   'eval-ready', // EvalReadyCard — nudge to acknowledge a released evaluation
+  'recognition', // RecognitionCard (MOB-5) — below the ritual hero + any
+  // urgent action (backfill-alert, eval-ready), above focus-value: recognition
+  // is a reason to open the app, but the week's ritual stays the pinned hero.
   'recent-win', // RecentWinBanner
   'current-focus', // CurrentFocusCard — what the focus move is
   'focus-value', // FocusMoveValueCard (MOB-3) — how to do the focus move

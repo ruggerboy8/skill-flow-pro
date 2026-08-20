@@ -6,6 +6,7 @@ import { getDomainSlug } from '@/lib/domainUtils';
 import { quarterNum } from '@/lib/reviewPayload';
 import { reviewPath } from '@/lib/reviewRoute';
 import { ConfidenceCard } from '@/components/performance/ConfidenceCard';
+import { GlowHistory } from '@/components/performance/GlowHistory';
 import OnTimeRateWidget from '@/components/coach/OnTimeRateWidget';
 
 type DomainEvalRow = { domain_name: string; observer_score: number | null; self_score: number | null };
@@ -253,6 +254,10 @@ export default function PerformancePage() {
               </div>
             </div>
           )}
+
+          {/* Recognition (MOB-5): glow history, after the focus hero and
+              near/with ConfidenceCard — both key off domain. */}
+          <GlowHistory staffId={staffId} />
 
           {/* 3. Confidence + still building */}
           <ConfidenceCard staffId={staffId} subject="you" />

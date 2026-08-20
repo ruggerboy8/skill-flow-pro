@@ -15,10 +15,12 @@ here and get full specs once the foundation is agreed and built.
 
 Pro Moves has been an **input** surface — staff put honest data in and the value
 came back out through meeting facilitators, not the app. This redesign makes the
-app itself deliver value to the staff member: **mirror out, tool in.** Every
-surface that shows a staff member their own data must hand them something in the
-same view. Acceptance criteria across these tickets are written to that standard,
-not to "the screen renders."
+app itself deliver value to the staff member: **give value back.** A surface that
+shows a staff member their own data should, where it naturally can, hand them
+something useful in the same view. This is a design instinct applied with
+judgment surface by surface — NOT a rigid "every screen must carry an action +
+disclosure" formula (John, 2026-08-20: forced universally it reads as generated).
+Acceptance criteria lean toward usefulness, not just "the screen renders."
 
 Timing: the whole mobile shell is still gated to one test user
 (`staff.pwa_enabled`, plus the `pwa_v1` dev flag), so the IA has zero
@@ -39,6 +41,15 @@ re-learning cost to change right now. That is why the foundation goes first.
   "Moves you're still building" list → `OnTimeRateWidget`). **No persisted
   "flagged" concept and no lifecycle/clear action exist** — "still building" is
   just a `confidence_score <= 2` filter over the window.
+- Focus-hero data (verified live 2026-08-20): `staff_quarter_focus` covers only
+  ~24% of evals — a real **adoption** gap (only 20 of 59 evals were opened by the
+  staff member; 14 chose a focus), **not backfillable** (focus is a staff choice
+  with no derivable source). The lever is adoption: make focus selection expected
+  in the review flow (mirrors glow-expected), a coach-set default, or a nudge.
+  Separately, the eval **self-score** IS populating fine (~83%) — since 2026-04-21
+  it's an aggregation of the quarter's weekly performance scores, not an interview
+  self-rating. So the coach-vs-self card (MOB-7) has solid data; only the focus
+  hero is sparse, and for a reason no migration fixes.
 - Explore: `src/pages/my-role/*` (`MyRoleLayout`, `CraftAtlasOverview`,
   `CraftAtlasArea`, `DomainDetail`, `PracticeLog`). Graded tiles via
   `levelForScore()`; resources via `ProMoveDrawer` (`pro_move_resources` types
@@ -78,6 +89,10 @@ admin) on mobile currently has no path to their management routes — the tab ba
 is participant-only and `MorePage` carries no management rows. The menu must
 surface exactly the destinations the user's role already grants, reusing the
 authoritative `navigation` derivation in `Layout.tsx` (no second role map).
+**Role-structure note (John, 2026-08-20):** the supervising relationship is
+role-based — RDAs have Lead RDAs, but **DFIs (front desk) have no peer lead;
+their "lead" is the office manager or regional manager.** The menu and any
+Team/lead entry must not assume every staff member reports to a peer lead.
 Cross-cutting; the confirmed review gap closes here. **Depends on:** nothing.
 
 ### MOB-2 — Persistent self-serve "Install the app" affordance  → `mob-2-persistent-install-affordance.md`
@@ -91,13 +106,20 @@ shared-device opt-out. **Depends on:** MOB-1 (soft).
 
 ### MOB-3 — Home value reframe (feed that gives before it asks)  → `mob-3-home-value-reframe.md`
 Turn Home from a status board into a ranked feed that hands the staff member
-value: add a script/30-second-listen value card pulled from the focus move
-(`staff_quarter_focus` → `pro_move_resources`, reusing the existing drawers),
-hide raw self-scores on the public glance behind a tap (color/status stays),
-rewrite the "marked late" line in the coaching voice naming the audience (P8),
-and codify Home as a ranked feed with the ritual hero pinned first so recognition
-and comms cards can join later by rank. **Depends on:** nothing; establishes the
-card budget and feed slot MOB-5 fills.
+value: add a value card pulled from the focus move — a script/audio when the
+move has one, else the move's **description** (fall back to `action_statement`
+so it is never empty). **Resource reality (audited 2026-08-20):** script/audio
+covers only ~16% of moves and only Front Desk + Dental Assistant roles;
+description is 96.8% and the statement 100%, so for most staff the card is a
+well-written description, and the card copy must NOT promise "listen"/"script"
+when showing text. No resource→move tagging exists yet (future capability); v1
+uses `pro_move_resources` + description only. Also: rewrite the "marked late"
+line in the coaching voice naming the audience, and codify Home as a ranked feed
+with the ritual hero pinned first so recognition and comms cards can join later
+by rank. **Dropped from the earlier draft (John, 2026-08-20):** no hiding of
+self-scores behind a tap — people aren't reading each other's phones, so show
+them normally. **Depends on:** nothing; establishes the card budget and feed
+slot MOB-5 fills.
 
 ---
 
@@ -150,13 +172,17 @@ the recognition spine.
 
 ### MOB-6 — Explore reframe: lead with tools, de-emphasize graded squares
 Flip Explore from a report card wearing a library's name into "what to actually
-say." Lead with the scripts and audio (`pro_move_resources` via `ProMoveDrawer`)
-— the most valuable and most buried asset — instead of opening on the graded
-`levelForScore` tiles in `CraftAtlasOverview`. De-emphasize the graded squares
-(grading belongs to Performance). **The Alcan Way is holding-space only** — no
-such code exists today; the segment stays hidden until its module is built (E3
-in `explore-page-plan.md`), so this ticket does not build it, only notes and
-reserves it. **Depends on:** MOB-1 (tab identity). **Lane:** medium.
+do and say." Lead with the tools (`pro_move_resources` via `ProMoveDrawer`, plus
+the move description as the universal fallback) instead of opening on the graded
+`levelForScore` tiles in `CraftAtlasOverview`; de-emphasize the graded squares
+(grading belongs to Performance). **This ticket is deliberately narrow: only the
+low-risk reorder.** The fuller "museum"/Craft Atlas + Alcan Way build is **NOT a
+one-shot and is split out into its own iterative track (John, 2026-08-20)** —
+John wants a dedicated design conversation about what the museum looks like
+before it is specced, and it will be built in sections. So MOB-6 reserves
+Explore's identity and reorders; the atlas/Alcan-Way build is separate,
+post-conversation. **The Alcan Way is holding-space only** (no code exists).
+**Depends on:** MOB-1 (tab identity). **Lane:** medium.
 
 ### MOB-7 — Performance reframe: growth tool, with an "I've grown here" lifecycle
 Give flagged / "still building" items a lifecycle. Today a low confidence score
@@ -182,11 +208,15 @@ Check-out is the documented leak (25–30% lower completion) and the shipped cod
 never designed it — `PerformanceWizard.tsx` is a copy-paste sibling of
 `ConfidenceWizard.tsx`, reusing its structure and copy. Give check-out its own
 question framing and its own completion moment, one step easier than check-in,
-and close the loop with value on completion (surface a resource for the move
-just rated lowest). The two wizards being physically separate files means this
-is real design work per surface, not a config flag. Whether the leak is
-individual or per-location is an open data question (skeleton §5) that changes
-who reminders target but not this "make check-out its own easy ritual" work.
+and close the loop with value on completion (surface something useful for the
+move just rated lowest — script/audio if it has one, else the description; don't
+assume audio). The two wizards being physically separate files means this is real
+design work per surface, not a config flag. **The leak is very likely
+per-location in most cases (John, 2026-08-20)** — the location's check-out
+meeting doesn't happen or is skipped — plus some individual cases and a
+scheduling dimension (staff not at work on the check-out day). So much of the fix
+is ops/facilitation, and any future reminder must be schedule-aware (Deputy-
+gated); this ticket's "make check-out its own easy ritual" work stands regardless.
 **Depends on:** MOB-3 (value-card / resource-drawer patterns reused). **Lane:**
 medium.
 

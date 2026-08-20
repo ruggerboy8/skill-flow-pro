@@ -4,7 +4,6 @@
 **Lane:** medium (Home surface restructure + copy; no DB change)
 **Ticket:** MOB-3 (Motion, MyProMoves Dev Board)
 **Branch:** feature/mob-3-home-value-reframe
-**Spec:** this file
 **DB change:** none
 **Personas to test as:** participant, lead
 **Depends on:** nothing to ship the structure; it establishes the ranked-feed
@@ -12,49 +11,53 @@ container and card budget that MOB-5 (recognition card) later slots into.
 
 ## What and why
 
-The governing thesis of the redesign (skeleton §0): Pro Moves has been an
-**input** surface — staff put honest scores in and got nothing back in the same
-view. "**Mirror out, tool in**": every surface that shows a staff member their
-own data must hand them something in the same view. Home is the screen most
-often open in an operatory between patients, so it is where this matters most.
+The governing thesis (skeleton §0): Pro Moves has been an **input** surface —
+staff put honest scores in and got nothing back in the same view. The redesign
+**gives value back**: where a surface naturally can, it should hand the staff
+member something useful. (Design instinct applied with judgment, not a rigid
+"every screen must carry an action" formula.) Home is the most-opened surface,
+so it is where this matters most.
 
-Four concrete changes (skeleton §3, "Home"):
+Three concrete changes (skeleton §3, "Home"):
 
-1. **Add one value card inside the card budget: a script / 30-second-listen
-   pulled from the staff member's focus move.** This is the cheapest reciprocity
-   lever and "the reason to open the app on a Tuesday." The resources already
-   exist (`pro_move_resources`, types `script` / `audio`) and the focus move is
-   already resolved on Home by `CurrentFocusCard`.
-2. **Stop displaying raw self-scores on the public glance.** Today the mobile
-   move rows render the confidence/performance numbers inline via `ConfPerfDelta`
-   — an honest "2" is visible to anyone walking past. Show status by color;
-   reveal the numbers on tap.
-3. **Rewrite the "marked late" footnote in the coaching voice** and name the
-   audience ("your coach sees it, so they can check in"), per principle P8.
-4. **Build Home as a ranked feed** with the ritual hero pinned first, so
+1. **Add one value card inside the card budget, pulled from the staff member's
+   focus move.** Prefer a script or short audio when the move has one; **fall
+   back to the move's text description** (then its one-line `action_statement`)
+   when it doesn't. Resource reality (audited 2026-08-20): script/audio exists
+   for only ~16% of moves and only for Front Desk + Dental Assistant roles;
+   description is 96.8% and the statement 100%. So for most staff this card is a
+   well-written description, and **its copy must not promise "listen"/"script"
+   when it is showing text.** The focus move is already resolved on Home by
+   `CurrentFocusCard`.
+2. **Rewrite the "marked late" footnote in the coaching voice** and name the
+   audience plainly ("your coach sees it, so they can check in").
+3. **Build Home as a ranked feed** with the ritual hero pinned first, so
    broadcast comms and the coach-recognition card (MOB-5) can join later as
    ranked cards without new navigation.
+
+**Explicitly NOT in this ticket (dropped 2026-08-20):** an earlier draft
+proposed hiding self-scores behind a tap for over-the-shoulder privacy. John:
+people are not reading each other's phones, so that would just be a headache.
+Scores render normally; no tap-to-reveal.
 
 ## Scope
 
 **In:**
-- A focus-move **value card** on the mobile Home surfacing a script or short
-  audio resource for the staff member's current quarterly focus move.
-- Hiding raw confidence/performance numbers on the Home move list behind a tap
-  (color/status stays visible; numbers reveal on interaction).
+- A focus-move **value card** on mobile Home: script/audio if the move has one,
+  else the move's description, else its `action_statement` — never empty.
 - Coaching-voice rewrite of the deadline/late disclaimer copy on mobile Home.
-- Establishing an explicit **ranked-feed** order for the mobile Home cards with
-  the ritual hero (`ThisWeekPanel`) pinned first and a documented ranking rule.
+- An explicit **ranked-feed** order for the mobile Home cards with the ritual
+  hero (`ThisWeekPanel`) pinned first and a documented ranking rule.
 
 **Out:**
 - The recognition card itself (MOB-5, depends on MOB-4 glow intake). MOB-3 only
   leaves the ranked-feed slot and card budget it will occupy.
-- Any change to the desktop Home (`Index.tsx` non-mobile branch stays
-  byte-identical — the file already isolates the mobile branch behind
-  `isMobileShell`).
+- Any change to desktop Home (`Index.tsx` non-mobile branch stays byte-identical
+  — the file already isolates the mobile branch behind `isMobileShell`).
 - Changes to the ritual wizards themselves (MOB-8).
-- Changing `ConfPerfDelta` on desktop or on the Performance surface — the
-  tap-to-reveal change is scoped to the mobile Home move list.
+- Any score-hiding / tap-to-reveal behavior (dropped).
+- Resource→pro-move tagging of other platform material (a future capability;
+  none exists today — `pro_move_resources` is the only association).
 
 ## Approach (grounded in the real files)
 
@@ -66,95 +69,78 @@ inside `ThisWeekPanel` → `MobileMovesAndBanner`
 (`src/components/home/ThisWeekPanel.tsx`, lines 673–762).
 
 1. **Ranked feed + pinned hero.** Codify the card order as an explicit ranking
-   rule with `ThisWeekPanel` (the week-state hero + ritual CTA) always first.
-   The current order is already close; the deliverable is making the ordering a
-   named, documented rule (a `HOME_FEED_ORDER` list or equivalent) so future
-   cards (recognition, comms) insert by rank rather than by editing JSX in place.
-   Keep the one-glanceable-hero + one-CTA discipline (P3): do not let the feed
-   grow unbounded — the card budget is real.
+   rule with `ThisWeekPanel` (the week-state hero + ritual CTA) always first
+   (a `HOME_FEED_ORDER` list or equivalent) so future cards (recognition, comms)
+   insert by rank rather than by editing JSX in place. Keep the
+   one-glanceable-hero + one-CTA discipline (P3); the card budget is real.
 
-2. **Focus-move value card.** The focus move is resolved today by
-   `src/components/home/CurrentFocusCard.tsx` via `staff_quarter_focus` joined to
-   `pro_moves` (query key `['current-focus-card', staffId]`). Its `action_id` is
-   the key into resources. Resources come from `pro_move_resources`
-   (`.eq('action_id', …).eq('status','active')`), and the type handling already
-   exists in `src/components/my-role/ProMoveDrawer.tsx`: `type === 'script'` →
-   `content_md`; `type === 'audio'` → `.url` resolved via
-   `supabase.storage.from('pro-move-audio').getPublicUrl()`. Build the value card
-   to fetch the focus move's script/audio resource and present it as "here's
-   what this one sounds like / here's the script" — opening the existing
-   `LearnerLearnDrawer` (already used from `ThisWeekPanel`, imported line 23) or
-   `ProMoveDrawer` rather than a new player. When the focus move has no script or
-   audio resource, the card hides (no empty state) — reuse `CurrentFocusCard`'s
-   "return null when no data" pattern.
+2. **Focus-move value card with a fallback chain.** The focus move is resolved
+   today by `src/components/home/CurrentFocusCard.tsx` via `staff_quarter_focus`
+   joined to `pro_moves` (query key `['current-focus-card', staffId]`); its
+   `action_id` is the key into resources. Build the card to resolve, in order:
+   - a `pro_move_resources` row (`.eq('action_id',…).eq('status','active')`) of
+     type `script` (`content_md`) or `audio` (`.url` via
+     `supabase.storage.from('pro-move-audio').getPublicUrl()`) — reuse the type
+     handling in `src/components/my-role/ProMoveDrawer.tsx` and open the existing
+     `LearnerLearnDrawer` / `ProMoveDrawer`, not a new player;
+   - else the move's **`description`** (long form, 96.8% coverage);
+   - else its **`action_statement`** (100%).
+   The card's label/CTA adapts to what it shows ("Listen" / "Read the script" /
+   "How to do this move") — never promise audio when it's text. Reuse
+   `CurrentFocusCard`'s focus resolution (or extract a shared `useCurrentFocus`)
+   rather than a second divergent query.
+   **For Doctors (role 4):** staff `script`/`audio` don't exist, but a parallel
+   `doctor_*` content system does (~94% coverage) — decide whether the card
+   treats `doctor_script` as the script tier for role-4 users (open question).
 
-3. **Hide raw self-scores.** In `MobileMovesAndBanner`
-   (`ThisWeekPanel.tsx` line ~723), each row renders
-   `<ConfPerfDelta confidence={…} performance={…} />` with the numbers visible.
-   Replace the always-visible numeric delta on the Home glance with a
-   status/color indicator (the app's status tokens already encode
-   complete/missing/late/pending, and score-1 is orange not red per the design
-   addenda), and reveal the actual numbers only on tap/expand of that row. The
-   `ConfPerfDelta` component itself can stay for the tapped/expanded state; the
-   change is what the *resting* glance shows.
-
-4. **Coaching-voice copy.** The disclaimer at `Index.tsx` lines 122–130 reads
+3. **Coaching-voice copy.** The disclaimer at `Index.tsx` lines 122–130 reads
    "ProMove scores are due on the same day as your Check In/Out meeting. / Scores
-   submitted any other time are marked late." Rewrite in the coaching voice and
-   name the audience per P8 — "late" as a matter-of-fact status paired with who
-   sees it and why ("your coach sees it so they can check in"), never as a
-   citation. Note: the *production* string "ProMove scores" is a real
-   inconsistency the design addenda flag; standardize to "Pro Moves" in the new
-   copy. Final wording is John's to set.
+   submitted any other time are marked late." Rewrite in the coaching voice —
+   "late" as a matter-of-fact status paired with who sees it and why ("your coach
+   sees it so they can check in"), never a citation. Standardize the copy to
+   "Pro Moves" (the production "ProMove scores" string is a known inconsistency).
+   Final wording is John's to set.
 
 ## Acceptance criteria (behavioral, testable)
 
-1. On the mobile Home, when the staff member has a chosen quarterly focus move
-   with a script or audio resource, a value card appears offering that
-   script/listen and opens the resource in a drawer. When the focus move has no
-   such resource (or no focus is chosen), the card is absent — no empty shell.
-2. The Home move list shows each move's status by color at rest and does **not**
-   display the raw confidence/performance numbers until the row is tapped/
-   expanded; tapping reveals the numbers.
-3. The deadline/late line reads in the coaching voice, names who sees a late
+1. On mobile Home, when the staff member has a chosen quarterly focus move, a
+   value card appears: it offers the script/audio if one exists (opening the
+   drawer), otherwise it shows the move's description, otherwise its statement —
+   it is **never an empty shell**, and its label matches what it shows (no
+   "listen" on text). When no focus is chosen, the card is absent.
+2. The deadline/late line reads in the coaching voice, names who sees a late
    score and why, and uses "Pro Moves" (not "ProMove scores").
-4. `ThisWeekPanel` (the ritual hero + CTA) is the first card in the feed in every
+3. `ThisWeekPanel` (the ritual hero + CTA) is the first card in the feed in every
    week-state; the feed order follows a single documented ranking rule.
-5. Desktop Home and the Performance surface's use of `ConfPerfDelta` are
-   unchanged.
-6. No new database reads beyond the focus move's resources
+4. Self/performance scores on the move list render **normally** (no hiding, no
+   tap-to-reveal). Desktop Home is unchanged.
+5. No new database reads beyond the focus move's resources
    (`pro_move_resources`), which the app already queries elsewhere.
 
 ## Files touched
 
-- `src/pages/Index.tsx` — mobile branch: introduce the ranked-feed order + the
-  value card; rewrite the disclaimer copy.
-- `src/components/home/ThisWeekPanel.tsx` — `MobileMovesAndBanner`: tap-to-reveal
-  scores on the move rows.
-- A new `src/components/home/FocusMoveValueCard.tsx` (or similar) fetching the
-  focus move's script/audio resource and opening the existing drawer.
-- Possibly a small `src/lib/homeFeedOrder.ts` (or inline constant) for the
-  ranking rule.
+- `src/pages/Index.tsx` — mobile branch: ranked-feed order + the value card;
+  rewrite the disclaimer copy.
+- A new `src/components/home/FocusMoveValueCard.tsx` (or similar) implementing
+  the script/audio → description → statement fallback and opening the drawer.
+- Possibly a small `src/lib/homeFeedOrder.ts` (or inline constant) for the rule.
 
 ## Risks / blast radius
 
 - Confined to the mobile-shell Home (`isMobileShell` branch). Desktop Home and
   all non-flagged users are untouched.
 - The focus-move value card shares data shape with `CurrentFocusCard` and the
-  drawers; reusing those avoids a second divergent query. Risk is duplicating the
-  focus-resolution logic — reuse `CurrentFocusCard`'s query or extract a shared
-  `useCurrentFocus` hook.
-- Tap-to-reveal must not break the row's existing tap-to-open-learn-drawer
-  affordance where a move has resources (that gesture already exists on the row);
-  disambiguate the two tap targets so revealing a score and opening a resource do
-  not collide.
+  drawers; reuse those to avoid a second divergent query.
+- The fallback chain must be verified against the resource audit — most staff
+  will see the description tier, so that tier must look good, not like a
+  degraded "no media" state.
 
 ## Open questions for John
 
-1. **Value card content when several focus moves exist.** `staff_quarter_focus`
-   can hold more than one focus row (the Performance page assumes single-focus
-   with a `TODO`). If a staff member has multiple, does the Home value card show
-   the first, the lowest-confidence one, or rotate? Recommend: the first focus
-   move that actually has a script/audio resource.
-2. **Score reveal gesture.** Tap-to-expand the row vs a small "show my scores"
-   toggle for the whole list. Recommend per-row tap, but confirm.
+1. **Multiple focus moves.** `staff_quarter_focus` can hold more than one row.
+   If a staff member has several, does the value card show the first, the
+   lowest-confidence one, or rotate? (Recommend: the lowest-confidence focus
+   move, matching the recognition-card selection rule in MOB-5.)
+2. **Doctor content tier.** Should the value card treat the `doctor_*` content
+   as the script tier for role-4 users (0% → ~94% media coverage), or keep
+   doctors on the description tier for v1?

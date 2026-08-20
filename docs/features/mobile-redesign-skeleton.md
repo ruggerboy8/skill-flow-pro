@@ -21,10 +21,17 @@ finding was that today the app "takes honesty from its users and gives them
 nothing back, then displays what it took." The redesign's governing rule is
 the inverse:
 
-> **Mirror out, tool in.** Every surface that shows a staff member their
-> own data must hand them something in the same view (a script, a next
-> step, a way to close out an old low score). Every surface that shows one
-> person another person's data must carry an action and a disclosure.
+> **Give value back.** A surface that shows a staff member their own data
+> should, where it naturally can, hand them something useful in the same
+> view — a script or description, a next step, a way to close out an old
+> low score.
+
+This is a design instinct, not a mechanical rule to satisfy on every
+screen. (John, 2026-08-20: the "give value back" half is the point; do not
+force a rigid "every cross-person surface must carry an action + a
+disclosure" pattern everywhere — applied universally it reads as a
+generated formula rather than a good screen. Use judgment surface by
+surface.)
 
 The new value pillars (The Alcan Way, the comms platform, the Ask chatbot)
 are how the app grows into a one-stop shop. But **today's focus is the
@@ -76,9 +83,10 @@ inside an existing tab, never as a sixth tab. §2 maps them.
 
 No tab is ever renamed or removed once staff learn it. New features land
 **inside an existing tab or in the one reserved Ask slot**, never by
-reshuffling. This is the single most important constraint, because ~90% of
-logins happen inside a shared meeting where everyone's screen is visible at
-once, so a confused IA is confused out loud, across a room, all at once.
+reshuffling. This is the single most important constraint: a later reshuffle
+pays a re-learning cost across every staff phone at once, and much of the
+usage is anchored to the twice-weekly meeting, so the navigation staff learn
+at install should still be the navigation a year from now.
 
 ### Rollout (simplified — John, 2026-08-20)
 
@@ -142,47 +150,66 @@ member gets, not just gives or sees.
 ### Home — from "status board that nags" to "the feed that gives before it asks"
 
 - Keep the single glanceable week-state element and the one ritual CTA (P3).
-- **Add one value card inside the card budget: a "script / 30-second listen"
-  pulled from the staff member's focus move.** This is the cheapest possible
-  reciprocity lever and the review's three personas all independently wanted
-  it. It is the reason to open the app on a Tuesday.
-- **Stop displaying raw self-scores on the public glance.** Home is the one
-  screen open in an operatory between patients; today it shows a staff
-  member's honest 2 to anyone walking past. Show status by color; reveal the
-  numbers on tap.
-- Rewrite the "marked late" footnote in the coaching voice, and name the
-  audience ("your coach sees it, so they can check in"), per P8.
+- **Add one value card inside the card budget, pulled from the staff member's
+  focus move.** Prefer a script or short audio when the move has one; **fall
+  back to the move's text description when it doesn't** (John, 2026-08-20: not
+  every pro move has a script, but every one should have a description, so the
+  card always has something real to show). This is the cheapest reciprocity
+  lever and the reason to open the app on a Tuesday.
+  - **Prerequisite before building this:** audit what resources actually exist
+    per pro move (script/audio coverage is uneven, and description coverage
+    needs confirming). Resource→pro-move *tagging/recommendation* of other
+    platform-housed material is a future capability, not available today, so
+    v1 uses only what `pro_move_resources` + the move description already hold.
+- Rewrite the "marked late" footnote in the coaching voice, naming the
+  audience plainly ("your coach sees it, so they can check in").
 - Home is where broadcast comms and coach-recognition cards will later land
   (§2), so build it as a ranked feed now, with the ritual hero pinned first.
+- (No secrecy machinery. An earlier draft proposed hiding self-scores behind a
+  tap for over-the-shoulder privacy; John, 2026-08-20: people are not walking
+  past reading each other's phones, so that would just be a headache — show the
+  scores normally.)
 
 ### Check-in / Check-out — from "pure input" to "input that returns help"
 
 - The rating stays (it is the fuel). But **close the loop with value:** on
-  completion, alongside the celebration, surface a resource for the move the
-  staff member just rated lowest ("here's what this one sounds like"). The
-  moment of honest disclosure becomes a moment of getting help.
+  completion, alongside the celebration, surface something useful for the move
+  the staff member just rated lowest — a script/audio if it has one, else the
+  move's description. (Don't assume audio; "here's what this one sounds like"
+  only applies when a recording exists.) The moment of honest disclosure
+  becomes a moment of getting help. Depends on the same resource audit as Home.
 - **Design check-out as its own ritual, not check-in's clothes.** Check-out
   is the documented leak (25-30% lower completion) and the prototype never
   actually designed it — it reused the check-in flow and copy. Give it its
   own question framing and its own completion moment, one step easier than
   check-in.
-- (Whether the check-out leak is an individual problem or a per-location
-  facilitation problem is an open data question — see §5. It changes who the
-  design should serve, but not the "make check-out its own easy ritual" work.)
+- **The check-out leak is very likely per-location in most cases** (John,
+  2026-08-20): the location's check-out meeting doesn't happen, is rushed, or
+  is skipped. There are also genuine individual cases, and a scheduling
+  dimension — some staff simply aren't at work on the location's check-out day
+  (Thursday/Friday), so they can't check out in the meeting. This means the fix
+  is partly facilitation/ops (per-location), and any future reminder must be
+  schedule-aware (Deputy-gated) so we never nag someone on a day off. See §5.
 
 ### Explore — from "report card wearing a library's name" to "what to actually say"
 
 - Today the learning tab opens by **grading** the staff member (eval-average
   squares) before it teaches anything. Flip it: **lead with the tools** —
-  the scripts and audio that tell a front-desk hire what to actually say to
-  a nervous parent. These are the single most valuable and most buried asset
-  in the whole app; surface them as the headline, not four taps deep.
+  the scripts, audio, and descriptions that tell someone what to actually do
+  and say. (Same resource-availability caveat as Home: coverage is uneven, so
+  audit what exists first; description is the universal fallback.)
 - De-emphasize the graded squares; they belong to Performance, not the
   learning surface.
+- **Break Explore (the "museum" / Craft Atlas and The Alcan Way) into smaller
+  iterative pieces — it is NOT a one-shot build (John, 2026-08-20).** Before
+  building, John wants a dedicated design conversation about what the museum
+  actually looks like; expect to build it in stages, not from a single spec.
+  So this pass reserves Explore's identity and does the low-risk reorder
+  (lead-with-tools), but the fuller atlas/Alcan-Way build is its own
+  iterative track, specced in sections after that conversation.
 - **The Alcan Way is Explore's second pillar** (per `explore-page-plan.md`):
-  the patient-journey narrative, mobile swipe-first. This is pure
-  value-delivery with no input at all, and it is the clearest expression of
-  "the app teaches you to be great," so it anchors the tab's new identity.
+  the patient-journey narrative, mobile swipe-first — holding space here, part
+  of the iterative Explore track above, not built in this pass.
 
 ### Performance — from "museum of every time I was honest" to "growth tool"
 
@@ -203,10 +230,20 @@ member gets, not just gives or sees.
   callout. Coach and Self numbers side by side as information, not judgment (no
   amber/red gap styling); a gap in either direction is a calibration insight,
   not a failing.
-- Performance is the surface most at risk of being "half-alive" at launch
-  (its focus hero has no data for ~75% of evaluated staff today). It only
-  earns its tab if the recognition/intake work below lands. Flagged honestly
-  as a dependency, not assumed.
+- Performance's focus hero had no `staff_quarter_focus` for ~75% of evaluated
+  staff. **Investigated against live DB (2026-08-20): it's a real ADOPTION
+  gap, not a backfillable data bug.** Two mechanisms were being conflated:
+  - **The self-score DID change to an aggregation** (since 2026-04-21 it's the
+    average of the staff member's weekly performance scores per competency, not
+    an interview self-rating) — and that is populating fine (~83% of items). The
+    coach-vs-self card has solid data.
+  - **Focus is a separate staff choice** — pick 1-3 moves after reviewing the
+    eval. Only 20 of 59 evals were ever opened by the staff member, and 14 of
+    those chose a focus. Nothing can backfill a choice never made. So the focus
+    hero gap is filled by **adoption**, not migration: make focus selection
+    expected in the review flow (mirrors the glow-expected decision), a
+    coach-set default, or a nudge. The page already has an honest no-focus
+    state, so it is not "broken," just empty for the un-chosen.
 
 ### Recognition — the missing surface the existing system should provide
 
@@ -247,12 +284,19 @@ member gets, not just gives or sees.
   (nudge a teammate) — the app manufactures the urge and exports it to SMS.
   A real nudge needs the comms/notification layer, which is paused. **So
   this pass:** reorder the staff-detail page from compliance-stats-first to
-  coaching-first, add a disclosure line ("your lead can see this"), and fix
-  the Thursday headline that currently counts check-ins instead of
-  check-outs. The nudge action waits for comms.
+  coaching-first, and fix the Thursday headline that currently counts
+  check-ins instead of check-outs. The nudge action waits for comms.
 - Team stays a Home-owned drill-down (lead card that escalates toward
-  meeting day) plus an avatar-menu row — not a tab. Leads are 10 of ~68
+  meeting day) plus an avatar-menu row — not a tab. Leads are ~10 of ~68
   users; a tab is the scarcest resource in the IA.
+- **Role-structure distinction (John, 2026-08-20): the "lead" relationship is
+  role-based, not universal.** RDAs have Lead RDAs. **DFIs (front desk) do NOT
+  have a lead** — a DFI's "lead," functionally, is the **office manager or
+  regional manager.** So the Team/lead layer, the recognition-source options
+  (who can glow whom), and the role-aware avatar menu must not assume every
+  staff member reports to a peer lead; the supervising role differs by staff
+  role. Worth verifying against the actual role/scope model before building the
+  Team surface and the recognition-source field.
 
 ---
 
@@ -279,11 +323,32 @@ skeleton they hang on.
 
 None of these block starting the value reframe; they sharpen it.
 
-1. **Is the check-out leak individual or per-location?** Two read-only
-   queries on `weekly_scores` (per-location check-out completion; do
-   submissions cluster in meeting-shaped windows). Same query verifies the
-   "90% in meetings" figure, which is currently an estimate, not a
-   measurement. Changes whether reminders target individuals or facilitation.
+0. **Resource availability — audited 2026-08-20 (live DB).** For the fallback
+   chain script/audio → description → statement:
+   - **Script or audio: only ~16% of the 339 active pro moves**, and **only for
+     Front Desk (role 1) and Dental Assistant (role 2).** Office Managers get
+     **description only**; Doctors have a separate `doctor_*` content system
+     (~94% covered) that the card could treat as their "script" tier.
+   - **Description: 96.8%**, and the short `action_statement` is **100%** — so
+     the card should fall back script/audio → description → statement and will
+     **always render something real.** Audio is genuinely populated (real TTS
+     files), not aspirational.
+   - **No resource→move tagging system exists** beyond `pro_move_resources`
+     (one-to-many by `action_id`); John's "tag platform-housed resources to pro
+     moves and recommend them" is confirmed a future capability. v1 uses only
+     `pro_move_resources` + the move's description/statement.
+   - Implication for design: **expect a real script/audio card only ~1 in 6
+     times, mostly for front desk and assistants**; for everyone else the value
+     card is the move's description, well-written. That is fine, but the card's
+     copy/label must not promise "listen"/"script" when it's showing text.
+1. **Is the check-out leak individual or per-location?** John's read
+   (2026-08-20): **very likely per-location in most cases** — the location's
+   check-out meeting doesn't happen or gets skipped — with some genuine
+   individual cases and a scheduling dimension (staff not at work on the
+   check-out day). Confirmable with two read-only queries on `weekly_scores`
+   (per-location check-out completion; whether submissions cluster in
+   meeting-shaped windows). Determines how much of the fix is ops/facilitation
+   vs app, and means any reminder must be schedule-aware (Deputy-gated).
 2. **What do staff actually want on their phone** (schedule, pay,
    recognition, ask-a-question, progress)? A five-item forced-rank across
    ~15 staff settles the reserved-tab question (Ask vs Deputy) and the

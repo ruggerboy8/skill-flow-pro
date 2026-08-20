@@ -17,8 +17,19 @@ export function formatPrimaryReason(move: {
     case 'NEVER':
       return 'Never practiced yet';
     case 'STALE': {
-      const w = move.lastPracticedWeeks === 999 ? null : move.lastPracticedWeeks;
-      return w != null ? `Not practiced in ${w} weeks` : 'Not practiced recently';
+      // A STALE reason code paired with the 999 "never practiced" sentinel is
+      // contradictory upstream data (never-practiced moves should carry a
+      // NEVER reason code, not STALE) and the type system does not prevent
+      // it. Rather than silently falling back to a vague message, surface it
+      // loudly so the bad data gets noticed and traced back to its source.
+      if (move.lastPracticedWeeks === 999) {
+        console.warn(
+          'formatPrimaryReason: STALE reason code with lastPracticedWeeks=999 (the "never practiced" sentinel) — conflicting upstream data.',
+          move
+        );
+        return 'Conflicting data: marked stale but never practiced';
+      }
+      return `Not practiced in ${move.lastPracticedWeeks} weeks`;
     }
     case 'TIE':
     default:
@@ -39,48 +50,59 @@ export interface BadgeInfo {
   tooltip: string;
 }
 
+// At most 2 badges are ever shown (screen real estate on the recommender
+// card/row). When more than 2 signal conditions fire on the same move, this
+// order decides which ones survive the cap:
+//
+//   New (never practiced) > Low Conf > Retest > Stale
+//
+// "New" is deliberately ranked first. A move that has never been practiced
+// is the single highest-signal fact a coach can see about it, so it must
+// never be the one silently dropped by the cap, even on the rare move where
+// Low Conf and Retest also fire (e.g. a never-practiced move that already
+// has a retest scheduled and a low-confidence rating on record). See COR-5.
+const BADGE_PRIORITY: readonly string[] = ['New', 'Low Conf', 'Retest', 'Stale'];
+
 export function getBadges(move: {
   lowConfShare: number | null;
   retestDue: boolean;
   lastPracticedWeeks: number;
   primaryReasonCode: string;
 }): BadgeInfo[] {
-  const badges: BadgeInfo[] = [];
-  
-  // Priority 1: Low confidence (>=33% rated 1-2)
+  const candidates: Record<string, BadgeInfo> = {};
+
   if (move.primaryReasonCode === 'LOW_CONF' || (move.lowConfShare !== null && move.lowConfShare >= 0.33)) {
-    badges.push({
+    candidates['Low Conf'] = {
       label: 'Low Conf',
       tooltip: 'High share of 1–2 scores recently',
-    });
+    };
   }
-  
-  // Priority 2: Retest due
+
   if (move.retestDue) {
-    badges.push({
+    candidates['Retest'] = {
       label: 'Retest',
       tooltip: 'Return soon to verify improvement',
-    });
+    };
   }
-  
-  // Priority 3: Never practiced
+
   if (move.lastPracticedWeeks === 999) {
-    badges.push({
+    candidates['New'] = {
       label: 'New',
       tooltip: 'Never practiced yet',
-    });
+    };
   }
-  
-  // Priority 4: Stale (8+ weeks, not retest, not never)
+
+  // Stale (8+ weeks, not retest, not never)
   if (!move.retestDue && move.lastPracticedWeeks !== 999 && move.lastPracticedWeeks >= 8) {
-    badges.push({
+    candidates['Stale'] = {
       label: 'Stale',
       tooltip: 'Not practiced in 8+ weeks',
-    });
+    };
   }
-  
-  // Return max 2 badges
-  return badges.slice(0, 2);
+
+  return BADGE_PRIORITY.filter((label) => candidates[label])
+    .map((label) => candidates[label])
+    .slice(0, 2);
 }
 
 // Filtering and sorting functions

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { applyFilters, getBadges, formatPrimaryReason, FilterState } from './recommenderUtils';
 
 // A "move" here is a ranked Pro Move recommendation as the sequencer panel
@@ -82,16 +82,22 @@ describe('formatPrimaryReason', () => {
     expect(text).toBe('Not practiced in 10 weeks');
   });
 
-  it('falls back to a generic staleness message when weeks is the "never" sentinel (999)', () => {
+  it('surfaces a conflicting-data message and warns when a STALE reason is paired with the "never" sentinel (999)', () => {
     // A STALE reason paired with the 999 "never practiced" sentinel is a
-    // contradiction the type system does not prevent (see PR notes).
+    // contradiction the type system does not prevent. Rather than quietly
+    // falling back to a vague message, this should be loud: an explicit
+    // "conflicting data" message plus a console.warn so the bad upstream
+    // data gets noticed. See COR-5.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const text = formatPrimaryReason({
       primaryReasonCode: 'STALE',
       primaryReasonValue: null,
       lowConfShare: null,
       lastPracticedWeeks: 999,
     });
-    expect(text).toBe('Not practiced recently');
+    expect(text).toBe('Conflicting data: marked stale but never practiced');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
   });
 
   it('explains a tie reason as high overall need', () => {
@@ -248,9 +254,9 @@ describe('getBadges', () => {
   it('caps display at two badges, keeping the two highest-priority ones', () => {
     // Low Conf, Retest and New can all technically fire together even
     // though this combination is a strange real-world state (never
-    // practiced but a retest is due). getBadges does not guard against it,
-    // so the truncation to 2 quietly drops "New" here. Flagged in the PR,
-    // not fixed.
+    // practiced but a retest is due). "New" is the highest-signal fact here
+    // (see BADGE_PRIORITY in recommenderUtils.ts), so it must survive the
+    // 2-badge cap instead of being silently dropped. See COR-5.
     const badges = getBadges({
       lowConfShare: 0.5,
       retestDue: true,
@@ -258,6 +264,27 @@ describe('getBadges', () => {
       primaryReasonCode: 'LOW_CONF',
     });
     expect(badges).toHaveLength(2);
+    expect(badges.map((b) => b.label)).toEqual(['New', 'Low Conf']);
+  });
+
+  it('keeps "New" even when all four signal conditions fire at once', () => {
+    const badges = getBadges({
+      lowConfShare: 0.5,
+      retestDue: true,
+      lastPracticedWeeks: 999,
+      primaryReasonCode: 'LOW_CONF',
+    });
+    expect(badges.map((b) => b.label)).toContain('New');
+  });
+
+  it('orders badges by priority (New > Low Conf > Retest > Stale) regardless of which two survive the cap', () => {
+    // Low Conf + Retest, no New in play: order should still follow priority.
+    const badges = getBadges({
+      lowConfShare: 0.5,
+      retestDue: true,
+      lastPracticedWeeks: 3,
+      primaryReasonCode: 'LOW_CONF',
+    });
     expect(badges.map((b) => b.label)).toEqual(['Low Conf', 'Retest']);
   });
 });

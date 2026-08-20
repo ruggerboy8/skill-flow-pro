@@ -34,6 +34,18 @@ describe('getManagementLinks', () => {
     expect(result.map((r) => r.name)).toEqual(['Coach']);
   });
 
+  it('keeps a doctor\'s /doctor/my-role even though it is labeled "My Role"', () => {
+    const navigation = [
+      { name: 'Home', href: '/' },
+      { name: 'My Role', href: '/doctor/my-role' },
+    ];
+    // Exclusion is by route, not label: the doctor's role page is NOT the
+    // Explore tab's /my-role, so it must survive.
+    expect(getManagementLinks(navigation)).toEqual([
+      { name: 'My Role', href: '/doctor/my-role' },
+    ]);
+  });
+
   it('keeps every management destination for an org admin', () => {
     const navigation = [
       { name: 'Command Center', href: '/dashboard' },

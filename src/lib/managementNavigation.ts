@@ -6,11 +6,13 @@
  * never re-derive roles independently, or the avatar menu and the desktop
  * sidebar can drift out of sync (see CLAUDE.md split-brain-permissions note).
  *
- * "Home" and "My Role" are excluded because those destinations are already
- * reachable via the mobile shell's Home and Explore tabs; everything else
- * in `navigation` (Coach, Facilitate, Command Center, Training, Builder,
- * Admin, Evaluations, Clinical, Doctor, My Location, Platform, ...) is a
- * management/secondary surface the tabs don't cover.
+ * The Home tab ("/") and the Explore tab ("/my-role") already cover those
+ * destinations, so they are excluded. Exclusion is by ROUTE, not by label:
+ * a doctor's role page is also named "My Role" but lives at "/doctor/my-role",
+ * so a name-based filter would wrongly drop it from a flagged doctor's menu.
+ * Everything else in `navigation` (Coach, Facilitate, Command Center, Training,
+ * Builder, Admin, Evaluations, Clinical, Doctor, My Location, Platform, ...) is
+ * a management/secondary surface the tabs don't cover.
  */
 
 export interface NavLinkItem {
@@ -18,8 +20,8 @@ export interface NavLinkItem {
   href: string;
 }
 
-const TAB_COVERED_LINK_NAMES = new Set(['Home', 'My Role']);
+const TAB_COVERED_ROUTES = new Set(['/', '/my-role']);
 
 export function getManagementLinks<T extends NavLinkItem>(navigation: T[]): T[] {
-  return navigation.filter((item) => !TAB_COVERED_LINK_NAMES.has(item.name));
+  return navigation.filter((item) => !TAB_COVERED_ROUTES.has(item.href));
 }

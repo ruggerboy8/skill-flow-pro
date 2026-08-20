@@ -173,13 +173,14 @@ describe('buildLocationStatusLine', () => {
   });
 
   describe('partially excused', () => {
-    it('names the excused metric with its reason', () => {
+    it('names the excused metric with its reason when the live metric has nothing to report', () => {
       expect(
         buildLocationStatusLine({
           ...base,
           isPartiallyExcused: true,
           confExcused: true,
           confReason: 'new location ramp-up',
+          nextDeadlineLabel: null,
         }),
       ).toEqual([{ text: 'conf excused: new location ramp-up' }]);
     });
@@ -193,6 +194,62 @@ describe('buildLocationStatusLine', () => {
           perfReason: null,
         }),
       ).toEqual([{ text: 'perf excused' }]);
+    });
+
+    // DASH-2 QA fix 3: an excuse on one metric must never hide stragglers on
+    // the other, still-live metric - it only adds a reason phrase on top.
+    it('conf excused, perf late: reports the live perf lateness before the excuse reason', () => {
+      expect(
+        buildLocationStatusLine({
+          ...base,
+          tier: 'watch',
+          isPartiallyExcused: true,
+          confExcused: true,
+          confReason: 'holiday closure',
+          confClosed: true,
+          perfClosed: true,
+          missingConfCount: 0, // caller zeroes the excused metric's count
+          missingPerfCount: 3,
+        }),
+      ).toEqual([{ text: '3 late (perf)' }, { text: 'conf excused: holiday closure' }]);
+    });
+
+    it('perf excused, conf late at red tier: reports the live conf misses before the excuse reason', () => {
+      expect(
+        buildLocationStatusLine({
+          ...base,
+          tier: 'red',
+          isPartiallyExcused: true,
+          perfExcused: true,
+          perfReason: 'system outage',
+          confClosed: true,
+          perfClosed: true,
+          missingConfCount: 5,
+          missingPerfCount: 0, // caller zeroes the excused metric's count
+          distinctMissedCount: 5,
+        }),
+      ).toEqual([
+        { text: '5 people missing (conf)' },
+        { text: 'perf excused: system outage' },
+      ]);
+    });
+
+    it('conf excused, perf still open with no misses: appends the reason after the window phrase', () => {
+      expect(
+        buildLocationStatusLine({
+          ...base,
+          tier: 'good',
+          isPartiallyExcused: true,
+          confExcused: true,
+          confReason: 'new location ramp-up',
+          confClosed: true,
+          perfOpen: true,
+          nextDeadlineLabel: 'Perf due Fri 5:00 PM',
+        }),
+      ).toEqual([
+        { text: 'perf window open until Fri 5:00 PM' },
+        { text: 'conf excused: new location ramp-up' },
+      ]);
     });
   });
 

@@ -72,7 +72,7 @@ Post-deadline, red collapse: red border, light red wash, red chip:
 | Fully excused | "Excused" wordmark, muted, reason as sub-line | none | "no submissions required" | outline excused chip | muted border, muted/20 bg |
 | Partially excused | per live metric rules above | excused slot reads "Conf excused" | reason in status line | outline excused chip | tier from the live metric only |
 
-Notes: "distinct missed count" is stats.distinctMissedCount (already on LocationStats). The next-deadline label already arrives via the nextDeadlineLabel prop; reuse it for the "conf due Tue 10am" / "perf open until ..." phrases (lowercase the first letter if needed for prose flow). "N people missing: X conf, Y perf" uses distinctMissedCount with the per-metric counts in the breakdown; if only one metric has misses, simplify to "N people missing (conf)".
+Notes: "distinct missed count" is stats.distinctMissedCount (already on LocationStats). The next-deadline label already arrives via the nextDeadlineLabel prop; reuse it for the "conf due Tue 10am" / "perf open until ..." phrases (lowercase the first letter if needed for prose flow). "N people missing: X conf, Y perf" uses distinctMissedCount with the per-metric counts in the breakdown; if only one metric has misses, simplify to "N people missing (conf)". Clarification (QA fix, DASH-2): for the partially excused row, "reason in status line" means the excuse reason is appended after the live metric's own normal-state phrases (late counts, window/deadline info), never in place of them - an excuse on one metric must not hide stragglers on the other, still-live metric.
 
 ## Anti-goals
 

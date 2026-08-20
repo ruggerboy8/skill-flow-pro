@@ -86,39 +86,27 @@ function missingOrLatePhrases(
 }
 
 /**
- * Builds the ordered list of dot-separated status-line phrases for
- * LocationHealthCard (DASH-2). Pure: state in, phrase list out, so the
- * component can render it directly and the state matrix can be unit tested
- * without mounting the card.
+ * The live (non-excused) metric's normal state-rule phrases: late/missing
+ * facts, deadline/window context, or "all in" when clean. Identical to what
+ * a fully live (non-excused) card would show - a partial excuse only ever
+ * adds a reason phrase on top of this, never replaces it (DASH-2 QA fix 3:
+ * excused-metric silence must not hide a live metric's stragglers).
  */
-export function buildLocationStatusLine(input: LocationStatusLineInput): StatusPhrase[] {
-  const {
-    tier,
-    isFullyExcused,
-    isPartiallyExcused,
-    confExcused,
-    perfExcused,
-    confReason,
-    perfReason,
-    confClosed,
-    perfClosed,
-    perfOpen,
-    missingConfCount,
-    missingPerfCount,
-    distinctMissedCount,
-    nextDeadlineLabel,
-  } = input;
-
-  if (isFullyExcused) {
-    return [{ text: 'no submissions required' }];
-  }
-
-  if (isPartiallyExcused) {
-    const metric = confExcused ? 'conf' : 'perf';
-    const reason = confExcused ? confReason : perfReason;
-    return [{ text: reason ? `${metric} excused: ${reason}` : `${metric} excused` }];
-  }
-
+function buildLiveMetricPhrases(
+  input: Pick<
+    LocationStatusLineInput,
+    | 'tier'
+    | 'confClosed'
+    | 'perfClosed'
+    | 'perfOpen'
+    | 'missingConfCount'
+    | 'missingPerfCount'
+    | 'distinctMissedCount'
+    | 'nextDeadlineLabel'
+  >,
+): StatusPhrase[] {
+  const { tier, confClosed, perfClosed, perfOpen, missingConfCount, missingPerfCount, distinctMissedCount, nextDeadlineLabel } =
+    input;
   const anyDeadlinePassed = confClosed || perfClosed;
 
   // Nothing due yet: the only fact worth a phrase is when the next thing is due.
@@ -141,6 +129,33 @@ export function buildLocationStatusLine(input: LocationStatusLineInput): StatusP
   const phrases = missingOrLatePhrases(tier, missingConfCount, missingPerfCount, distinctMissedCount);
   if (phrases.length === 0) {
     return [{ text: 'all in', icon: 'check' }];
+  }
+  return phrases;
+}
+
+/**
+ * Builds the ordered list of dot-separated status-line phrases for
+ * LocationHealthCard (DASH-2). Pure: state in, phrase list out, so the
+ * component can render it directly and the state matrix can be unit tested
+ * without mounting the card.
+ */
+export function buildLocationStatusLine(input: LocationStatusLineInput): StatusPhrase[] {
+  const { isFullyExcused, isPartiallyExcused, confExcused, confReason, perfReason } = input;
+
+  if (isFullyExcused) {
+    return [{ text: 'no submissions required' }];
+  }
+
+  // A partial excuse only silences the excused metric's own facts (the
+  // caller already zeroes its missing count before calling this function).
+  // The live metric still reports its normal state-rule phrases - stragglers
+  // on the live metric must never be hidden by the other metric's excuse -
+  // with the excuse reason appended last, not substituted in its place.
+  const phrases = buildLiveMetricPhrases(input);
+  if (isPartiallyExcused) {
+    const metric = confExcused ? 'conf' : 'perf';
+    const reason = confExcused ? confReason : perfReason;
+    phrases.push({ text: reason ? `${metric} excused: ${reason}` : `${metric} excused` });
   }
   return phrases;
 }

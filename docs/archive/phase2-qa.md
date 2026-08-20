@@ -1,4 +1,14 @@
 > **Archived 2026-08-19 (DOC-5).** This is a historical record, accurate about the past, and is not a description of how the system works today. Do not treat it as current. For the present state see docs/README.md.
+>
+> **Addendum, 2026-08-19 (DOC-3):** `VITE_USE_WEEKLY_ASSIGNMENTS` and
+> `useWeeklyAssignmentsV2Enabled` no longer exist anywhere in `src/` (grepped
+> and confirmed zero hits). The flag was not just defaulted on, it was
+> deleted outright once `weekly_plan`/`weekly_focus` were retired on
+> 2026-07-25. `src/hooks/useWeeklyAssignments.tsx` still exists but now
+> queries `weekly_assignments` unconditionally, with no flag and no fallback
+> branch; `src/pages/Week.tsx` no longer exists at all. `weekly_assignments`
+> is unconditionally the only source now. This is the "documented feature
+> flag is dead" finding from the 2026-08-18 assessment.
 
 # Phase 2 QA: Dual-Read Feature Flag Validation
 

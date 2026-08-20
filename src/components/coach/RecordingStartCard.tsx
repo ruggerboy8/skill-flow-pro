@@ -67,18 +67,18 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
                 <div className={cn(
                   "p-2 rounded-full",
                   hasExistingInsights && !isRecording
-                    ? "bg-green-100 dark:bg-green-950"
-                    : isRecording 
-                      ? isPaused ? "bg-amber-100 dark:bg-amber-950" : "bg-red-100 dark:bg-red-950"
+                    ? "bg-[hsl(var(--status-complete-bg))]"
+                    : isRecording
+                      ? isPaused ? "bg-[hsl(var(--status-late-bg))]" : "bg-destructive/10"
                       : "bg-muted"
                 )}>
                   {hasExistingInsights && !isRecording ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    <CheckCircle2 className="w-5 h-5 text-[hsl(var(--status-complete))]" />
                   ) : (
                     <Mic className={cn(
                       "w-5 h-5",
-                      isRecording 
-                        ? isPaused ? "text-amber-600" : "text-red-600" 
+                      isRecording
+                        ? isPaused ? "text-[hsl(var(--status-late))]" : "text-destructive"
                         : "text-muted-foreground"
                     )} />
                   )}
@@ -95,11 +95,11 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
                       Loading saved recording...
                     </p>
                   ) : showDraftNotice ? (
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                    <p className="text-xs text-[hsl(var(--status-late))]">
                       Draft recording found — scroll down to review
                     </p>
                   ) : hasExistingInsights && !isRecording ? (
-                    <p className="text-xs text-green-600 dark:text-green-400">
+                    <p className="text-xs text-[hsl(var(--status-complete))]">
                       Notes have been mapped to competencies below
                     </p>
                   ) : isRecording ? (
@@ -149,13 +149,13 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
                     {/* Status badge */}
                     <span className={cn(
                       "flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium",
-                      isPaused 
-                        ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200"
-                        : "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200"
+                      isPaused
+                        ? "bg-[hsl(var(--status-late-bg))] text-[hsl(var(--status-late))]"
+                        : "bg-destructive/10 text-destructive"
                     )}>
                       <span className={cn(
                         "w-2 h-2 rounded-full",
-                        isPaused ? "bg-amber-500" : "bg-red-500 animate-pulse"
+                        isPaused ? "bg-[hsl(var(--status-late))]" : "bg-destructive animate-pulse"
                       )} />
                       {isPaused ? "Paused" : "Recording"}
                     </span>

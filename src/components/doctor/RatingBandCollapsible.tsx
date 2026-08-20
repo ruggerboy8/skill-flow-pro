@@ -15,6 +15,8 @@ interface RatingBandCollapsibleProps {
   onItemClick: (item: BaselineItem) => void;
 }
 
+// 1-4 self-rating bands use the --score-N learning-gradient tokens (DASH-1a:
+// confidence/skill scores never render as a red/green traffic light).
 const BAND_CONFIG: Record<number, {
   label: string;
   subtext: string;
@@ -25,30 +27,30 @@ const BAND_CONFIG: Record<number, {
   4: {
     label: '4 — Exceptional, above and beyond',
     subtext: 'If this is a 4, you\'re saying you go beyond the standard—others look to you as the example.',
-    bgClass: 'bg-emerald-50 dark:bg-emerald-950/30',
-    borderClass: 'border-emerald-200 dark:border-emerald-800',
-    textClass: 'text-emerald-700 dark:text-emerald-300',
+    bgClass: 'bg-[hsl(var(--score-4-bg))]',
+    borderClass: 'border-[hsl(var(--score-4))]/30',
+    textClass: 'text-[hsl(var(--score-4))]',
   },
   3: {
     label: '3 — Excellent, consistent standard',
     subtext: 'If this is a 3, you\'re saying you do this reliably and well—it\'s part of who you are.',
-    bgClass: 'bg-blue-50 dark:bg-blue-950/30',
-    borderClass: 'border-blue-200 dark:border-blue-800',
-    textClass: 'text-blue-700 dark:text-blue-300',
+    bgClass: 'bg-[hsl(var(--score-3-bg))]',
+    borderClass: 'border-[hsl(var(--score-3))]/30',
+    textClass: 'text-[hsl(var(--score-3))]',
   },
   2: {
     label: '2 — Good, with room to grow',
     subtext: 'If this is a 2, you\'re saying there\'s opportunity here—you\'re working on it.',
-    bgClass: 'bg-amber-50 dark:bg-amber-950/30',
-    borderClass: 'border-amber-200 dark:border-amber-800',
-    textClass: 'text-amber-700 dark:text-amber-300',
+    bgClass: 'bg-[hsl(var(--score-2-bg))]',
+    borderClass: 'border-[hsl(var(--score-2))]/30',
+    textClass: 'text-[hsl(var(--score-2))]',
   },
   1: {
     label: '1 — Needs focus',
     subtext: 'If this is a 1, you\'re saying this isn\'t reliably showing up yet.',
-    bgClass: 'bg-red-50 dark:bg-red-950/30',
-    borderClass: 'border-red-200 dark:border-red-800',
-    textClass: 'text-red-700 dark:text-red-300',
+    bgClass: 'bg-[hsl(var(--score-1-bg))]',
+    borderClass: 'border-[hsl(var(--score-1))]/30',
+    textClass: 'text-[hsl(var(--score-1))]',
   },
 };
 

@@ -35,6 +35,7 @@ import { QuarterlyEvalsTab } from '@/components/coach/QuarterlyEvalsTab';
 import { StaffOverviewTab } from '@/components/coach/StaffOverviewTab';
 import { RawScoreRow } from '@/types/coachV2';
 import { getDomainPastelVar, getDomainColorVar, getDomainPastelVarRaw } from '@/lib/domainColors';
+import { scoreBucket, scoreBucketTokens } from '@/lib/confidenceScoreRamp';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { toast } from 'sonner';
 import { getLocationSubmissionGates, type SubmissionGates } from '@/lib/submissionStatus';
@@ -434,13 +435,18 @@ export default function StaffDetailV2() {
           <div className="flex flex-wrap gap-2">
             {domainConfidenceStrip.map(({ domain, avg }) => {
               const richColor = getDomainColorVar(domain);
-              const bgColor = avg >= 3.0 ? 'bg-emerald-50 dark:bg-emerald-950/20' : avg >= 2.5 ? 'bg-amber-50 dark:bg-amber-950/20' : 'bg-rose-50 dark:bg-rose-950/20';
-              const textColor = avg >= 3.0 ? 'text-emerald-700 dark:text-emerald-400' : avg >= 2.5 ? 'text-amber-700 dark:text-amber-400' : 'text-rose-700 dark:text-rose-400';
+              // Confidence scores use the 1-4 score-ramp gradient, never a
+              // red/amber/green traffic light — see confidenceScoreRamp.ts (DASH-1a).
+              const tokens = scoreBucketTokens(scoreBucket(avg));
               return (
-                <div key={domain} className={`flex items-center gap-2 rounded-lg px-3 py-2 border ${bgColor}`}>
+                <div
+                  key={domain}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 border"
+                  style={{ backgroundColor: tokens.bg, borderColor: tokens.text }}
+                >
                   <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: richColor }} />
                   <span className="text-xs font-medium text-muted-foreground">{domain}</span>
-                  <span className={`text-sm font-bold ${textColor}`}>{avg.toFixed(1)}</span>
+                  <span className="text-sm font-bold" style={{ color: tokens.text }}>{avg.toFixed(1)}</span>
                 </div>
               );
             })}
@@ -502,7 +508,14 @@ export default function StaffDetailV2() {
                                   Week of {format(parseISO(weekOf), 'MMM d, yyyy')}
                                 </span>
                                 {isWeekExempt && (
-                                  <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
+                                  <Badge
+                                    variant="secondary"
+                                    style={{
+                                      backgroundColor: 'hsl(var(--status-excused-bg))',
+                                      color: 'hsl(var(--status-excused))',
+                                      borderColor: 'hsl(var(--status-excused) / 0.3)',
+                                    }}
+                                  >
                                     <CalendarOff className="h-3 w-3 mr-1" />
                                     Exempt
                                   </Badge>

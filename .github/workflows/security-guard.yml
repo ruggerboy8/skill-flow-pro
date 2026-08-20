@@ -1,0 +1,32 @@
+name: Security guard (nightly)
+
+# SEC-1 regression guard. Runs the anon-read-surface test against production
+# Supabase every night, plus on demand. A failed run means the anon-read
+# exposure closed by SEC-1 (PR #15) may have reopened - see
+# docs/specs/sec-1-anon-read-regression-guard.md and
+# src/security/anonReadSurface.test.ts.
+#
+# No secrets are needed: the anon (publishable) key is already public and
+# committed in src/integrations/supabase/client.ts.
+
+on:
+  schedule:
+    # 09:00 UTC daily (03:00-04:00 America/Chicago depending on DST).
+    - cron: '0 9 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  anon-read-surface:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npx vitest run src/security/anonReadSurface.test.ts
+        env:
+          RUN_LIVE_SECURITY_TESTS: '1'

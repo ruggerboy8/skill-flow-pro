@@ -303,6 +303,7 @@ medium.
 
 ## Resolved (John, 2026-08-20)
 
+- **Wave 0 + Wave 1 confirmed for build** — MOB-1/2/3 then MOB-4/5.
 - **Recognition-source (MOB-4)** — add a glow-source field now, kept loose
   (evaluator today, extensible; must not assume an evaluator).
 - **Glow granularity (MOB-4)** — per competency, so MOB-5 can select by domain.
@@ -310,6 +311,13 @@ medium.
   domain; no clutter.
 - **Coach-vs-self comparison (MOB-7)** — keep it as a self-awareness check;
   reframe the display neutral and two-directional, not an "overconfident" callout.
+- **Focus selection is "expected"** as part of eval review; the ~75% gap is an
+  internal/ops problem (people haven't been given time/nudges to complete
+  reviews), which a future push notification can help. No backfill; the lever is
+  adoption of the review-and-choose-focus step.
+- **Value card resource tiers (MOB-3)** — Doctors stay on the **description**
+  tier for v1 (don't wire the `doctor_*` content in yet). Card copy never
+  promises "listen"/"script" when showing text.
 
 ## Open questions still carried into the tickets
 

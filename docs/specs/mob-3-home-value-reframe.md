@@ -141,6 +141,6 @@ inside `ThisWeekPanel` → `MobileMovesAndBanner`
    If a staff member has several, does the value card show the first, the
    lowest-confidence one, or rotate? (Recommend: the lowest-confidence focus
    move, matching the recognition-card selection rule in MOB-5.)
-2. **Doctor content tier.** Should the value card treat the `doctor_*` content
-   as the script tier for role-4 users (0% → ~94% media coverage), or keep
-   doctors on the description tier for v1?
+2. **Doctor content tier — RESOLVED (John, 2026-08-20):** keep doctors on the
+   **description** tier for v1. Do not wire the `doctor_*` content into the value
+   card yet.

@@ -9,6 +9,7 @@ import { getManagementLinks } from '@/lib/managementNavigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { InstallInstructions } from '@/components/pwa/InstallInstructions';
 import { isStandalone, isDeviceOptedOut, setDeviceOptOut } from '@/lib/pwa';
+import { ProMovesLogo } from '@/components/ProMovesLogo';
 
 export interface ManagementNavItem {
   name: string;
@@ -181,6 +182,14 @@ export function MoreMenuRows({
           </div>
         </div>
       )}
+
+      {/* DSN-8: guaranteed Pro Moves wordmark in the menu's footer. Quiet,
+          non-interactive (not a row — no hover state, no chevron, no
+          click), separated from the rows above the same way the sections
+          above are separated from each other. */}
+      <div className="mt-3 flex justify-center border-t border-border pt-3 cursor-default">
+        <ProMovesLogo className="text-xs opacity-70" />
+      </div>
     </div>
   );
 }

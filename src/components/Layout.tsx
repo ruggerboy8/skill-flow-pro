@@ -39,11 +39,11 @@ export default function Layout() {
     organizationId,
     isLoading: roleInfoLoading,
     isCoach,
+    isLead,
     isSuperAdmin,
     isOrgAdmin,
     isRegional,
     isParticipant,
-    isLead,
     isOfficeManager,
     isDoctor,
     isClinicalDirector,
@@ -114,7 +114,14 @@ export default function Layout() {
   const canAccessAdmin = isSuperAdmin || isOrgAdmin;
 
   // Tab visibility derived from role flags + capability toggles (all from useUserRole).
-  const showCoachTabs = isCoach || isOrgAdmin || isLead || canViewSubmissions || canSubmitEvals;
+  // isLead dropped (MOB-ADJUST-1 item 6): a pure lead (is_lead but not is_coach) no
+  // longer gets the old Coach dashboard link — they use /team instead. Real coaches
+  // (isCoach), org admins, and evaluators (canViewSubmissions/canSubmitEvals) keep it.
+  // showCoachTabs gates only the "Coach" nav entry below (checked repo-wide); it isn't
+  // used for route access — /coach's own guard (allowCoachSurface) still includes
+  // isLead, so a pure lead could still reach /coach by typed URL even with the link
+  // gone. That route-level change wasn't in scope for this ticket.
+  const showCoachTabs = isCoach || isOrgAdmin || canViewSubmissions || canSubmitEvals;
   // Facilitate is for the people who run check-in/check-out meetings (directors /
   // regionals / admins) — leads and OMs keep Coach but not Facilitate. Participants
   // are excluded even when they hold org-wide scopes (several lead RDAs do, which
@@ -181,6 +188,13 @@ export default function Layout() {
     // Doctor portal — for admins/coaches who are also doctors
     ...(isDoctor ? [
       { name: 'Doctor', href: '/doctor', icon: Stethoscope },
+    ] : []),
+    // Lead RDAs get a Team link (their team surface), on every layout — desktop
+    // sidebar and the mobile avatar menu — replacing the old Coach page they lost
+    // when isLead was dropped from showCoachTabs. On mobile Home there is also a
+    // "My Team" button; this keeps a route for desktop / unflagged-browser leads.
+    ...(isLead ? [
+      { name: 'Team', href: '/team', icon: Users },
     ] : []),
     ...(showCoachTabs ? [
       { name: 'Coach', href: '/coach', icon: Users },

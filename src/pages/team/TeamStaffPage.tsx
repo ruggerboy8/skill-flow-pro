@@ -132,7 +132,12 @@ export default function TeamStaffPage() {
       {evalData && (
         <div className="rounded-2xl border border-border bg-card p-4">
           <h2 className="text-[15px] font-semibold">From their {evalData.periodLabel} evaluation</h2>
-          <div className="mt-2">
+          <div className="flex items-center gap-2 pt-2 pb-1">
+            <span className="flex-1" />
+            <span className="w-11 text-center text-2xs font-bold uppercase tracking-wide text-muted-foreground">Evaluator</span>
+            <span className="w-11 text-center text-2xs font-bold uppercase tracking-wide text-muted-foreground">Self</span>
+          </div>
+          <div>
             {Array.from(
               evalData.domainRows.reduce((map, row) => {
                 const entry = map.get(row.domain_name) ?? { observerSum: 0, observerN: 0, selfSum: 0, selfN: 0 };

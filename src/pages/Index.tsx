@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import RegionalDashboard from '@/pages/dashboard/RegionalDashboard';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Wrench, ArrowRight, ChevronRight } from 'lucide-react';
+import { Wrench, ArrowRight, ChevronRight, Users } from 'lucide-react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { differenceInDays, format } from 'date-fns';
 
@@ -118,28 +118,29 @@ export default function Index() {
               statement. Never an empty shell; absent when no focus is chosen. */}
           <FocusMoveValueCard />
 
-          {/* rank: lead-focus, lead-meeting-request — Ariyana's weekly focus +
-              scheduling, at the bottom on mobile. The card wraps in a
-              pressable that navigates to /team (section F); LeadFocusHomeCard
-              itself is untouched. */}
+          {/* rank: lead-focus, lead-meeting-request — Ariyana's weekly focus
+              (display-only, no longer a disguised nav target — MOB-ADJUST-1
+              item 1 QA feedback: tapping the focus card to reach /team read
+              as mislabeled navigation) + the meeting-request card, plus a
+              separate, explicitly-labeled "My Team" row to reach the roster. */}
           {staffProfile?.is_lead && (
             <>
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => navigate('/team')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    navigate('/team');
-                  }
-                }}
-                className="relative cursor-pointer active:opacity-90"
-              >
-                <LeadFocusHomeCard isLead={staffProfile.is_lead} />
-                <ChevronRight className="h-4 w-4 text-muted-foreground absolute top-3.5 right-4 pointer-events-none" />
-              </div>
+              <LeadFocusHomeCard isLead={staffProfile.is_lead} />
               <LeadMeetingRequestCard staffId={staffProfile.id} isLead={staffProfile.is_lead} />
+              <button
+                type="button"
+                onClick={() => navigate('/team')}
+                className="w-full flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 min-h-[56px] text-left active:bg-primary/5"
+              >
+                <div
+                  className="h-8 w-8 rounded-full flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: 'hsl(var(--primary) / 0.08)', color: 'hsl(var(--primary))' }}
+                >
+                  <Users className="h-4 w-4" />
+                </div>
+                <span className="flex-1 text-[15px] font-semibold">My Team</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground flex-none" />
+              </button>
             </>
           )}
 

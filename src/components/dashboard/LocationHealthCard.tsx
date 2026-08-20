@@ -12,6 +12,7 @@ export interface LocationStats {
   submissionRate: number;      // 0-100 (conf+perf complete %)
   missingConfCount: number;    // staff missing confidence (after deadline - LATE)
   missingPerfCount: number;    // staff missing performance (after deadline - LATE)
+  distinctMissedCount: number; // DISTINCT staff missing anything (a person missing both conf and perf counts once)
   pendingConfCount?: number;   // staff not yet submitted but before deadline
   confSubmitted?: number;      // raw count of conf submissions
   confExpected?: number;       // raw count of expected conf submissions
@@ -70,12 +71,19 @@ export function LocationHealthCard({
   const perfOpen = submissionGates?.performanceOpen ?? false;
   const anyDeadlinePassed = confClosed || perfClosed;
 
+  // Round once and reuse everywhere (tier decision AND display) so a
+  // displayed 60% can never be judged red and a displayed 85% can never
+  // read as below the watch threshold (DASH-1a QA fix: rounding mismatch).
+  const displayRate = Math.round(stats.submissionRate);
+
   // The single source of truth for card-level alarm color: red only past a
   // deadline and below the red threshold (with the small-team guard), amber
   // in the watch band, otherwise the default surface. See DASH-1a spec.
+  // Uses distinctMissedCount (DASH-1a QA fix), not missingConfCount +
+  // missingPerfCount, which double-counts anyone missing both metrics.
   const tier = participationTier({
-    rate: stats.submissionRate,
-    missedCount: stats.missingConfCount + stats.missingPerfCount,
+    rate: displayRate,
+    missedCount: stats.distinctMissedCount,
     teamSize: stats.staffCount,
     anyDeadlinePassed,
   });
@@ -117,7 +125,7 @@ export function LocationHealthCard({
       return (
         <>
           <div className="text-2xl font-black" style={{ color: rateColor }}>
-            {Math.round(stats.submissionRate)}%
+            {displayRate}%
           </div>
           <div className="text-2xs text-muted-foreground leading-tight">Submitted</div>
         </>
@@ -129,7 +137,7 @@ export function LocationHealthCard({
       return (
         <>
           <div className="text-2xl font-black" style={{ color: rateColor }}>
-            {Math.round(stats.submissionRate)}%
+            {displayRate}%
           </div>
           <div className="text-2xs text-muted-foreground leading-tight">Conf Rate</div>
           {perfOpen && confExp > 0 && (

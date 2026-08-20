@@ -15,7 +15,7 @@ import { format as formatDate } from 'date-fns';
 import { StaffWeekSummary } from '@/types/coachV2';
 import { nowUtc } from '@/lib/centralTime';
 import { useLocationTimezone } from '@/hooks/useLocationTimezone';
-import { getLocationSubmissionGates, calculateLocationStats, type SubmissionGates } from '@/lib/submissionStatus';
+import { getLocationSubmissionGates, calculateLocationStats, calculateDistinctMissedCount, type SubmissionGates } from '@/lib/submissionStatus';
 import { getSubmissionPolicy, getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
 import { participationTier, tierColorTokens } from '@/lib/participationTier';
 import { supabase } from '@/integrations/supabase/client';
@@ -121,12 +121,12 @@ export default function RegionalDashboard() {
       
       const locStats = calculateLocationStats(staff, gates);
       const excuseStatus = getExcuseStatus(locId);
-      
+
       let adjustedMissingConf = locStats.missingConfCount;
       let adjustedMissingPerf = locStats.missingPerfCount;
       let adjustedPendingConf = locStats.pendingConfCount;
       let adjustedSubmissionRate = locStats.submissionRate;
-      
+
       if (excuseStatus.isConfExcused) {
         adjustedMissingConf = 0;
         adjustedPendingConf = 0;
@@ -134,11 +134,21 @@ export default function RegionalDashboard() {
       if (excuseStatus.isPerfExcused) {
         adjustedMissingPerf = 0;
       }
-      
+
       if (excuseStatus.isConfExcused && excuseStatus.isPerfExcused) {
         adjustedSubmissionRate = 100;
       }
-      
+
+      // DASH-1a QA fix: distinct people missed, honoring the same excuse
+      // adjustments applied to missingConf/missingPerf above (an excused
+      // metric is treated as not-yet-past-deadline, so it can never count
+      // someone as "missing").
+      const distinctMissedCount = calculateDistinctMissedCount(staff, {
+        ...gates,
+        isPastConfidenceDeadline: gates.isPastConfidenceDeadline && !excuseStatus.isConfExcused,
+        isPastPerformanceDeadline: gates.isPastPerformanceDeadline && !excuseStatus.isPerfExcused,
+      });
+
       return {
         id: locId,
         name: staff[0]?.location_name || 'Unknown',
@@ -146,6 +156,7 @@ export default function RegionalDashboard() {
         submissionRate: adjustedSubmissionRate,
         missingConfCount: adjustedMissingConf,
         missingPerfCount: adjustedMissingPerf,
+        distinctMissedCount,
         pendingConfCount: adjustedPendingConf,
         confSubmitted: locStats.confSubmittedCount,
         confExpected: locStats.confExpectedCount,
@@ -159,6 +170,9 @@ export default function RegionalDashboard() {
     const totalStaff = stats.reduce((sum, s) => sum + s.staffCount, 0);
     const totalMissingConf = stats.reduce((sum, s) => sum + s.missingConfCount, 0);
     const totalMissingPerf = stats.reduce((sum, s) => sum + s.missingPerfCount, 0);
+    // DASH-1a QA fix: sum of per-location DISTINCT missed counts. Safe to
+    // sum across locations since a staff member belongs to exactly one.
+    const totalDistinctMissed = stats.reduce((sum, s) => sum + s.distinctMissedCount, 0);
     const totalPendingConf = stats.reduce((sum, s) => sum + (s.pendingConfCount ?? 0), 0);
     const totalConfSubmitted = stats.reduce((sum, s) => sum + (s.confSubmitted ?? 0), 0);
     const totalConfExpected = stats.reduce((sum, s) => sum + (s.confExpected ?? 0), 0);
@@ -174,9 +188,9 @@ export default function RegionalDashboard() {
       return gates?.isPastConfidenceDeadline || gates?.isPastPerformanceDeadline;
     });
 
-    return { 
-      locationStats: stats, 
-      totals: { totalStaff, totalMissingConf, totalMissingPerf, totalPendingConf, avgRate, locationCount: stats.length,
+    return {
+      locationStats: stats,
+      totals: { totalStaff, totalMissingConf, totalMissingPerf, totalDistinctMissed, totalPendingConf, avgRate, locationCount: stats.length,
         totalConfSubmitted, totalConfExpected, totalPerfSubmitted, totalPerfExpected, anyLocationPastDeadline }
     };
   }, [summaries, locationGatesMap]);
@@ -190,18 +204,23 @@ export default function RegionalDashboard() {
       const gates = locationGatesMap.get(loc.id);
       const anyDeadlinePassed = !!(gates?.isPastConfidenceDeadline || gates?.isPastPerformanceDeadline);
       if (!anyDeadlinePassed || loc.staffCount === 0) return;
-      if (loc.submissionRate >= 85) return;
+
+      // Round once and reuse for both the >= 85 gate and the tier decision
+      // (DASH-1a QA fix), so a rate that displays as 85% can never still
+      // read "below 85%" in the signal message.
+      const displayRate = Math.round(loc.submissionRate);
+      if (displayRate >= 85) return;
 
       const tier = participationTier({
-        rate: loc.submissionRate,
-        missedCount: loc.missingConfCount + loc.missingPerfCount,
+        rate: displayRate,
+        missedCount: loc.distinctMissedCount,
         teamSize: loc.staffCount,
         anyDeadlinePassed,
       });
 
       result.push({
         type: 'participation_drop',
-        message: `${loc.name}: participation rate is ${Math.round(loc.submissionRate)}% this week, below 85%.`,
+        message: `${loc.name}: participation rate is ${displayRate}% this week, below 85%.`,
         locationName: loc.name,
         severity: tier === 'red' ? 'red' : 'watch',
       });
@@ -241,17 +260,26 @@ export default function RegionalDashboard() {
   const locationIdList = useMemo(() => locationStats.map(l => l.id), [locationStats]);
 
   // Org-wide rates and tiers for the summary cards, same participationTier
-  // bands as the location cards and signals banner (DASH-1a).
+  // bands as the location cards and signals banner (DASH-1a). Each rate is
+  // rounded ONCE here and reused for both the tier decision and the
+  // displayed percentage (DASH-1a QA fix for the rounding mismatch), so
+  // the JSX below just renders these numbers directly.
   const summaryTiers = useMemo(() => {
-    const confRate = totals.totalConfExpected > 0
-      ? (totals.totalConfSubmitted / totals.totalConfExpected) * 100
-      : 100;
-    const perfRate = totals.totalPerfExpected > 0
-      ? (totals.totalPerfSubmitted / totals.totalPerfExpected) * 100
-      : 100;
+    const confRate = Math.round(
+      totals.totalConfExpected > 0
+        ? (totals.totalConfSubmitted / totals.totalConfExpected) * 100
+        : 100
+    );
+    const perfRate = Math.round(
+      totals.totalPerfExpected > 0
+        ? (totals.totalPerfSubmitted / totals.totalPerfExpected) * 100
+        : 100
+    );
+    const avgRate = Math.round(totals.avgRate);
     return {
       confRate,
       perfRate,
+      avgRate,
       confTier: participationTier({
         rate: confRate,
         missedCount: totals.totalMissingConf,
@@ -264,9 +292,12 @@ export default function RegionalDashboard() {
         teamSize: totals.totalStaff,
         anyDeadlinePassed: totals.anyLocationPastDeadline,
       }),
+      // Uses the summed DISTINCT missed count (DASH-1a QA fix), not
+      // totalMissingConf + totalMissingPerf, which double-counts anyone
+      // missing both metrics.
       avgTier: participationTier({
-        rate: totals.avgRate,
-        missedCount: totals.totalMissingConf + totals.totalMissingPerf,
+        rate: avgRate,
+        missedCount: totals.totalDistinctMissed,
         teamSize: totals.totalStaff,
         anyDeadlinePassed: totals.anyLocationPastDeadline,
       }),
@@ -376,7 +407,7 @@ export default function RegionalDashboard() {
                         className="text-2xl font-bold"
                         style={{ color: tierColorTokens(summaryTiers.confTier)?.text ?? 'hsl(var(--foreground))' }}
                       >
-                        {Math.round(summaryTiers.confRate)}%
+                        {summaryTiers.confRate}%
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {totals.totalConfSubmitted}/{totals.totalConfExpected} conf submitted
@@ -403,7 +434,7 @@ export default function RegionalDashboard() {
                         className="text-2xl font-bold"
                         style={{ color: tierColorTokens(summaryTiers.perfTier)?.text ?? 'hsl(var(--foreground))' }}
                       >
-                        {Math.round(summaryTiers.perfRate)}%
+                        {summaryTiers.perfRate}%
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {totals.totalPerfSubmitted}/{totals.totalPerfExpected} perf submitted
@@ -434,7 +465,7 @@ export default function RegionalDashboard() {
                   className="text-3xl font-bold"
                   style={{ color: tierColorTokens(summaryTiers.avgTier)?.text ?? 'hsl(var(--foreground))' }}
                 >
-                  {Math.round(totals.avgRate)}%
+                  {summaryTiers.avgRate}%
                 </div>
               ) : (
                 <div>

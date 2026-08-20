@@ -31,6 +31,27 @@ describe('participationTier', () => {
     });
   });
 
+  describe('display/logic rounding agreement (DASH-1a QA fix)', () => {
+    // Callers must round the rate ONCE and feed that same rounded value to
+    // both the tier decision and the displayed percentage, so a number
+    // shown on screen can never disagree with its own color. These tests
+    // exercise participationTier with the rounded value, the way
+    // LocationHealthCard and RegionalDashboard now call it.
+    const base = { missedCount: 10, teamSize: 20, anyDeadlinePassed: true };
+
+    it('a raw rate of 59.5 rounds to a displayed 60%, which must not be red', () => {
+      const displayRate = Math.round(59.5);
+      expect(displayRate).toBe(60);
+      expect(participationTier({ ...base, rate: displayRate })).toBe('watch');
+    });
+
+    it('a raw rate of 84.6 rounds to a displayed 85%, which must not be watch', () => {
+      const displayRate = Math.round(84.6);
+      expect(displayRate).toBe(85);
+      expect(participationTier({ ...base, rate: displayRate })).toBe('good');
+    });
+  });
+
   describe('small-team guard', () => {
     it('a 3-person location with one absence stays non-red', () => {
       expect(

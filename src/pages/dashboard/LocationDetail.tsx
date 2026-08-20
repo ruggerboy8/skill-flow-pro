@@ -100,6 +100,7 @@ export default function LocationDetail({
       submissionRate: stats.submissionRate,
       missingConfCount: stats.missingConfCount,
       missingPerfCount: stats.missingPerfCount,
+      distinctMissedCount: stats.distinctMissedCount,
       pendingConfCount: stats.pendingConfCount,
     };
 

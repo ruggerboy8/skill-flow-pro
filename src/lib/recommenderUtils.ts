@@ -7,6 +7,13 @@ export function formatPrimaryReason(move: {
   lowConfShare: number | null;
   lastPracticedWeeks: number;
 }): string {
+  // lastPracticedWeeks can arrive as the string "999" when it crosses the
+  // JSON boundary from the sequencer-rank edge function, even though the
+  // type says number. Normalize once so the sentinel compare below is
+  // reliable regardless of which shape it actually arrives in.
+  const rawWeeks: unknown = move.lastPracticedWeeks;
+  const weeks = typeof rawWeeks === 'string' ? Number(rawWeeks) : rawWeeks as number;
+
   switch (move.primaryReasonCode) {
     case 'LOW_CONF': {
       const pct = move.lowConfShare != null ? Math.round(move.lowConfShare * 100) : null;
@@ -22,14 +29,14 @@ export function formatPrimaryReason(move: {
       // NEVER reason code, not STALE) and the type system does not prevent
       // it. Rather than silently falling back to a vague message, surface it
       // loudly so the bad data gets noticed and traced back to its source.
-      if (move.lastPracticedWeeks === 999) {
+      if (weeks === 999) {
         console.warn(
           'formatPrimaryReason: STALE reason code with lastPracticedWeeks=999 (the "never practiced" sentinel) — conflicting upstream data.',
           move
         );
         return 'Conflicting data: marked stale but never practiced';
       }
-      return `Not practiced in ${move.lastPracticedWeeks} weeks`;
+      return `Not practiced in ${weeks} weeks`;
     }
     case 'TIE':
     default:
@@ -69,6 +76,12 @@ export function getBadges(move: {
   lastPracticedWeeks: number;
   primaryReasonCode: string;
 }): BadgeInfo[] {
+  // See the matching normalization note in formatPrimaryReason: this must
+  // stay a number for both the 999 sentinel compare and the >= 8 staleness
+  // compare, or a stringified "999" gets mislabeled as Stale instead of New.
+  const rawWeeks: unknown = move.lastPracticedWeeks;
+  const weeks = typeof rawWeeks === 'string' ? Number(rawWeeks) : rawWeeks as number;
+
   const candidates: Record<string, BadgeInfo> = {};
 
   if (move.primaryReasonCode === 'LOW_CONF' || (move.lowConfShare !== null && move.lowConfShare >= 0.33)) {
@@ -85,7 +98,7 @@ export function getBadges(move: {
     };
   }
 
-  if (move.lastPracticedWeeks === 999) {
+  if (weeks === 999) {
     candidates['New'] = {
       label: 'New',
       tooltip: 'Never practiced yet',
@@ -93,7 +106,7 @@ export function getBadges(move: {
   }
 
   // Stale (8+ weeks, not retest, not never)
-  if (!move.retestDue && move.lastPracticedWeeks !== 999 && move.lastPracticedWeeks >= 8) {
+  if (!move.retestDue && weeks !== 999 && weeks >= 8) {
     candidates['Stale'] = {
       label: 'Stale',
       tooltip: 'Not practiced in 8+ weeks',

@@ -100,6 +100,19 @@ describe('formatPrimaryReason', () => {
     warnSpy.mockRestore();
   });
 
+  it('still detects the conflict when lastPracticedWeeks arrives as the string "999" (a JSON-boundary shape the type does not admit)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const text = formatPrimaryReason({
+      primaryReasonCode: 'STALE',
+      primaryReasonValue: null,
+      lowConfShare: null,
+      lastPracticedWeeks: '999' as unknown as number,
+    });
+    expect(text).toBe('Conflicting data: marked stale but never practiced');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
+  });
+
   it('explains a tie reason as high overall need', () => {
     const text = formatPrimaryReason({
       primaryReasonCode: 'TIE',
@@ -207,6 +220,17 @@ describe('getBadges', () => {
       });
       expect(badges.map((b) => b.label)).not.toContain('New');
     });
+
+    it('still labels the move New, not Stale, when lastPracticedWeeks arrives as the string "999" (a JSON-boundary shape the type does not admit)', () => {
+      const badges = getBadges({
+        lowConfShare: null,
+        retestDue: false,
+        lastPracticedWeeks: '999' as unknown as number,
+        primaryReasonCode: 'NEVER',
+      });
+      expect(badges.map((b) => b.label)).toContain('New');
+      expect(badges.map((b) => b.label)).not.toContain('Stale');
+    });
   });
 
   describe('Stale badge (>= 8 weeks, not retest, not never)', () => {
@@ -286,6 +310,32 @@ describe('getBadges', () => {
       primaryReasonCode: 'LOW_CONF',
     });
     expect(badges.map((b) => b.label)).toEqual(['Low Conf', 'Retest']);
+  });
+
+  it('orders New before Low Conf when only those two fire (nothing is dropped by the cap)', () => {
+    // Before COR-5's priority reordering this pushed in insertion order
+    // (Low Conf, New); the new deliberate order puts New first. Pinning it
+    // here even though both badges display either way, since the order is
+    // now an intentional choice, not an accident of insertion.
+    const badges = getBadges({
+      lowConfShare: 0.5,
+      retestDue: false,
+      lastPracticedWeeks: 999,
+      primaryReasonCode: 'LOW_CONF',
+    });
+    expect(badges.map((b) => b.label)).toEqual(['New', 'Low Conf']);
+  });
+
+  it('orders New before Retest when only those two fire (nothing is dropped by the cap)', () => {
+    // Same as above: was insertion order (Retest, New), now deliberately New
+    // first.
+    const badges = getBadges({
+      lowConfShare: null,
+      retestDue: true,
+      lastPracticedWeeks: 999,
+      primaryReasonCode: 'RETEST',
+    });
+    expect(badges.map((b) => b.label)).toEqual(['New', 'Retest']);
   });
 });
 

@@ -86,8 +86,9 @@ Rules, in priority order:
 2. If the documents do not cover the question, say so plainly and point the person to the expert area that owns that territory (the areas are: ${areas}). One or two warm sentences; no apology theater.
 3. If documents contradict each other on the point being asked, say that plainly, cite both, and name the owning expert area as the place to resolve it. Do not pick a side.
 4. If someone is venting or looking for a sympathetic ear rather than an answer, respond kindly and briefly, and gently point them to a human — their manager or the owning expert area. Do not turn feelings into policy answers.
+5. When a document contains a word-for-word script for talking with families, quote the script verbatim rather than paraphrasing it — exact scripts are how Alcan teaches.
 
-Style: warm, plain, and concise, like a helpful colleague. No em dashes. Answer the actual question first; add context only when it helps.`;
+Style: warm, plain, and concise, like a helpful colleague. No em dashes. Answer the actual question first; add context only when it helps. Frame answers as "here's how we do it at Alcan", never as reciting a rule at someone.`;
 }
 
 Deno.serve(async (req) => {
@@ -158,10 +159,11 @@ Deno.serve(async (req) => {
       .from('ask_messages')
       .select('role, content')
       .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: false })
+      .limit(10);
     const history = ((priorMessages ?? []) as { role: 'user' | 'assistant'; content: string }[])
-      .filter((m) => m.content.trim().length > 0)
-      .slice(-10);
+      .reverse()
+      .filter((m) => m.content.trim().length > 0);
 
     // Load the eligible corpus (kept + canon, Alcan org).
     const { data: docs, error: docsErr } = await supabase
@@ -259,7 +261,14 @@ Deno.serve(async (req) => {
         source_url: packed[i].doc.source_url,
       }));
 
-    await persistExchange(supabase, convo, question, answer, citations.map((c) => c.document_id));
+    // The answer is already paid for — a persistence failure must not discard
+    // it or trigger a retry that re-runs the whole exchange. Log loudly and
+    // return the answer anyway.
+    try {
+      await persistExchange(supabase, convo, question, answer, citations.map((c) => c.document_id));
+    } catch (persistErr) {
+      console.error('ask-alcan persist failure (answer still returned):', persistErr);
+    }
 
     // FROZEN response contract (ASK-2 additivity guarantee): exactly this shape.
     return json({ answer, citations });

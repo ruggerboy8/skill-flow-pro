@@ -6,6 +6,7 @@
 // persists both sides of each exchange.
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import type {
@@ -123,7 +124,16 @@ export function useAskMutations() {
       const { data, error } = await supabase.functions.invoke('ask-alcan', {
         body: { question: args.question, conversation_id: args.conversationId },
       });
-      if (error) throw error;
+      if (error) {
+        // On non-2xx the invoke error carries only a generic message; the
+        // server's real message ("question exceeds…", 403, …) is in the
+        // response body, reachable via error.context.
+        if (error instanceof FunctionsHttpError) {
+          const body = await error.context.json().catch(() => null);
+          if (body?.error) throw new Error(body.error);
+        }
+        throw error;
+      }
       if (data?.error) throw new Error(data.error);
       return data as AskAlcanResponse;
     },
@@ -137,5 +147,20 @@ export function useAskMutations() {
       ]),
   });
 
-  return { createConversation, ask };
+  /**
+   * Deletes a conversation the caller owns; ask_messages rows cascade in the
+   * database. RLS makes anyone else's rows unreachable.
+   */
+  const deleteConversation = useMutation({
+    mutationFn: async (conversationId: string): Promise<void> => {
+      const { error } = await sb.from('ask_conversations').delete().eq('id', conversationId);
+      if (error) throw error;
+    },
+    onSuccess: (_data, conversationId) => {
+      queryClient.removeQueries({ queryKey: ['ask', 'messages', conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['ask', 'conversations'] });
+    },
+  });
+
+  return { createConversation, ask, deleteConversation };
 }

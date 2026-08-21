@@ -73,6 +73,8 @@ const PlatformPage = lazy(() => import("@/pages/PlatformPage"));
 const EvalResultsV2 = lazy(() => import("@/pages/admin/EvalResultsV2"));
 const SurveyBuilderPage = lazy(() => import("@/pages/admin/SurveyBuilderPage"));
 const SurveyResultsPage = lazy(() => import("@/pages/admin/SurveyResultsPage"));
+// ASK-1: Ask Alcan corpus chat spike (self-guards to super admins)
+const AskPage = lazy(() => import("@/pages/ask/AskPage"));
 
 // Evaluation review flows
 const EvaluationViewer = lazy(() => import("@/pages/EvaluationViewer"));
@@ -259,6 +261,8 @@ function AppRoutes() {
         <Route path="admin/surveys/:id/edit" element={<SurveyBuilderPage />} />
         <Route path="admin/surveys/:id" element={<SurveyResultsPage />} />
         <Route path="survey/:id" element={<SurveyTakePage />} />
+        {/* Ask Alcan — corpus chat spike (ASK-1, super-admin only) */}
+        <Route path="ask" element={<AskPage />} />
 
         <Route path="evaluation/:evalId" element={<EvaluationViewer />} />
         <Route path="evaluation/:evalId/review" element={<EvaluationReview />} />

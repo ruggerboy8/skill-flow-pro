@@ -71,7 +71,7 @@ export function getDoctorJourneyStatus(
           stage: 'scheduling_invite_sent',
           label: 'Prep Available',
           variant: 'default',
-          colorClass: 'bg-primary/10 text-primary',
+          colorClass: 'bg-primary/10 text-primary', // already a token, not counted by the guard
           nextAction: 'Complete your meeting prep and schedule your session',
           nextActionUrl: `/doctor/review-prep/${latest.id}`,
         };
@@ -127,7 +127,12 @@ export function getDoctorJourneyStatus(
       stage: 'coach_baseline_pending',
       label: 'Baseline Submitted',
       variant: 'outline',
-      colorClass: 'bg-blue-100 text-blue-800',
+      // DSN-3 slice 3: reuses --status-released's blue, same "waiting on the
+      // next actor" reuse convention as --status-late elsewhere in this file.
+      // QA fix: every colorClass below pairs a -bg tint with the matching
+      // -ink token (not the vivid base) — text sitting directly on its own
+      // status-bg needs the darker -ink variant to clear WCAG contrast.
+      colorClass: 'bg-[hsl(var(--status-released-bg))] text-[hsl(var(--status-released-ink))]',
       nextAction: 'Complete your coach baseline assessment',
       nudge: 'You can still build the agenda first, but the coach baseline gives you better prep.',
     };
@@ -139,7 +144,7 @@ export function getDoctorJourneyStatus(
       stage: 'ready_for_prep',
       label: 'Ready for Prep',
       variant: 'outline',
-      colorClass: 'bg-blue-100 text-blue-800',
+      colorClass: 'bg-[hsl(var(--status-released-bg))] text-[hsl(var(--status-released-ink))]',
       nextAction: 'Create a baseline review session',
     };
   }
@@ -150,7 +155,7 @@ export function getDoctorJourneyStatus(
       stage: 'baseline_submitted',
       label: 'Baseline Submitted',
       variant: 'default',
-      colorClass: 'bg-green-100 text-green-800',
+      colorClass: 'bg-[hsl(var(--status-complete-bg))] text-[hsl(var(--status-complete-ink))]',
       nextAction: 'Complete your private assessment, then build the meeting agenda',
     };
   }
@@ -160,7 +165,7 @@ export function getDoctorJourneyStatus(
       stage: 'baseline_in_progress',
       label: 'Baseline In Progress',
       variant: 'secondary',
-      colorClass: 'bg-amber-100 text-amber-800',
+      colorClass: 'bg-[hsl(var(--status-late-bg))] text-[hsl(var(--status-late-ink))]',
       nextAction: 'Doctor is working on their baseline',
     };
   }
@@ -171,7 +176,7 @@ export function getDoctorJourneyStatus(
       stage: 'baseline_released',
       label: 'Baseline Available',
       variant: 'secondary',
-      colorClass: 'bg-blue-100 text-blue-800',
+      colorClass: 'bg-[hsl(var(--status-released-bg))] text-[hsl(var(--status-released-ink))]',
       nextAction: 'Doctor can now start their baseline self-assessment',
     };
   }

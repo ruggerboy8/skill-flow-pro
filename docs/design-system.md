@@ -183,8 +183,14 @@ Two status families share the `--status-*` tokens, both rendered through
   `in_progress`, `completed`, `locked`.
 
 Base tokens: `--status-complete`, `--status-missing`, `--status-late`,
-`--status-excused`, `--status-pending`, `--status-released` (each with a
-`-bg` variant). Several `DeliveryStatus`/`TrackStatus` values deliberately
+`--status-excused`, `--status-pending`, `--status-released`, `--status-info`
+(each with a `-bg` variant). `--status-info` was added in DSN-3 slice 3 for
+the blue "informational notice" banner pattern (`border-blue-200
+bg-blue-50/50` + matching text) that had no token through slices 1-2 — see
+`docs/dev/token-migration-pattern.md` §5a. It isn't wired into
+`StatusBadge.tsx`'s `statusConfig` (no `SubmissionStatus`/`DeliveryStatus`/
+`TrackStatus` value is literally "info"); consume it directly via the CSS
+var, same as `--score-*`. Several `DeliveryStatus`/`TrackStatus` values deliberately
 **reuse** an existing status token rather than getting their own — e.g.
 `draft` and `viewed` both reuse `--status-late`'s amber as a general
 "warning/in-progress" color, not literally about lateness. `no_eval` and
@@ -194,9 +200,31 @@ Base tokens: `--status-complete`, `--status-missing`, `--status-late`,
 See `StatusBadge.tsx`'s `statusConfig` for the full, current mapping — it is
 the single source of truth, this doc is a summary of it.
 
+**`--status-*-ink`** (added DSN-3 slice 3, post-QA): a darker, higher-
+contrast variant for `complete`, `late`, `missing`, `excused`, `pending`,
+`released`, and `info`, for when a status color is used as literal TEXT or
+a small icon — not a border, dot, or other non-text accent. **The vivid
+base tokens fail WCAG contrast as text**, both on their own `-bg` (as low
+as 1.78:1) and against a plain white/card background (as low as 1.98:1) —
+computed with the WCAG relative-luminance formula, not assumed safe by
+precedent. Light values are a direct HSL conversion of each token's
+Tailwind `-800` family shade (the same "`-800` text on `-100` bg" pairing
+the pre-token hand-rolled classes already used); dark values use the same
+hue/saturation with lightness pushed to 80%, matching `--score-*-ink`'s
+shape. Full derivation and the computed contrast table are in
+`docs/dev/token-migration-pattern.md` §5c. **`StatusBadge.tsx` itself does
+not yet consume `-ink`** — every state in its `statusConfig` still pairs
+vivid text with its `-bg`, the same pattern this fix disproved. That's a
+real, if long-standing and unaudited, gap in the single most-used status
+component in the app; flagged as a follow-up, not fixed as part of this
+migration slice (out of its named scope, and a shared component with a
+much bigger blast radius than the new consumers this slice added).
+
 **Always render a status through `<StatusBadge status="..." />`** rather
 than hand-rolling a pill. If you need the raw token outside a badge context,
-use the `--status-*` CSS var directly via inline style.
+use the `--status-*` CSS var directly via inline style — and reach for the
+matching `-ink` variant whenever that raw usage is text or a small icon,
+not `-bg`'s pale tint accent.
 
 ### Win banner colors
 
@@ -276,10 +304,10 @@ The guard, `scripts/check-hardcoded-colors.mjs` (`npm run check:colors`,
 part of `npm run check`), ratchets the count of raw Tailwind palette classes
 in `src/**/*.{ts,tsx}` down over time and fails the build if it goes up.
 
-A known gap flagged by that doc and still open: no `--status-info` token
-exists for the blue "informational notice" pattern used in at least three
-files. Don't invent it in a docs-only or migration ticket — it's a token
-design decision for its own ticket.
+`--status-info` (section 2 above) fills the blue "informational notice" gap
+this doc previously flagged as open — added in DSN-3 slice 3, following the
+existing `--status-*` structure exactly (a direct HSL conversion of the
+Tailwind blue already in use at every call site, not an invented color).
 
 ## 6. Motion (DSN-5c)
 

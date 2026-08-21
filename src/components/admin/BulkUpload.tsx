@@ -293,14 +293,18 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
     URL.revokeObjectURL(url);
   };
 
+  // DSN-3 slice 3: same row-outcome mapping as ProMoveImportDialog.tsx's
+  // identical new/update/error tags (status-complete/status-info/status-missing).
+  // QA fix: -ink, not vivid — same contrast failure against plain white as
+  // ProMoveImportDialog.tsx's identical icons.
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'new':
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
+        return <CheckCircle className="w-4 h-4 text-[hsl(var(--status-complete-ink))]" />;
       case 'update':
-        return <Clock className="w-4 h-4 text-blue-600" />;
+        return <Clock className="w-4 h-4 text-[hsl(var(--status-info-ink))]" />;
       case 'error':
-        return <AlertCircle className="w-4 h-4 text-red-600" />;
+        return <AlertCircle className="w-4 h-4 text-[hsl(var(--status-missing-ink))]" />;
       default:
         return null;
     }
@@ -316,10 +320,10 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
         <div className="flex-1 overflow-auto">
           {step === 'upload' && (
             <div className="space-y-6">
-              <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg">
-                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <div className="text-center p-8 border-2 border-dashed border-muted-foreground/30 rounded-lg">
+                <Upload className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">Upload CSV File</h3>
-                <p className="text-gray-600 mb-4">
+                <p className="text-muted-foreground mb-4">
                   Select a CSV file with pro-moves data to upload
                 </p>
                 <input
@@ -344,7 +348,7 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
                 </div>
               </div>
               
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-muted-foreground">
                 <p className="font-medium mb-2">Required CSV columns:</p>
                 <ul className="list-disc list-inside space-y-1">
                   <li><code>role_name</code> - Role name (DFI, RDA, Office Manager)</li>
@@ -379,14 +383,16 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
                 </div>
               </div>
 
+              {/* QA fix: -ink, not vivid — same contrast failure against
+                  plain white as ProMoveImportDialog.tsx's identical badges. */}
               <div className="flex gap-4 text-sm">
-                <Badge variant="outline" className="text-green-600">
+                <Badge variant="outline" className="text-[hsl(var(--status-complete-ink))]">
                   New: {parsedRows.filter(r => r.status === 'new').length}
                 </Badge>
-                <Badge variant="outline" className="text-blue-600">
+                <Badge variant="outline" className="text-[hsl(var(--status-info-ink))]">
                   Update: {parsedRows.filter(r => r.status === 'update').length}
                 </Badge>
-                <Badge variant="outline" className="text-red-600">
+                <Badge variant="outline" className="text-[hsl(var(--status-missing-ink))]">
                   Errors: {parsedRows.filter(r => r.status === 'error').length}
                 </Badge>
               </div>
@@ -414,7 +420,7 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
                         <TableCell>{row.data.role_name}</TableCell>
                         <TableCell>{row.data.competency_name}</TableCell>
                         <TableCell className="max-w-md truncate">{row.data.text}</TableCell>
-                        <TableCell className="text-red-600 text-sm">{row.error}</TableCell>
+                        <TableCell className="text-[hsl(var(--status-missing-ink))] text-sm">{row.error}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -435,7 +441,7 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
 
           {step === 'complete' && results && (
             <div className="space-y-6 text-center">
-              <CheckCircle className="w-16 h-16 text-green-600 mx-auto" />
+              <CheckCircle className="w-16 h-16 text-[hsl(var(--status-complete-ink))] mx-auto" />
               <div>
                 <h3 className="text-lg font-medium mb-2">Upload Complete</h3>
                 <div className="space-y-2">
@@ -443,7 +449,7 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
                   <p>Updated: <strong>{(results as any).updated || 0}</strong> existing pro-moves</p>
                   <p>Skipped: <strong>{(results as any).skipped || 0}</strong> deleted IDs</p>
                   {(results as any).errors && (results as any).errors.length > 0 && (
-                    <p className="text-red-600">
+                    <p className="text-[hsl(var(--status-missing-ink))]">
                       Errors: <strong>{(results as any).errors.length}</strong> rows failed
                     </p>
                   )}

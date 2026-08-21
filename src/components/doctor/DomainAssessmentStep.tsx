@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ChevronLeft, ChevronRight, Check, Loader2, MessageSquare } from 'lucide-react';
 import { DoctorMaterialsSheet } from './DoctorMaterialsSheet';
+import { scoreBucketTokens, type ScoreBucket } from '@/lib/confidenceScoreRamp';
 
 interface ProMoveItem {
   action_id: number;
@@ -40,12 +41,12 @@ const SCORE_LABELS = [
   { value: 4, label: 'I am a master, I do it all the time', short: '4' },
 ];
 
-const SCORE_COLORS: Record<number, { selected: string; dot: string }> = {
-  1: { selected: 'bg-amber-100 border-amber-400 text-amber-800', dot: 'bg-amber-400' },
-  2: { selected: 'bg-orange-100 border-orange-400 text-orange-800', dot: 'bg-orange-400' },
-  3: { selected: 'bg-blue-100 border-blue-400 text-blue-800', dot: 'bg-blue-400' },
-  4: { selected: 'bg-emerald-100 border-emerald-400 text-emerald-800', dot: 'bg-emerald-400' },
-};
+// DSN-3 slice 3: 1-4 self-rating → --score-1..4 via scoreBucketTokens(), the
+// same helper CoachBaselineWizard's SCORE_CONFIG already uses (slice 2).
+// BEHAVIOR NOTE: this is not just a softer shade — the original tier order
+// was amber (1) then orange (2); the score ramp is orange (1) then amber
+// (2), so tiers 1 and 2 effectively swap which hue they wear. See the
+// pattern doc's "Behavior changes" section.
 
 export function DomainAssessmentStep({
   domain,
@@ -126,7 +127,10 @@ export function DomainAssessmentStep({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-1 gap-x-4 text-xs">
               {SCORE_LABELS.map(s => (
                 <span key={s.value} className="flex items-center gap-1.5">
-                  <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${SCORE_COLORS[s.value].dot}`} />
+                  <span
+                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: scoreBucketTokens(s.value as ScoreBucket).text }}
+                  />
                   <strong>{s.short}</strong> — {s.label}
                 </span>
               ))}
@@ -208,18 +212,23 @@ export function DomainAssessmentStep({
                               onValueChange={(val) => onRatingChange(pm.action_id, parseInt(val))}
                               className="flex gap-2"
                             >
-                              {SCORE_LABELS.map((s) => (
+                              {SCORE_LABELS.map((s) => {
+                                const tokens = scoreBucketTokens(s.value as ScoreBucket);
+                                const isSelected = currentRating === s.value;
+                                return (
                                 <div key={s.value} className="w-10 flex justify-center">
                                   <Label
                                     htmlFor={`${pm.action_id}-${s.value}`}
                                     className={`
                                       w-8 h-8 rounded-full border-2 flex items-center justify-center cursor-pointer
                                       transition-all
-                                      ${currentRating === s.value 
-                                        ? SCORE_COLORS[s.value].selected
-                                        : 'border-muted-foreground/30 hover:border-primary/50'
-                                      }
+                                      ${isSelected ? '' : 'border-muted-foreground/30 hover:border-primary/50'}
                                     `}
+                                    style={isSelected ? {
+                                      backgroundColor: tokens.bg,
+                                      borderColor: tokens.text,
+                                      color: tokens.ink,
+                                    } : undefined}
                                   >
                                     <RadioGroupItem
                                       value={s.value.toString()}
@@ -229,7 +238,8 @@ export function DomainAssessmentStep({
                                     <span className="text-xs font-medium">{s.value}</span>
                                   </Label>
                                 </div>
-                              ))}
+                                );
+                              })}
                             </RadioGroup>
                             {anyConditional && (
                               pm.conditionally_applicable ? (

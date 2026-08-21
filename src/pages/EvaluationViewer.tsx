@@ -17,18 +17,24 @@ import { getDomainColor, getDomainColorRaw, getDomainColorRichRaw } from '@/lib/
 import { getDomainOrderIndex } from '@/lib/domainUtils';
 import type { EvaluationWithItems, ExtractedInsights, InsightsPerspective, DomainInsight } from '@/lib/evaluations';
 import { ParticipationSnapshotCard, type ParticipationSnapshot } from '@/components/evaluations/ParticipationSnapshotCard';
+import { scoreBucketTokens, type ScoreBucket } from '@/lib/confidenceScoreRamp';
 
-const SCORE_PILLS = [
-  { v: 1, cls: 'bg-red-100 text-red-800 border-red-200' },
-  { v: 2, cls: 'bg-orange-100 text-orange-800 border-orange-200' },
-  { v: 3, cls: 'bg-blue-100 text-blue-800 border-blue-200' },
-  { v: 4, cls: 'bg-green-100 text-green-800 border-green-200' },
-];
-
+// DSN-3 slice 3: this is the same 1-4 observer/self score EvaluationHub.tsx's
+// SCORE_OPTIONS already migrated in slice 1, just in a read-only pill here —
+// reuses scoreBucketTokens() instead of a second hardcoded copy. Band 1
+// moves from red to --score-1's orange, the same intentional DASH-1a hue
+// shift documented for RatingBandCollapsible.tsx in slice 2.
 function ReadOnlyScore({ value }: { value: number | null }) {
   if (value == null) return <span className="text-xs text-muted-foreground">—</span>;
-  const pill = SCORE_PILLS.find(p => p.v === value);
-  return <span className={`px-2.5 py-1 rounded border text-sm ${pill?.cls}`}>{value}</span>;
+  const tokens = scoreBucketTokens(value as ScoreBucket);
+  return (
+    <span
+      className="px-2.5 py-1 rounded border text-sm"
+      style={{ backgroundColor: tokens.bg, color: tokens.ink, borderColor: tokens.text }}
+    >
+      {value}
+    </span>
+  );
 }
 
 type RolledNote = {
@@ -554,8 +560,13 @@ export default function EvaluationViewer() {
                             <div className="space-y-3">
                               {notes.map((note, idx) => (
                                 <div key={idx} className="text-sm">
+                                  {/* DSN-3 slice 3: "Self" (was slate) is generic
+                                      neutral chrome, migrated to muted. "Observer"
+                                      is a source-attribution color with no
+                                      domain/score/status/win meaning — left
+                                      hardcoded. */}
                                   <span className={`inline-block px-2 py-0.5 mr-2 rounded text-xs ${
-                                    note.source === 'Observer' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-800'
+                                    note.source === 'Observer' ? 'bg-blue-100 text-blue-800' : 'bg-muted text-muted-foreground'
                                   }`}>
                                     {note.source}
                                   </span>

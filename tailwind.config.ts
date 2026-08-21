@@ -7,6 +7,11 @@ export default {
 		"./components/**/*.{ts,tsx}",
 		"./app/**/*.{ts,tsx}",
 		"./src/**/*.{ts,tsx}",
+		// ASK-1b: streamdown (AI Elements' markdown renderer, used by
+		// MessageResponse) ships Tailwind utility classes baked into its
+		// compiled JS rather than a stylesheet; Tailwind's JIT scanner needs
+		// this path to generate them.
+		"./node_modules/streamdown/dist/**/*.js",
 	],
 	prefix: "",
 	theme: {

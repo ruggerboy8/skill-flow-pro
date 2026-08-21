@@ -1,16 +1,31 @@
-// ASK-1: the Ask Alcan spike surface. Super-admin-only (same gate as the
+// ASK-1b: the Ask Alcan chat surface, rebuilt on AI Elements (see
+// docs/specs/ask-1b-chat-ui-adoption.md). Super-admin-only (same gate as the
 // surveys surface); answers come from the curated corpus via the ask-alcan
 // edge function, with citation chips deep-linking to the Basecamp source.
+//
+// Data layer (useAskAlcanChat.ts) and the ask-alcan response contract are
+// unchanged by this ticket — this is a presentation rebuild only.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
-import { Lock, MessageSquare, MessagesSquare, Plus, Send, ExternalLink, Trash2 } from 'lucide-react';
+import {
+  Lock,
+  MessageSquare,
+  MessagesSquare,
+  Plus,
+  ExternalLink,
+  Trash2,
+  Menu,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +36,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from '@/components/ai-elements/conversation';
+import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message';
+import {
+  PromptInput,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+} from '@/components/ai-elements/prompt-input';
 import { useToast } from '@/hooks/use-toast';
 import { useAskAlcanAccess } from '@/lib/askAlcanAccess';
 import {
@@ -29,7 +57,13 @@ import {
   useAskMutations,
   useCitedDocuments,
 } from '@/hooks/useAskAlcanChat';
-import type { AskMessageRow } from '@/integrations/supabase/corpusTypes';
+import type { AskConversationRow, AskMessageRow } from '@/integrations/supabase/corpusTypes';
+import {
+  computeShowPending,
+  useIsTouchDevice,
+  usePrefersReducedMotion,
+  type PendingAsk,
+} from './askPageLogic';
 
 // Matches MAX_QUESTION_CHARS in the ask-alcan edge function.
 const MAX_QUESTION_CHARS = 4000;
@@ -40,12 +74,14 @@ const EXAMPLE_QUESTIONS = [
   'What is the nitrous oxide monitoring requirement for new RDAs?',
 ];
 
+type CitedDocsMap = Map<string, { id: string; title: string; source_url: string | null }>;
+
 function CitationChips({
   documentIds,
   docs,
 }: {
   documentIds: string[];
-  docs: Map<string, { id: string; title: string; source_url: string | null }> | undefined;
+  docs: CitedDocsMap | undefined;
 }) {
   if (documentIds.length === 0) return null;
   return (
@@ -91,39 +127,31 @@ function CitationChips({
   );
 }
 
-function MessageBubble({
+function ChatMessage({
   message,
   docs,
 }: {
   message: Pick<AskMessageRow, 'role' | 'content' | 'cited_document_ids'>;
-  docs: Map<string, { id: string; title: string; source_url: string | null }> | undefined;
+  docs: CitedDocsMap | undefined;
 }) {
   const isUser = message.role === 'user';
   return (
-    <div className={isUser ? 'flex justify-end' : 'flex justify-start'}>
-      <div
-        className={
-          isUser
-            ? 'max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-primary-foreground'
-            : 'max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5'
-        }
-      >
+    <Message from={isUser ? 'user' : 'assistant'}>
+      <MessageContent>
         {isUser ? (
           <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
         ) : (
-          <div className="space-y-2 text-sm leading-relaxed [&_a]:underline [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-5">
-            <ReactMarkdown>{message.content}</ReactMarkdown>
-          </div>
+          <MessageResponse>{message.content}</MessageResponse>
         )}
         {!isUser && <CitationChips documentIds={message.cited_document_ids} docs={docs} />}
-      </div>
-    </div>
+      </MessageContent>
+    </Message>
   );
 }
 
 function ThinkingBubble() {
   return (
-    <div className="flex justify-start">
+    <Message from="assistant">
       <div
         role="status"
         aria-live="polite"
@@ -139,28 +167,117 @@ function ThinkingBubble() {
           …
         </span>
       </div>
+    </Message>
+  );
+}
+
+function ConversationRow({
+  conversation,
+  isActive,
+  busy,
+  onSelect,
+  onDelete,
+}: {
+  conversation: AskConversationRow;
+  isActive: boolean;
+  busy: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  const title = conversation.title ?? 'New conversation';
+  return (
+    <div className="group relative flex min-w-0 items-center">
+      <button
+        onClick={onSelect}
+        disabled={busy}
+        className={`min-h-11 w-full min-w-0 truncate rounded-md px-3 py-2.5 pr-11 text-left text-sm transition-colors hover:bg-accent disabled:opacity-60 ${
+          isActive ? 'bg-accent font-medium' : 'text-muted-foreground'
+        }`}
+      >
+        <span className="block min-w-0 truncate">{title}</span>
+      </button>
+      <button
+        onClick={onDelete}
+        disabled={busy}
+        title="Delete conversation"
+        aria-label={`Delete conversation "${title}"`}
+        className="absolute right-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-0"
+      >
+        <Trash2 className="h-5 w-5" />
+      </button>
     </div>
   );
 }
 
-interface PendingAsk {
-  // null while the conversation is still being created for a first send.
-  conversationId: string | null;
-  question: string;
-  // Message count at send time — the pending bubble stays up until the two
-  // real rows (question + answer) have landed, independent of content, so a
-  // repeated question still shows feedback.
-  prevCount: number;
+function ConversationListPane({
+  conversations,
+  loading,
+  activeId,
+  busy,
+  onSelect,
+  onNew,
+  onDeleteRequest,
+}: {
+  conversations: AskConversationRow[] | undefined;
+  loading: boolean;
+  activeId: string | null;
+  busy: boolean;
+  onSelect: (id: string) => void;
+  onNew: () => void;
+  onDeleteRequest: (id: string, title: string) => void;
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between border-b p-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
+          <MessagesSquare className="h-5 w-5" />
+          Conversations
+        </h2>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onNew}
+          title="New conversation"
+          aria-label="New conversation"
+          disabled={busy}
+          className="h-11 w-11 md:h-10 md:w-10"
+        >
+          <Plus className="h-5 w-5" />
+        </Button>
+      </div>
+      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+        {loading && (
+          <>
+            <Skeleton className="h-11 w-full" />
+            <Skeleton className="h-11 w-full" />
+          </>
+        )}
+        {(conversations ?? []).map((c) => (
+          <ConversationRow
+            key={c.id}
+            conversation={c}
+            isActive={c.id === activeId}
+            busy={busy}
+            onSelect={() => onSelect(c.id)}
+            onDelete={() => onDeleteRequest(c.id, c.title ?? 'New conversation')}
+          />
+        ))}
+      </div>
+    </>
+  );
 }
 
 export default function AskPage() {
   const { canAccess, isLoading: accessLoading } = useAskAlcanAccess();
   const { toast } = useToast();
+  const isTouch = useIsTouchDevice();
+  const reducedMotion = usePrefersReducedMotion();
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState<PendingAsk | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [mobileListOpen, setMobileListOpen] = useState(false);
 
   const { data: conversations, isLoading: conversationsLoading } = useAskConversations();
   const {
@@ -179,17 +296,11 @@ export default function AskPage() {
   const { data: citedDocs } = useCitedDocuments(citedIds);
 
   // The pending bubble is keyed to the conversation it was sent in, and stays
-  // up until the refetched rows for that exchange are on screen.
-  const showPending =
-    !!pending &&
-    pending.conversationId === activeId &&
-    (messages?.length ?? 0) < pending.prevCount + 2;
+  // up until the refetched rows for that exchange are on screen (see
+  // computeShowPending in askPageLogic.ts for the carried-over PR #81 fix).
+  const showPending = computeShowPending(pending, activeId, messages?.length ?? 0);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    bottomRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
-  }, [messages, pending]);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   if (accessLoading) {
     return (
@@ -202,6 +313,11 @@ export default function AskPage() {
   if (!canAccess) return <Navigate to="/" replace />;
 
   const busy = ask.isPending || createConversation.isPending;
+
+  const selectConversation = (id: string | null) => {
+    setActiveId(id);
+    setMobileListOpen(false);
+  };
 
   const send = async () => {
     const question = draft.trim();
@@ -260,78 +376,71 @@ export default function AskPage() {
     }
   };
 
+  const status: 'idle' | 'submitted' = busy ? 'submitted' : 'idle';
+
   return (
-    <div className="flex h-[calc(100vh-4rem)] gap-4 p-4 md:p-6">
-      {/* Conversation list */}
+    <div className="flex h-full min-h-0 flex-col gap-3 md:flex-row md:gap-4">
+      {/* Conversation list — sidebar on desktop, a Sheet drawer on mobile */}
       <aside className="hidden w-64 shrink-0 flex-col rounded-xl border bg-card md:flex">
-        <div className="flex items-center justify-between border-b p-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold">
-            <MessagesSquare className="h-4 w-4" />
-            Conversations
-          </h2>
+        <ConversationListPane
+          conversations={conversations}
+          loading={conversationsLoading}
+          activeId={activeId}
+          busy={busy}
+          onSelect={selectConversation}
+          onNew={() => selectConversation(null)}
+          onDeleteRequest={(id, title) => setDeleteTarget({ id, title })}
+        />
+      </aside>
+
+      <Sheet open={mobileListOpen} onOpenChange={setMobileListOpen}>
+        <SheetContent side="left" className="flex w-[85%] max-w-sm flex-col p-0 sm:max-w-sm">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Conversations</SheetTitle>
+          </SheetHeader>
+          <ConversationListPane
+            conversations={conversations}
+            loading={conversationsLoading}
+            activeId={activeId}
+            busy={busy}
+            onSelect={selectConversation}
+            onNew={() => selectConversation(null)}
+            onDeleteRequest={(id, title) => setDeleteTarget({ id, title })}
+          />
+        </SheetContent>
+      </Sheet>
+
+      {/* Chat pane */}
+      <main className="flex min-h-0 flex-1 flex-col rounded-xl border bg-card">
+        <div className="flex items-start gap-2 border-b p-4">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setActiveId(null)}
-            title="New conversation"
-            aria-label="New conversation"
-            disabled={busy}
+            className="h-11 w-11 shrink-0 md:hidden"
+            onClick={() => setMobileListOpen(true)}
+            aria-label="Open conversation list"
           >
-            <Plus className="h-5 w-5" />
+            <Menu className="h-5 w-5" />
           </Button>
-        </div>
-        <ScrollArea className="flex-1">
-          <div className="space-y-1 p-2">
-            {conversationsLoading && (
-              <>
-                <Skeleton className="h-9 w-full" />
-                <Skeleton className="h-9 w-full" />
-              </>
-            )}
-            {(conversations ?? []).map((c) => (
-              <div key={c.id} className="group relative">
-                <button
-                  onClick={() => setActiveId(c.id)}
-                  disabled={busy}
-                  className={`w-full truncate rounded-md px-3 py-2 pr-9 text-left text-sm transition-colors hover:bg-accent disabled:opacity-60 ${
-                    c.id === activeId ? 'bg-accent font-medium' : 'text-muted-foreground'
-                  }`}
-                >
-                  {c.title ?? 'New conversation'}
-                </button>
-                <button
-                  onClick={() =>
-                    setDeleteTarget({ id: c.id, title: c.title ?? 'New conversation' })
-                  }
-                  disabled={busy}
-                  title="Delete conversation"
-                  aria-label={`Delete conversation "${c.title ?? 'New conversation'}"`}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-0"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-semibold">Ask Alcan</h1>
+            <p className="text-sm text-muted-foreground">
+              Real answers from Alcan&apos;s own playbook — every answer shows you where it came
+              from.
+            </p>
+            <p className="mt-1 flex items-center gap-1 text-2xs text-muted-foreground">
+              <Lock className="h-3 w-3 shrink-0" aria-hidden="true" />
+              Your conversations are private to you. No one else can read them — not even admins.
+            </p>
           </div>
-        </ScrollArea>
-      </aside>
-
-      {/* Chat pane */}
-      <main className="flex min-w-0 flex-1 flex-col rounded-xl border bg-card">
-        <div className="border-b p-4">
-          <h1 className="text-lg font-semibold">Ask Alcan</h1>
-          <p className="text-sm text-muted-foreground">
-            Real answers from Alcan&apos;s own playbook — every answer shows you where it came
-            from.
-          </p>
-          <p className="mt-1 flex items-center gap-1 text-2xs text-muted-foreground">
-            <Lock className="h-3 w-3 shrink-0" aria-hidden="true" />
-            Your conversations are private to you. No one else can read them — not even admins.
-          </p>
         </div>
 
-        <ScrollArea className="flex-1">
-          <div className="mx-auto max-w-2xl space-y-4 p-4" aria-live="polite">
+        <Conversation
+          className="min-h-0"
+          initial={reducedMotion ? 'instant' : 'smooth'}
+          resize={reducedMotion ? 'instant' : 'smooth'}
+        >
+          <ConversationContent>
             {activeId && messagesLoading && (
               <div className="space-y-3">
                 <Skeleton className="ml-auto h-10 w-2/3" />
@@ -347,11 +456,11 @@ export default function AskPage() {
               </div>
             )}
             {(messages ?? []).map((m) => (
-              <MessageBubble key={m.id} message={m} docs={citedDocs} />
+              <ChatMessage key={m.id} message={m} docs={citedDocs} />
             ))}
             {showPending && (
               <>
-                <MessageBubble
+                <ChatMessage
                   message={{ role: 'user', content: pending!.question, cited_document_ids: [] }}
                   docs={citedDocs}
                 />
@@ -359,8 +468,8 @@ export default function AskPage() {
               </>
             )}
             {!activeId && !pending && (
-              <div className="flex flex-col items-center gap-4 py-16 text-center">
-                <MessageSquare className="h-6 w-6 text-muted-foreground" />
+              <ConversationEmptyState>
+                <MessageSquare className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
                 <div>
                   <p className="font-medium">Ask a question</p>
                   <p className="text-sm text-muted-foreground">
@@ -371,52 +480,49 @@ export default function AskPage() {
                   {EXAMPLE_QUESTIONS.map((q) => (
                     <button
                       key={q}
-                      onClick={() => setDraft(q)}
-                      className="rounded-lg border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      onClick={() => {
+                        setDraft(q);
+                        composerRef.current?.focus();
+                      }}
+                      className="min-h-11 rounded-lg border bg-background px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
                       {q}
                     </button>
                   ))}
                 </div>
-              </div>
+              </ConversationEmptyState>
             )}
-            <div ref={bottomRef} />
-          </div>
-        </ScrollArea>
+          </ConversationContent>
+          <ConversationScrollButton />
+        </Conversation>
 
-        <div className="border-t p-4">
-          <form
-            className="mx-auto flex max-w-2xl items-end gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
+        <div className="border-t p-3 md:p-4">
+          <PromptInput
+            className="mx-auto max-w-2xl"
+            onSubmit={() => {
               void send();
             }}
           >
-            <Textarea
+            <PromptInputTextarea
+              ref={composerRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  void send();
-                }
-              }}
+              enterToSend={!isTouch}
               placeholder="Ask how we do things here — scripts, setups, policies…"
               aria-label="Your question"
               maxLength={MAX_QUESTION_CHARS}
-              rows={2}
-              className="min-h-0 resize-none"
             />
-            <Button
-              type="submit"
-              size="icon"
-              disabled={busy || !draft.trim()}
-              title="Send"
-              aria-label="Send question"
-            >
-              <Send className="h-5 w-5" />
-            </Button>
-          </form>
+            <PromptInputFooter>
+              <span className="text-2xs text-muted-foreground">
+                {isTouch ? 'Tap send to ask' : 'Enter to send, Shift+Enter for a new line'}
+              </span>
+              <PromptInputSubmit
+                status={status}
+                disabled={busy || !draft.trim()}
+                className="h-11 w-11 md:h-9 md:w-9"
+              />
+            </PromptInputFooter>
+          </PromptInput>
         </div>
       </main>
 

@@ -154,9 +154,19 @@ the 20 pre-existing instances those shapes were hiding.
 
 ## 5. What slice 2 migrated
 
-Baseline: 775 → 556 (219 instances, 10 files). Target surfaces were coach
-dashboard / staff detail / recommender-adjacent (doctor pro-move materials)
-screens, picked from slice 1's highest-count list.
+Baseline: 775 → 549 (226 instances, 11 files, after QA fixes below). Target
+surfaces were coach dashboard / staff detail / recommender-adjacent (doctor
+pro-move materials) screens, picked from slice 1's highest-count list.
+
+**Post-QA correction:** the table below was originally published with two
+wrong "After" counts (`RecordingProcessCard.tsx` claimed 0 with 4 remaining;
+`coachingSessionStatus.ts` claimed 16 with the true figure at 8 even before
+the QA pass). Both are corrected below and verified against
+`scripts/hardcoded-colors-baseline.json`. See §7 for the full QA-fix list,
+including a `ClinicalBaselineResults.tsx` fix that was invisible to the
+ratchet (a raw `hsl()` literal map, not a Tailwind class) and so doesn't
+move this file's row below, and `ScoreHistoryV2.tsx`, added as a new row
+for a same-semantic-different-color fix (finding 6).
 
 | Surface | Before | After | Notes |
 |---|---|---|---|
@@ -164,18 +174,19 @@ screens, picked from slice 1's highest-count list.
 | `src/components/dashboard/LocationSkillGaps.tsx` | 24 | 0 | Confidence-average badges and domain chips used a red/amber/green traffic light on `avg_confidence` — replaced with `scoreBucket()`/`scoreBucketTokens()` from `src/lib/confidenceScoreRamp.ts` (the DASH-1a rule: confidence scores use the 1-4 score ramp, never a traffic light). Same fix applied to `StaffOverviewTab.tsx`, `StaffDetailV2.tsx`'s domain strip, and `StaffPriorityFocusTab.tsx`'s confidence badge — all four had independently reinvented the same traffic-light anti-pattern. |
 | `src/components/coach/StaffOverviewTab.tsx` | 15 | 0 | Same confidence-traffic-light fix as above. |
 | `src/pages/coach/StaffDetailV2.tsx` | 15 | 0 | Domain confidence strip → score ramp (as above); "Exempt" week badge → `--status-excused` tokens (was hardcoded amber; excused/exempt already has a dedicated, intentionally-neutral token). |
-| `src/lib/coachingSessionStatus.ts` | 24 | 16 | 5 of 7 pipeline stages → `--status-late` (amber "attention" reuse) / `--status-complete`. `scheduling_invite_sent` (sky) and `meeting_pending` (purple) left hardcoded — see §6. |
-| `src/components/coach/RecordingStartCard.tsx` | 23 | 0 | Recording/paused/processed states → `bg-destructive`/`text-destructive` (recording, dark-mode-aware token per §2) and `--status-late`/`--status-complete` (paused/processed), matching the established recording-dot convention in `EvaluationHub.tsx`. |
-| `src/components/coach/RecordingProcessCard.tsx` | 14 | 0 | Same paused/attention amber → `--status-late`. |
-| `src/components/clinical/CoachBaselineWizard.tsx` | 20 | 0 | `SCORE_CONFIG` (1-4 rating buttons) → `--score-1..4`/`-bg`; "Complete" pill, co-editor "Edited by" flag, "Notes mapped" confirmation → `--status-complete`/`--status-late`; recording pulse dot → `bg-destructive`. |
-| `src/components/doctor/DoctorProMoveDrawer.tsx` | 24 | 6 | `MATERIAL_SECTIONS`: "Why It Matters" → `--status-late`, "Scripting" → `--status-released`, "What Good Looks Like" → `--status-complete`. "Gut Check Questions" (purple) left hardcoded — see §6. Kept in sync with the identical config duplicated in `DoctorMaterialsSheet.tsx`. |
+| `src/lib/coachingSessionStatus.ts` | 24 | 8 | 5 of 7 pipeline stages → tokens. `director_prep_ready`/`doctor_revision_requested` → `--status-late` (amber "attention" reuse); `doctor_confirmed` → `--status-complete`; `doctor_prep_submitted` → `--status-pending` (QA fix — originally also `--status-complete`, which made an in-flight stage wear the "done" color identically to the terminal stage; see §7). `scheduling_invite_sent` (sky) and `meeting_pending` (purple) left hardcoded — see §7. |
+| `src/components/coach/RecordingStartCard.tsx` | 23 | 0 | Recording/paused/processed states → `--status-missing` (recording — QA fix, was `bg-destructive`/`text-destructive`; see §7 finding 5), `--status-late` (paused), `--status-complete` (processed). |
+| `src/components/coach/RecordingProcessCard.tsx` | 14 | 0 | Paused/attention amber → `--status-late` (QA fix: a second, differently-ordered instance of the same class string at the "restored recording" card was missed in the original pass and is now also migrated; see §7). |
+| `src/components/clinical/CoachBaselineWizard.tsx` | 20 | 0 | `SCORE_CONFIG` (1-4 rating buttons) → `--score-1..4`/`-bg`; "Complete" pill, co-editor "Edited by" flag, "Notes mapped" confirmation → `--status-complete`/`--status-late`; recording pulse dot → `bg-destructive` (a solid filled dot, not text-on-tint, so the §7 finding-5 contrast issue doesn't apply here). |
+| `src/components/doctor/DoctorProMoveDrawer.tsx` | 24 | 6 | `MATERIAL_SECTIONS`: "Why It Matters" → `--status-late`, "Scripting" → `--status-released`, "What Good Looks Like" → `--status-complete`. "Gut Check Questions" (purple) left hardcoded — see §7. Kept in sync with the identical config duplicated in `DoctorMaterialsSheet.tsx`. |
 | `src/components/doctor/DoctorMaterialsSheet.tsx` | 24 | 6 | Same `MATERIAL_SECTIONS` fix, same purple gap. |
-| `src/components/doctor/RatingBandCollapsible.tsx` | 24 | 0 | 1-4 self-rating bands → `--score-1..4`/`-bg` (DASH-1a: band 1 shifts from hardcoded red to `--score-1`'s orange — a real, intentional hue shift, not a bug — see §6). |
-| `src/components/coach/StaffPriorityFocusTab.tsx` | 9 | 1 | Confidence badge (1 or 2) → `scoreBucketTokens(scoreBucket(...))`. One `dark:bg-slate-800` card-surface class left hardcoded (decorative glass-card pattern, see §6). |
+| `src/components/doctor/RatingBandCollapsible.tsx` | 24 | 0 | 1-4 self-rating bands → `--score-1..4`/`-bg` (DASH-1a: band 1 shifts from hardcoded red to `--score-1`'s orange — a real, intentional hue shift, not a bug — see §7). |
+| `src/components/coach/StaffPriorityFocusTab.tsx` | 9 | 1 | Confidence badge (1 or 2) → `scoreBucketTokens(scoreBucket(...))`. One `dark:bg-slate-800` card-surface class left hardcoded (decorative glass-card pattern, see §7). |
+| `src/components/my-role/ScoreHistoryV2.tsx` | 9 | 6 | QA fix (finding 6): staff-facing "Exempt" week badge (3 instances) was hardcoded amber while the coach-facing equivalent in `StaffDetailV2.tsx` already used `--status-excused` (gray) — same semantic state, two colors. Migrated to match. The remaining 6 are an unrelated blue "backfill" button, untouched and out of scope for this finding. |
 
 ## 6. Remaining unmigrated surfaces (post slice-2 baseline)
 
-80 files still carry at least one hardcoded palette class, 556 instances
+79 files still carry at least one hardcoded palette class, 549 instances
 total. `OnTimeRateWidget.tsx` and `LocationSubmissionWidget.tsx` (30 each)
 remain out of scope (Command Center / `RegionalDashboard`, owned by DASH
 tickets).
@@ -187,7 +198,7 @@ Highest-count remaining files, for whoever scopes the next slice:
 | `src/components/coach/OnTimeRateWidget.tsx` | 30 (dashboard, excluded) |
 | `src/components/dashboard/LocationSubmissionWidget.tsx` | 30 (dashboard, excluded) |
 | `src/components/admin/EditUserDrawer.tsx` | 26 |
-| `src/components/home/ThisWeekPanel.tsx` | 25 (see §6 — mostly the decorative glass-border pattern plus the unmapped amber notice banner) |
+| `src/components/home/ThisWeekPanel.tsx` | 25 (see §7 — mostly the decorative glass-border pattern plus the unmapped amber notice banner) |
 | `src/pages/doctor/DoctorReviewPrep.tsx` | 22 (shares the blue "backfill" info-banner pattern with `EditUserDrawer.tsx` — do them together, see the `--status-info` gap below) |
 | `src/components/admin/ProMoveList.tsx` | 19 |
 | `src/pages/doctor/DoctorHome.tsx` | 17 |
@@ -201,6 +212,47 @@ future migration slice lands to see the current full list and confirm the
 new total.
 
 ## 7. Ambiguous items left for follow-up (not fixed here, flagged instead)
+
+### ⚠️ Behavior changes, not just hue changes
+
+Adopting `scoreBucket()`/`scoreBucketTokens()` (`src/lib/confidenceScoreRamp.ts`)
+in `LocationSkillGaps.tsx`, `StaffOverviewTab.tsx`, and `StaffDetailV2.tsx`
+was the right call — those three files (plus a second, inconsistent
+threshold scheme inside `LocationSkillGaps.tsx` itself, see below) had each
+independently hand-rolled a red/amber/green confidence traffic light with
+slightly different cutoffs, and unifying them onto the canonical helper is
+exactly what this migration is for. **But it is not a pure recolor.** The
+canonical helper's tier boundaries do not line up with any of the ad hoc
+versions it replaced, so some scores now land in a visibly different tier,
+not just a different hex. Two concrete boundary changes:
+
+1. **Low-tier cutoff moved from 2.5 to 2.0.** `StaffOverviewTab.tsx`,
+   `StaffDetailV2.tsx`'s domain strip, and `LocationSkillGaps.tsx`'s domain
+   chips all used `avg >= 2.5` as the red/amber line. `scoreBucket()` uses
+   `avg < 2` for tier 1. **A domain averaging 2.3 confidence used to render
+   in the red/lowest tier at those three call sites; it now renders in
+   `--score-2` (amber), the "developing" tier, not the "needs attention"
+   tier.** A coach scanning for the reddest cards will see fewer flagged
+   than before for scores in the 2.0-2.4 range.
+2. **The 3.0-3.9 band moved from green to blue.** Every one of the four
+   files treated `avg >= 3.0` as "good" (green/emerald). `scoreBucket()`
+   buckets `[3, 4)` into `--score-3`, whose hue is blue (211°), reserving
+   green (`--score-4`, 160°) for a full 4.0. **A domain averaging 3.5 used
+   to render green; it now renders blue.** Nothing between 3.0 and 3.9 will
+   read as "green/done" anymore — only a perfect 4.0 average does.
+3. **`LocationSkillGaps.tsx` also had two disagreeing schemes in the same
+   file** — its per-move badge (`getConfidenceColor`, cutoffs 2.0/3.0)
+   didn't match its domain chips (cutoffs 2.5/3.0), so the same 2.3 average
+   could show red in one part of the card and amber in another. The
+   unification also fixes that internal inconsistency, which is a genuine
+   improvement, not just a side effect.
+
+None of this is a bug in the migration — the DASH-1a score ramp is the
+system of record and `confidenceScoreRamp.ts` is already tested — but it is
+a real behavior change layered on top of a color-token change, and it
+recategorizes what coaching staff visually read as "needs attention" at
+several call sites. Flag it in QA/visual review specifically; don't assume
+"same avg, different hex" the way most of this migration's other fixes are.
 
 - **`--status-info`-shaped gap.** The blue "informational notice" pattern
   (`border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20`
@@ -254,3 +306,51 @@ new total.
 - **`slatebrand.400`/`slatebrand.600`** in `tailwind.config.ts` has zero
   consumers in `src/`, same as the `brand.50/600/900` keys slice 1 removed.
   Still out of this ticket's named scope — worth a one-line cleanup ticket.
+
+### QA-fix notes (post-publish corrections to this slice)
+
+- **Ratchet-invisible hardcoded colors: check for raw `hsl()`/`rgb()`
+  literals, not just Tailwind classes, in any file you touch.**
+  `ClinicalBaselineResults.tsx`'s `SCORE_COLORS` map used raw `hsl(0 70%
+  95%)`-style literals (not Tailwind classes) for its band-1 color, so it
+  read as "red" in the UI but was completely invisible to the ratchet
+  script (which only counts Tailwind palette classes) — even though this
+  slice edited the same file's ratchet-visible classes. Migrated to
+  `--score-1..4`/`-bg`/`-ink` (band 1: red → orange, same DASH-1a reasoning
+  as `RatingBandCollapsible.tsx`). The `hsl(38 90% 97%)` literal two lines
+  below (the coach/self-disagreement row highlight) was also migrated, to
+  `--status-late-bg`, since it already pairs with a `--status-late` ring
+  applied a few lines up. Neither fix moves this file's ratchet count
+  (still 28 → 0) since neither was ever counted. **Lesson: grep a touched
+  file for `hsl(`/`rgb(` literals as well as palette classes before calling
+  it migrated — the ratchet only proves the Tailwind-class count went down,
+  not that every hardcoded color in the file is gone.**
+- **Verify "identical" duplicated class strings actually match before using
+  `replace_all`.** `RecordingProcessCard.tsx` had the same amber
+  bg/border/rounded treatment on two cards, but with `space-y-3` in a
+  different position in the class string (`"p-4 bg-amber-50 ... rounded-lg
+  space-y-3"` vs `"space-y-3 p-4 bg-amber-50 ... rounded-lg"`) — different
+  strings, so a single `replace_all` silently migrated only one of the two.
+  Both are now migrated (14 → 0, correcting the doc's previously-wrong 0).
+  **Lesson: re-run the exact-match grep after a `replace_all` on a
+  hand-written class string; don't assume visually-identical Tailwind
+  output means byte-identical source strings.**
+- **`bg-destructive`/`text-destructive` is tuned for solid fills, not
+  tinted-background text.** `RecordingStartCard.tsx`'s "Recording" badge
+  paired `bg-destructive/10` with `text-destructive`. `--destructive` has a
+  real `.dark` override (`0 62.8% 30.6%`, a low-lightness red meant to read
+  as a solid button fill against light `-foreground` text) — on a 10%-opacity
+  tint in dark mode that produces dark red text on a near-black background,
+  effectively unreadable. Fixed by switching to `--status-missing`
+  (`0 84% 60%`, mode-invariant, already proven for exactly this
+  tinted-bg-plus-colored-text pairing via `StatusBadge`) for both the badge
+  and its pulsing dot, reusing its red hue for the "actively recording"
+  semantic the same way `--status-late`'s amber is reused for "attention"
+  states elsewhere in this doc. `bg-destructive` alone (no paired
+  `text-destructive` on a tint) is still fine — see the solid pulse dots in
+  `EvaluationHub.tsx` and `CoachBaselineWizard.tsx`, which have no text
+  layered on top and so no contrast issue. **Lesson: `--destructive` is
+  safe for solid-fill buttons and solid dots/icons; treat it as unproven
+  for the "light tint background + matching-hue text" pattern this
+  migration uses everywhere else, and reach for a `--status-*` token there
+  instead.**

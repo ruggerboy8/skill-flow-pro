@@ -1,5 +1,5 @@
 {
-  "total": 556,
+  "total": 549,
   "files": {
     "src/components/NumberScale.tsx": 3,
     "src/components/admin/AdminUsersTab.tsx": 8,
@@ -29,7 +29,6 @@
     "src/components/coach/AudioRecorder.tsx": 4,
     "src/components/coach/FloatingRecorderPill.tsx": 5,
     "src/components/coach/OnTimeRateWidget.tsx": 30,
-    "src/components/coach/RecordingProcessCard.tsx": 4,
     "src/components/coach/ReminderComposer.tsx": 1,
     "src/components/coach/StaffPriorityFocusTab.tsx": 1,
     "src/components/dashboard/LocationSubmissionWidget.tsx": 30,
@@ -43,7 +42,7 @@
     "src/components/home/ChristmasWelcome.tsx": 12,
     "src/components/home/ThisWeekPanel.tsx": 25,
     "src/components/my-role/RoleRadar.tsx": 3,
-    "src/components/my-role/ScoreHistoryV2.tsx": 9,
+    "src/components/my-role/ScoreHistoryV2.tsx": 6,
     "src/components/planner/MonthView.tsx": 1,
     "src/components/planner/ProMoveCard.tsx": 4,
     "src/components/planner/ProMovePickerDialog.tsx": 6,

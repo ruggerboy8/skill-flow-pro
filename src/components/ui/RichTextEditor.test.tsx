@@ -199,4 +199,63 @@ describe('RichTextEditor', () => {
       'User typed this.'
     );
   });
+
+  // Codex review (CLN-2a follow-up, PR #73): changing `modules`/`formats`
+  // rebuilds the editor on the same host node. Quill inserts its toolbar as
+  // a SIBLING of the container element it's given, not a descendant, so a
+  // teardown that only unbound the 'text-change' listener left the old
+  // .ql-toolbar (still interactive) behind every time -- duplicate toolbar
+  // DOM accumulating on every rebuild. EvaluationHub hits this at runtime:
+  // its readOnly toggle switches `modules.toolbar` between `false` and a
+  // toolbar array, rebuilding the editor each time.
+  it('never accumulates .ql-toolbar DOM across a modules/readOnly-driven rebuild', async () => {
+    const onChange = vi.fn();
+    function Harness({ isReadOnly }: { isReadOnly: boolean }) {
+      return (
+        <RichTextEditor
+          value="<p>a</p>"
+          onChange={onChange}
+          readOnly={isReadOnly}
+          // Mirrors EvaluationHub's actual config exactly: readOnly flips
+          // modules.toolbar between `false` and a real toolbar array.
+          modules={{
+            toolbar: isReadOnly ? false : [['bold', 'italic'], [{ list: 'bullet' }], ['clean']],
+          }}
+        />
+      );
+    }
+
+    const { container, rerender } = render(<Harness isReadOnly={false} />);
+    await waitFor(() => {
+      expect(container.querySelectorAll('.ql-toolbar')).toHaveLength(1);
+    });
+    expect(container.querySelectorAll('.ql-container')).toHaveLength(1);
+
+    // toolbar config A -> config B (readOnly on): forces a rebuild on the
+    // same host. This is the exact path that used to leak the old toolbar.
+    rerender(<Harness isReadOnly={true} />);
+    await waitFor(() => {
+      expect(container.querySelectorAll('.ql-toolbar')).toHaveLength(0);
+    });
+    expect(container.querySelectorAll('.ql-container')).toHaveLength(1);
+
+    // Toggle back to config A: if either rebuild leaked DOM, this is where
+    // it would show up as more than one toolbar or container.
+    rerender(<Harness isReadOnly={false} />);
+    await waitFor(() => {
+      expect(container.querySelectorAll('.ql-toolbar')).toHaveLength(1);
+    });
+    expect(container.querySelectorAll('.ql-container')).toHaveLength(1);
+
+    // Cycle through both states once more for good measure.
+    rerender(<Harness isReadOnly={true} />);
+    await waitFor(() => {
+      expect(container.querySelectorAll('.ql-toolbar')).toHaveLength(0);
+    });
+    rerender(<Harness isReadOnly={false} />);
+    await waitFor(() => {
+      expect(container.querySelectorAll('.ql-toolbar')).toHaveLength(1);
+    });
+    expect(container.querySelectorAll('.ql-container')).toHaveLength(1);
+  });
 });

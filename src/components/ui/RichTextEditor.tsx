@@ -80,7 +80,6 @@ export function RichTextEditor({
   className,
 }: RichTextEditorProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
-  const editingAreaRef = useRef<HTMLDivElement | null>(null);
   const quillRef = useRef<Quill | null>(null);
 
   // Latest onChange, read from inside the Quill event handler, so the
@@ -108,10 +107,25 @@ export function RichTextEditor({
   // Mount / re-instantiate. Runs once, and again whenever the *content* of
   // modules or formats changes (a toolbar/format change needs a fresh Quill
   // instance -- Quill doesn't support reconfiguring those in place).
+  // EvaluationHub actually hits the rebuild path at runtime: its readOnly
+  // toggle switches `modules.toolbar` between `false` and a toolbar array,
+  // which changes modulesKey and reruns this effect.
   useEffect(() => {
-    if (!editingAreaRef.current) return;
+    const host = wrapperRef.current;
+    if (!host) return;
 
-    const quill = new Quill(editingAreaRef.current, {
+    // Quill takes the container element we hand it (a fresh child div, not
+    // `host` itself) and inserts its toolbar as a SIBLING of that
+    // container -- i.e. as another child of `host`, not a descendant of
+    // the container. So the previous instance's teardown (below) can't
+    // just remove its own container; it clears the whole host. By the
+    // time this line runs, `host` is guaranteed empty (either this is the
+    // first mount, or the prior effect's cleanup already cleared it), so a
+    // fresh container is all `host` needs.
+    const editingArea = document.createElement('div');
+    host.appendChild(editingArea);
+
+    const quill = new Quill(editingArea, {
       theme: 'snow',
       modules: modules ?? {},
       formats,
@@ -146,11 +160,17 @@ export function RichTextEditor({
     return () => {
       quill.off('text-change', handleTextChange);
       quillRef.current = null;
-      // Quill has no destroy() API (true in v1 and v2 alike) -- react-quill
-      // only ever unbound its listener too, relying on React to tear down
-      // the DOM. Same here: the editingArea div (and any toolbar Quill
-      // inserted as its sibling) live inside wrapperRef, which React
-      // unmounts for us.
+      // Quill has no destroy() API (true in v1 and v2 alike), and its
+      // toolbar lives outside the container element we gave it (see
+      // above), so unbinding the listener alone leaves DOM behind: a
+      // stale, still-interactive .ql-toolbar plus the old container and
+      // whatever classes/attributes Quill set on it. Emptying `host`
+      // removes all of it regardless of exactly what Quill injected or
+      // where, so a rebuild (readOnly toggling `modules.toolbar` between
+      // `false` and an array, as EvaluationHub does) or an unmount never
+      // leaves residue -- and it leaves `host` empty for the next
+      // instantiation's `appendChild` above to build into.
+      host.innerHTML = '';
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesKey, formatsKey]);
@@ -181,9 +201,9 @@ export function RichTextEditor({
     quill.enable(!readOnly);
   }, [readOnly]);
 
-  return (
-    <div ref={wrapperRef} className={className}>
-      <div ref={editingAreaRef} />
-    </div>
-  );
+  // `wrapperRef` is an otherwise-empty host: the effect above populates it
+  // imperatively (a fresh container div, plus whatever Quill inserts next
+  // to it) and fully empties it on every teardown, so React never needs to
+  // reconcile children it didn't render itself.
+  return <div ref={wrapperRef} className={className} />;
 }

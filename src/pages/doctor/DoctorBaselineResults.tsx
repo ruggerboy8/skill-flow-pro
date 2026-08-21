@@ -33,11 +33,20 @@ interface GroupedData {
 
 const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
 
+// DSN-9 QA follow-up (Codex, PR #76): this map was a fourth matched-pair
+// site the original DSN-9 grep missed — raw hsl() literals, not Tailwind
+// classes, so invisible to the hardcoded-color ratchet, same blind spot
+// ClinicalBaselineResults.tsx's own DSN-3 fix comment already called out.
+// Band 3 hardcoded the same blue (hue 210) DSN-9 removed from --score-3
+// everywhere else, and band 1 hardcoded red, which the score ramp
+// deliberately never renders. Migrated to the --score-N token family,
+// matching ClinicalBaselineResults.tsx's pattern exactly: bg/text/border
+// derive from -bg/-ink/vivid instead of being invented per surface.
 const SCORE_COLORS: Record<number, { bg: string; border: string; text: string; activeBorder: string }> = {
-  4: { bg: 'hsl(160 60% 95%)', border: 'hsl(160 50% 80%)', text: 'hsl(160 80% 25%)', activeBorder: 'hsl(160 60% 40%)' },
-  3: { bg: 'hsl(210 80% 95%)', border: 'hsl(210 60% 80%)', text: 'hsl(210 80% 30%)', activeBorder: 'hsl(210 70% 45%)' },
-  2: { bg: 'hsl(38 90% 95%)', border: 'hsl(38 70% 75%)', text: 'hsl(38 80% 30%)', activeBorder: 'hsl(38 80% 45%)' },
-  1: { bg: 'hsl(0 70% 95%)', border: 'hsl(0 60% 80%)', text: 'hsl(0 70% 35%)', activeBorder: 'hsl(0 65% 45%)' },
+  4: { bg: 'hsl(var(--score-4-bg))', border: 'hsl(var(--score-4) / 0.3)', text: 'hsl(var(--score-4-ink))', activeBorder: 'hsl(var(--score-4))' },
+  3: { bg: 'hsl(var(--score-3-bg))', border: 'hsl(var(--score-3) / 0.3)', text: 'hsl(var(--score-3-ink))', activeBorder: 'hsl(var(--score-3))' },
+  2: { bg: 'hsl(var(--score-2-bg))', border: 'hsl(var(--score-2) / 0.3)', text: 'hsl(var(--score-2-ink))', activeBorder: 'hsl(var(--score-2))' },
+  1: { bg: 'hsl(var(--score-1-bg))', border: 'hsl(var(--score-1) / 0.3)', text: 'hsl(var(--score-1-ink))', activeBorder: 'hsl(var(--score-1))' },
 };
 
 const SCORE_LABELS: Record<number, string> = {

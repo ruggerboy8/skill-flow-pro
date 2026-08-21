@@ -15,11 +15,22 @@
 // first search and staying correct however large the corpus grows.
 //
 // The { answer, citations } response shape is FROZEN, unchanged from v1:
-// ASK-2 changes how documents are found, never this contract. Citations
-// are the documents the model actually called read_document on (the system
-// prompt requires reading before citing), not just anything search turned
-// up — deliberately simpler and more auditable than relying on passage-
-// level citation parsing for a contract that only needs document identity.
+// ASK-2 changes how documents are found, never this contract.
+//
+// Citations fix (found in live QA): citations used to be built only from
+// documentsRead (documents the model called read_document on), but Sonnet
+// frequently answers straight from the rich search_corpus snippets and
+// skips read_document despite the system prompt asking for it, so citations
+// silently came back empty on well-covered questions. Fixed the same way
+// v1 solves it: Anthropic's native citations feature. Every document the
+// model is shown -- each search_corpus row AND every read_document body --
+// is sent as a `document` content block (citations: {enabled: true}) inside
+// the tool_result, instead of/alongside plain text, and appended in that
+// same order to `citableDocs`. After the loop, citations are recovered from
+// finalResponse.content's document_index citations, mapped back through
+// citableDocs -- see supabase/functions/_shared/citationMapping.ts. A
+// document the model never actually cites (even if surfaced by search)
+// produces no citation, same as before.
 //
 // Retrieval (search_corpus, read_document) runs through a caller-scoped
 // Supabase client carrying the asker's own JWT, so RLS is the real
@@ -32,6 +43,7 @@
 
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Anthropic from 'npm:@anthropic-ai/sdk';
+import { collectCitations, type CitableDoc } from '../_shared/citationMapping.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -82,9 +94,10 @@ const tools: Anthropic.Tool[] = [
     name: 'search_corpus',
     description:
       'Search the Alcan knowledge corpus (kept and canon documents) with a natural-language query. ' +
-      'Returns ranked snippets with document ids, titles, statuses, and links. Call this first for any ' +
-      'question, and call it again with different phrasing if the first pass comes up thin — do not give ' +
-      'up on one query.',
+      'Returns ranked snippets with document ids, titles, statuses, and links, each provided to you as ' +
+      'citable source content — cite a snippet directly if it answers the question. Call this first for ' +
+      'any question, and call it again with different phrasing if the first pass comes up thin — do not ' +
+      'give up on one query.',
     input_schema: {
       type: 'object',
       properties: {
@@ -97,8 +110,10 @@ const tools: Anthropic.Tool[] = [
     name: 'read_document',
     description:
       "Fetch a document's full text by its document_id (or, for videos and files with no extracted text " +
-      'yet, its title and link). Call this on every document you intend to cite in your answer, even if ' +
-      'the search snippet already told you what you needed — this is what makes the citation valid.',
+      'yet, its title and link), also provided to you as citable source content. Call this when a search ' +
+      'snippet is too thin to answer confidently, or to confirm a number, price, or policy before you ' +
+      'state it — reading is not required to cite a document, but is required before relying on more of ' +
+      'it than the snippet showed you.',
     input_schema: {
       type: 'object',
       properties: {
@@ -115,8 +130,8 @@ function buildSystemPrompt(areaNames: string[]): string {
 
 Rules, in priority order:
 1. Search before answering. Start with search_corpus, and search again with different phrasing if the first pass comes up thin.
-2. Before citing any document in your answer, call read_document on it at least once, even if the search snippet already told you what you needed. Only documents you actually read may be cited.
-3. Answer only from documents you have read via these tools, and cite them. Never answer from general knowledge about dentistry or business, and NEVER fabricate or guess at a policy, price, number, or procedure.
+2. Every document search_corpus or read_document gives you is citable source content — use Claude's citation mechanism on the specific passage you drew a claim from, rather than paraphrasing without a citation. Call read_document when a snippet is too thin to answer from confidently, or to confirm a number, price, or policy before you state it; you do not have to read a document first just to cite it.
+3. Answer only from documents you have been given via these tools, and cite them. Never answer from general knowledge about dentistry or business, and NEVER fabricate or guess at a policy, price, number, or procedure.
 4. If the best source for a question is a video or a file whose text hasn't been extracted yet, say so plainly and still name and cite it, so the person can go watch or open it themselves.
 5. If the documents do not cover the question, say so plainly and point the person to the expert area that owns that territory (the areas are: ${areas}). One or two warm sentences; no apology theater.
 6. If documents contradict each other on the point being asked, say that plainly, cite both, and name the owning expert area as the place to resolve it. Do not pick a side.
@@ -315,7 +330,15 @@ Deno.serve(async (req) => {
 
     let toolCallCount = 0;
     let searchCallCount = 0;
-    const documentsRead = new Map<string, { title: string; source_url: string | null }>();
+    let readDocumentCount = 0;
+    // Every document content block shown to the model, in the exact order
+    // it was pushed into `messages` -- Anthropic numbers document_index
+    // 0-based across the whole request in that same order, so this array's
+    // ordering must track the tool_result construction below exactly. A
+    // document can appear more than once (a search_corpus snippet, then a
+    // fuller read_document body); collectCitations() dedupes by document_id
+    // afterward, so pushing every occurrence here is intentional, not a bug.
+    const citableDocs: CitableDoc[] = [];
     let finalResponse: Anthropic.Message | undefined;
 
     for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
@@ -356,12 +379,30 @@ Deno.serve(async (req) => {
           try {
             const embedding = OPENAI_API_KEY ? await embedQuery(query, OPENAI_API_KEY) : null;
             const rows = await runSearchCorpus(caller, query, embedding);
-            const text = rows.length
-              ? rows
-                  .map((r) => `[${r.document_id}] ${r.title} (status: ${r.status})\n${r.snippet}`)
-                  .join('\n\n---\n\n')
-              : 'No matching documents found. Try a different phrasing.';
-            toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: text });
+            if (rows.length === 0) {
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: 'No matching documents found. Try a different phrasing.',
+              });
+            } else {
+              // Citations fix: one citable `document` block per row, in
+              // result order, instead of one plain-text blob. The snippet
+              // itself is the citable source text; document_id/status ride
+              // in `context` (visible to the model, not citable) so
+              // read_document's document_id argument still works.
+              const documentBlocks: Anthropic.DocumentBlockParam[] = rows.map((r) => {
+                citableDocs.push({ document_id: r.document_id, title: r.title, source_url: r.source_url });
+                return {
+                  type: 'document',
+                  source: { type: 'text', media_type: 'text/plain', data: r.snippet },
+                  title: r.title,
+                  context: `document_id: ${r.document_id} (status: ${r.status})`,
+                  citations: { enabled: true },
+                };
+              });
+              toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: documentBlocks });
+            }
           } catch (err) {
             console.error('ask-alcan-v2: search_corpus failed', err);
             toolResults.push({
@@ -385,18 +426,29 @@ Deno.serve(async (req) => {
                 content: 'Document not found or not eligible to cite.',
               });
             } else {
-              documentsRead.set(doc.id, { title: doc.title, source_url: doc.source_url });
+              readDocumentCount++;
+              citableDocs.push({ document_id: doc.id, title: doc.title, source_url: doc.source_url });
+              // Citations fix: the full body is the citable document block,
+              // same mechanism as search_corpus rows above -- a doc the
+              // model chooses to read in full is citable through the same
+              // native-citations path, not a separate "reading makes it
+              // citable" rule.
               const bodyText = doc.body ?? '(No extracted text yet — title and link only.)';
-              const text = [
-                `Title: ${doc.title}`,
+              const context = [
+                `document_id: ${doc.id}`,
                 doc.summary ? `Summary: ${doc.summary}` : null,
                 `Link: ${doc.source_url ?? '(none)'}`,
-                '',
-                bodyText,
               ]
                 .filter((line) => line !== null)
                 .join('\n');
-              toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: text });
+              const documentBlock: Anthropic.DocumentBlockParam = {
+                type: 'document',
+                source: { type: 'text', media_type: 'text/plain', data: bodyText },
+                title: doc.title,
+                context,
+                citations: { enabled: true },
+              };
+              toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: [documentBlock] });
             }
           } catch (err) {
             console.error('ask-alcan-v2: read_document failed', err);
@@ -439,19 +491,26 @@ Deno.serve(async (req) => {
         'more specific phrasing.';
     }
 
-    const citations = Array.from(documentsRead.entries()).map(([document_id, d]) => ({
-      document_id,
-      title: d.title,
-      source_url: d.source_url,
-    }));
+    // Citations fix: recover citations from Claude's native document_index
+    // citations on finalResponse's text blocks, mapped back through
+    // citableDocs -- mirrors v1's packed-doc mapping exactly. See
+    // supabase/functions/_shared/citationMapping.ts.
+    const citations = collectCitations(finalResponse.content, citableDocs);
 
     // Tool-loop equivalent of v1's packed-size log: the signal for how the
-    // shadow deploy is actually behaving.
+    // shadow deploy is actually behaving. citable_docs_surfaced and
+    // citations_returned are new with the citations fix -- they used to be
+    // identical to documents_read by construction (citations came only from
+    // documentsRead), so watching them diverge is the signal the fix is
+    // doing something: citations_returned should now be > 0 even on turns
+    // where documents_read is 0.
     console.log(JSON.stringify({
       event: 'ask-alcan-v2-tool-loop',
       search_calls: searchCallCount,
       tool_calls: toolCallCount,
-      documents_read: documentsRead.size,
+      documents_read: readDocumentCount,
+      citable_docs_surfaced: citableDocs.length,
+      citations_returned: citations.length,
       input_tokens: finalResponse.usage.input_tokens,
       cache_creation_input_tokens: finalResponse.usage.cache_creation_input_tokens,
       cache_read_input_tokens: finalResponse.usage.cache_read_input_tokens,

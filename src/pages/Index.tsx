@@ -11,7 +11,7 @@ import { RecognitionCard } from '@/components/home/RecognitionCard';
 import { LeadFocusHomeCard } from '@/components/home/LeadFocusHomeCard';
 import { LeadMeetingRequestCard } from '@/components/home/LeadMeetingRequestCard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { SignalP } from '@/components/brand/SignalP';
+import { RouteLoadingFallback } from '@/components/RouteLoadingFallback';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Wrench, ArrowRight, ChevronRight, Users } from 'lucide-react';
@@ -54,14 +54,13 @@ export default function Index() {
   // Admins / regional managers / coaches land on Command Center even if also a doctor.
   // They can reach /doctor via the sidebar "Doctor" link.
   if (showRegionalDashboard || isOrgAdmin || isSuperAdmin) {
+    // PRF-3 QA fix: this boundary is already inside Layout's viewport-
+    // constrained <main>, so its fallback must be content-scoped
+    // (fullScreen={false}) rather than min-h-screen -- a full-viewport
+    // fallback here fought Layout's own Outlet-level Suspense and produced
+    // an oversized content region / transient scrolling on cold-load.
     return (
-      <Suspense
-        fallback={
-          <div className="min-h-screen flex items-center justify-center bg-background">
-            <SignalP mode="waiting" size={48} />
-          </div>
-        }
-      >
+      <Suspense fallback={<RouteLoadingFallback fullScreen={false} />}>
         <RegionalDashboard />
       </Suspense>
     );

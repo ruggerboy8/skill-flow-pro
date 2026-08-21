@@ -89,6 +89,18 @@ class Postgrest:
                 return rows
             offset += page_size
 
+    def select_max(self, table: str, column: str, filters: dict | None = None):
+        """Return the maximum value of `column` in `table` (matching
+        `filters`), in exactly one request (`order=<column>.desc&limit=1`),
+        or None if no rows match. Used by mirror_pro_moves.py's watermark
+        short-circuit, where paging via select_all would defeat the point
+        (it would page through the whole table one row at a time)."""
+        eq = {col: f"eq.{value}" for col, value in (filters or {}).items()}
+        rows = self._request("GET", table, params={
+            "select": column, "order": f"{column}.desc", "limit": 1, **eq,
+        })
+        return rows[0][column] if rows else None
+
     def insert(self, table: str, records: list[dict]) -> None:
         if records:
             self._request("POST", table, body=records, prefer="return=minimal")

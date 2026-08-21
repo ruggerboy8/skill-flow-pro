@@ -34,21 +34,28 @@ function getScoreBadge(score: number | null): { label: string; style: React.CSSP
       },
     };
   }
+  // DSN-9 QA follow-up: `color` was the vivid --score-N (band 3's text-
+  // on-bg contrast dropped to 1.86:1 under the new lime, 2.89:1 before —
+  // already failing). Bands 2 and 4 fail the same way (1.77:1, 2.31:1) —
+  // RatingBandCollapsible/CoachBaselineWizard already avoid this exact
+  // mistake by using -ink for text. Switched all three bands to -ink,
+  // which clears 4.5:1 (band 2: 6.47:1, band 3: 6.41:1, band 4: 6.96:1).
+  // borderColor keeps the vivid token at low opacity, same as before.
   if (score === 4) {
     return {
       label: 'Mastery',
-      style: { backgroundColor: 'hsl(var(--score-4-bg))', color: 'hsl(var(--score-4))', borderColor: 'hsl(var(--score-4) / 0.3)' },
+      style: { backgroundColor: 'hsl(var(--score-4-bg))', color: 'hsl(var(--score-4-ink))', borderColor: 'hsl(var(--score-4) / 0.3)' },
     };
   }
   if (score === 3) {
     return {
       label: 'Proficient',
-      style: { backgroundColor: 'hsl(var(--score-3-bg))', color: 'hsl(var(--score-3))', borderColor: 'hsl(var(--score-3) / 0.3)' },
+      style: { backgroundColor: 'hsl(var(--score-3-bg))', color: 'hsl(var(--score-3-ink))', borderColor: 'hsl(var(--score-3) / 0.3)' },
     };
   }
   return {
     label: 'Building',
-    style: { backgroundColor: 'hsl(var(--score-2-bg))', color: 'hsl(var(--score-2))', borderColor: 'hsl(var(--score-2) / 0.3)' },
+    style: { backgroundColor: 'hsl(var(--score-2-bg))', color: 'hsl(var(--score-2-ink))', borderColor: 'hsl(var(--score-2) / 0.3)' },
   };
 }
 

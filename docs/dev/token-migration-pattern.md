@@ -253,6 +253,16 @@ not just a different hex. Two concrete boundary changes:
    could show red in one part of the card and amber in another. The
    unification also fixes that internal inconsistency, which is a genuine
    improvement, not just a side effect.
+4. **(DSN-9 QA follow-up, 2026-08-21) `EvaluationViewer.tsx`'s read-only
+   score pills moved from a hand-rolled red/orange/blue/green scheme to the
+   `--score-N` tokens.** This is the same rule as #2 above, applied to a
+   file the original DSN-9 sweep didn't catch because it doesn't share the
+   `--score-3` token's blue hue with anything else — it hardcoded its own
+   independent blue for band 3. Fixing it changes **band 1 from red to
+   orange**: `scoreBucket()`/the rest of the score ramp never renders a 1
+   as red (confidence/skill scores are never a red/green traffic light),
+   but this pill scheme did, so a rating of 1 in `EvaluationViewer.tsx`
+   reads as orange now, matching every other score-1 surface in the app.
 
 None of this is a bug in the migration — the DASH-1a score ramp is the
 system of record and `confidenceScoreRamp.ts` is already tested — but it is

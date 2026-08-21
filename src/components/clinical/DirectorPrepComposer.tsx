@@ -30,14 +30,20 @@ interface Props {
 
 const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
 
-// DSN-9: entry 3 was a hardcoded solid blue fill, a duplicate of the old
-// blue --score-3 token. Switched to the token itself so this can't drift
-// from the score ramp again.
+// DSN-9 QA follow-up: this was a solid vivid fill with white text (entry 3
+// hardcoded blue, now the token). White-on-fill fails 4.5:1 for EVERY band,
+// not just the old blue (band 1: 2.85:1, band 2: 1.98:1, band 3 on the new
+// lime: 2.02:1, band 4: 2.59:1) — dark ink text on the same solid fill still
+// fails all four (2.95-3.64:1). Moved to the established ink-on-bg pattern
+// (bg = -bg pastel, text = -ink, border = vivid) already used by
+// RatingBandCollapsible/CoachBaselineWizard/ClinicalBaselineResults, which
+// clears 4.5:1 for all four bands (6.41-7.24:1); the border keeps the
+// badge's circle-of-color visual weight close to the old solid fill.
 const SCORE_COLORS: Record<number, string> = {
-  4: 'bg-emerald-500',
-  3: 'bg-[hsl(var(--score-3))]',
-  2: 'bg-amber-500',
-  1: 'bg-orange-500',
+  4: 'bg-[hsl(var(--score-4-bg))] border border-[hsl(var(--score-4))] text-[hsl(var(--score-4-ink))]',
+  3: 'bg-[hsl(var(--score-3-bg))] border border-[hsl(var(--score-3))] text-[hsl(var(--score-3-ink))]',
+  2: 'bg-[hsl(var(--score-2-bg))] border border-[hsl(var(--score-2))] text-[hsl(var(--score-2-ink))]',
+  1: 'bg-[hsl(var(--score-1-bg))] border border-[hsl(var(--score-1))] text-[hsl(var(--score-1-ink))]',
 };
 
 function ScoreCircle({ score, label }: { score: number | null | undefined; label: string }) {
@@ -53,7 +59,7 @@ function ScoreCircle({ score, label }: { score: number | null | undefined; label
   return (
     <div className="flex items-center gap-1">
       <span className="text-2xs text-muted-foreground">{label}</span>
-      <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold text-white ${SCORE_COLORS[score] || 'bg-muted'}`}>
+      <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold ${SCORE_COLORS[score] || 'bg-muted text-muted-foreground'}`}>
         {score}
       </span>
     </div>

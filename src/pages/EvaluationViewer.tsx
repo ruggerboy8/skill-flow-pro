@@ -18,11 +18,19 @@ import { getDomainOrderIndex } from '@/lib/domainUtils';
 import type { EvaluationWithItems, ExtractedInsights, InsightsPerspective, DomainInsight } from '@/lib/evaluations';
 import { ParticipationSnapshotCard, type ParticipationSnapshot } from '@/components/evaluations/ParticipationSnapshotCard';
 
+// DSN-9 QA follow-up: this hand-rolled pill scheme still rendered band 3 as
+// blue (the exact thing DSN-9 removed) and band 1 as red, which the score
+// ramp deliberately never does (confidence/skill scores are never a
+// red/green traffic light — see confidenceScoreRamp.ts). Migrated to the
+// --score-N token family: bg = -bg pastel, text = -ink (clears 4.5:1 for
+// all four bands — 7.24/6.47/6.41/6.96:1), border = vivid. This changes
+// band 1 from red to orange; documented as a behavior change in
+// docs/dev/token-migration-pattern.md.
 const SCORE_PILLS = [
-  { v: 1, cls: 'bg-red-100 text-red-800 border-red-200' },
-  { v: 2, cls: 'bg-orange-100 text-orange-800 border-orange-200' },
-  { v: 3, cls: 'bg-blue-100 text-blue-800 border-blue-200' },
-  { v: 4, cls: 'bg-green-100 text-green-800 border-green-200' },
+  { v: 1, cls: 'bg-[hsl(var(--score-1-bg))] text-[hsl(var(--score-1-ink))] border-[hsl(var(--score-1))]' },
+  { v: 2, cls: 'bg-[hsl(var(--score-2-bg))] text-[hsl(var(--score-2-ink))] border-[hsl(var(--score-2))]' },
+  { v: 3, cls: 'bg-[hsl(var(--score-3-bg))] text-[hsl(var(--score-3-ink))] border-[hsl(var(--score-3))]' },
+  { v: 4, cls: 'bg-[hsl(var(--score-4-bg))] text-[hsl(var(--score-4-ink))] border-[hsl(var(--score-4))]' },
 ];
 
 function ReadOnlyScore({ value }: { value: number | null }) {

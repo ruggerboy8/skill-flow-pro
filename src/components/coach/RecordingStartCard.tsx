@@ -69,7 +69,7 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
                   hasExistingInsights && !isRecording
                     ? "bg-[hsl(var(--status-complete-bg))]"
                     : isRecording
-                      ? isPaused ? "bg-[hsl(var(--status-late-bg))]" : "bg-destructive/10"
+                      ? isPaused ? "bg-[hsl(var(--status-late-bg))]" : "bg-[hsl(var(--status-missing-bg))]"
                       : "bg-muted"
                 )}>
                   {hasExistingInsights && !isRecording ? (
@@ -78,7 +78,7 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
                     <Mic className={cn(
                       "w-5 h-5",
                       isRecording
-                        ? isPaused ? "text-[hsl(var(--status-late))]" : "text-destructive"
+                        ? isPaused ? "text-[hsl(var(--status-late))]" : "text-[hsl(var(--status-missing))]"
                         : "text-muted-foreground"
                     )} />
                   )}
@@ -146,16 +146,23 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
 
                 {isRecording && (
                   <div className="flex items-center gap-2">
-                    {/* Status badge */}
+                    {/* Status badge — reuses --status-missing's red hue rather
+                        than bg-destructive/10 + text-destructive: --destructive's
+                        dark-mode value is a low-lightness red tuned for solid
+                        fills (buttons), not text on a tinted background, and
+                        paired with a 10%-opacity tint it was unreadably dark
+                        in dark mode. --status-missing is mode-invariant and
+                        already proven for this exact tinted-bg/colored-text
+                        pairing via StatusBadge. */}
                     <span className={cn(
                       "flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium",
                       isPaused
                         ? "bg-[hsl(var(--status-late-bg))] text-[hsl(var(--status-late))]"
-                        : "bg-destructive/10 text-destructive"
+                        : "bg-[hsl(var(--status-missing-bg))] text-[hsl(var(--status-missing))]"
                     )}>
                       <span className={cn(
                         "w-2 h-2 rounded-full",
-                        isPaused ? "bg-[hsl(var(--status-late))]" : "bg-destructive animate-pulse"
+                        isPaused ? "bg-[hsl(var(--status-late))]" : "bg-[hsl(var(--status-missing))] animate-pulse"
                       )} />
                       {isPaused ? "Paused" : "Recording"}
                     </span>

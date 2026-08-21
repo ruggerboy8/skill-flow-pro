@@ -33,22 +33,36 @@ export function scoreBucket(avg: number): ScoreBucket | undefined {
 }
 
 export interface ScoreBucketTokens {
+  /** Vivid --score-N. Use for borders, dots, and other small/non-text
+   * accents — NOT for text sitting on top of `bg`. At normal-text sizes
+   * the vivid-on-`-bg` pair fails WCAG contrast in light mode (as low as
+   * ~1.8:1). Use `ink` for text instead. */
   text: string;
+  /** --score-N-bg, the pastel tint this bucket's `ink` is tuned against. */
   bg: string;
+  /** --score-N-ink: a mode-aware, darker/lighter (light/dark mode) shade
+   * of the same hue, designed to stay readable as TEXT on `bg`. Use this
+   * for any label, count, or score number rendered on the tinted
+   * background — mirrors the -bg + -ink pairing already used by
+   * ConfidenceCard, TeamStaffPage, and ClinicalBaselineResults. */
+  ink: string;
 }
 
 /**
- * hsl(var(--score-N)) / hsl(var(--score-N-bg)) strings for inline styles.
- * An undefined bucket (no data / invalid input) falls back to the same
- * muted-foreground, no-fill treatment used elsewhere for missing data.
+ * hsl(var(--score-N)) / hsl(var(--score-N-bg)) / hsl(var(--score-N-ink))
+ * strings for inline styles. An undefined bucket (no data / invalid input)
+ * falls back to the same muted-foreground, no-fill treatment used elsewhere
+ * for missing data — `ink` falls back to the same muted-foreground as
+ * `text` since there's no tinted `bg` to be readable against.
  */
 export function scoreBucketTokens(bucket: ScoreBucket | undefined): ScoreBucketTokens {
   if (bucket === undefined) {
-    return { text: 'hsl(var(--muted-foreground))', bg: 'transparent' };
+    return { text: 'hsl(var(--muted-foreground))', bg: 'transparent', ink: 'hsl(var(--muted-foreground))' };
   }
   return {
     text: `hsl(var(--score-${bucket}))`,
     bg: `hsl(var(--score-${bucket}-bg))`,
+    ink: `hsl(var(--score-${bucket}-ink))`,
   };
 }
 

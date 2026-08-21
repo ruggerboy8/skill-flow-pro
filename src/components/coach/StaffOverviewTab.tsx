@@ -91,7 +91,7 @@ export function StaffOverviewTab({ rawData, evalCount = 0 }: StaffOverviewTabPro
                       >
                         {domain}
                       </p>
-                      <p className="text-xl font-black" style={{ color: tokens.text }}>
+                      <p className="text-xl font-black" style={{ color: tokens.ink }}>
                         {avg.toFixed(1)}<span className="text-xs font-normal text-muted-foreground ml-0.5">/4</span>
                       </p>
                     </div>

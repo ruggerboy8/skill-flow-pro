@@ -354,3 +354,31 @@ several call sites. Flag it in QA/visual review specifically; don't assume
   for the "light tint background + matching-hue text" pattern this
   migration uses everywhere else, and reach for a `--status-*` token there
   instead.**
+- **Vivid `--score-N` on `--score-N-bg` fails contrast for text (Codex
+  review on PR #71, P2, legitimate).** `StaffPriorityFocusTab.tsx`,
+  `LocationSkillGaps.tsx` (both call sites), `StaffOverviewTab.tsx`,
+  `StaffDetailV2.tsx`, `RatingBandCollapsible.tsx`, and
+  `CoachBaselineWizard.tsx`'s `SCORE_CONFIG` all rendered a confidence/score
+  label in the vivid `--score-N` color directly on `--score-N-bg` — as low
+  as ~1.8-2.9:1 contrast in light mode, failing normal-text requirements on
+  badge-sized (12-14px) text. `ClinicalBaselineResults.tsx`'s QA fix 1
+  (above) already used the `-ink` variant correctly, which is what exposed
+  the inconsistency: `--score-N-ink` exists precisely for this pairing
+  (same `-bg` + `-ink` pattern already used by `ConfidenceCard.tsx` and
+  `TeamStaffPage.tsx`, both outside this slice). Fixed by adding an `ink`
+  field to `scoreBucketTokens()`'s return shape in
+  `src/lib/confidenceScoreRamp.ts` (additive — `text` and `bg` are
+  unchanged, so `DomainConfidenceHeatmap.tsx`, the one pre-existing
+  consumer outside this slice, is unaffected) and switching every
+  on-tint text usage above to `tokens.ink` / `--score-N-ink`, while
+  `borderColor`/`border-[...]`/`activeBorder` keep the vivid `--score-N` —
+  that usage is fine, it's text-on-tint specifically that fails.
+  `confidenceScoreRamp.test.ts`'s pinned `scoreBucketTokens()` shape was
+  updated deliberately to include `ink` in its `toEqual` expectations.
+  **Lesson: the `-bg` + `-ink` pairing (not `-bg` + vivid) is the correct
+  default for any score/status label rendered on its own tinted
+  background; reach for vivid only for borders, dots, rings, and other
+  non-text accents.** `DomainConfidenceHeatmap.tsx` was found to have the
+  same vivid-on-tint pattern in `scoreTextStyle()` but predates this slice
+  and wasn't touched — worth a follow-up ticket rather than scope-creeping
+  it into this QA fix.

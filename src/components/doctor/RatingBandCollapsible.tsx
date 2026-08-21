@@ -17,6 +17,11 @@ interface RatingBandCollapsibleProps {
 
 // 1-4 self-rating bands use the --score-N learning-gradient tokens (DASH-1a:
 // confidence/skill scores never render as a red/green traffic light).
+// textClass uses the -ink variant, not the vivid --score-N: the vivid color
+// on top of -bg fails normal-text contrast in light mode (~1.8-2.9:1).
+// -ink is the mode-aware shade tuned for exactly this on-tint-text pairing
+// (same pattern as ConfidenceCard, TeamStaffPage, ClinicalBaselineResults).
+// borderClass keeps the vivid token — fine for borders/accents.
 const BAND_CONFIG: Record<number, {
   label: string;
   subtext: string;
@@ -29,28 +34,28 @@ const BAND_CONFIG: Record<number, {
     subtext: 'If this is a 4, you\'re saying you go beyond the standard—others look to you as the example.',
     bgClass: 'bg-[hsl(var(--score-4-bg))]',
     borderClass: 'border-[hsl(var(--score-4))]/30',
-    textClass: 'text-[hsl(var(--score-4))]',
+    textClass: 'text-[hsl(var(--score-4-ink))]',
   },
   3: {
     label: '3 — Excellent, consistent standard',
     subtext: 'If this is a 3, you\'re saying you do this reliably and well—it\'s part of who you are.',
     bgClass: 'bg-[hsl(var(--score-3-bg))]',
     borderClass: 'border-[hsl(var(--score-3))]/30',
-    textClass: 'text-[hsl(var(--score-3))]',
+    textClass: 'text-[hsl(var(--score-3-ink))]',
   },
   2: {
     label: '2 — Good, with room to grow',
     subtext: 'If this is a 2, you\'re saying there\'s opportunity here—you\'re working on it.',
     bgClass: 'bg-[hsl(var(--score-2-bg))]',
     borderClass: 'border-[hsl(var(--score-2))]/30',
-    textClass: 'text-[hsl(var(--score-2))]',
+    textClass: 'text-[hsl(var(--score-2-ink))]',
   },
   1: {
     label: '1 — Needs focus',
     subtext: 'If this is a 1, you\'re saying this isn\'t reliably showing up yet.',
     bgClass: 'bg-[hsl(var(--score-1-bg))]',
     borderClass: 'border-[hsl(var(--score-1))]/30',
-    textClass: 'text-[hsl(var(--score-1))]',
+    textClass: 'text-[hsl(var(--score-1-ink))]',
   },
 };
 

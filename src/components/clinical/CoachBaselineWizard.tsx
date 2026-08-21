@@ -16,12 +16,14 @@ import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
 import { cn } from '@/lib/utils';
 
 // 1-4 rating buttons use the --score-N learning-gradient tokens (same
-// palette as the doctor's self-assessment wizard).
+// palette as the doctor's self-assessment wizard). text-[...] uses the -ink
+// variant, not the vivid --score-N: the vivid color on -bg fails contrast
+// for this button's small digit label in light mode. border keeps vivid.
 const SCORE_CONFIG = [
-  { value: 1, selected: 'bg-[hsl(var(--score-1-bg))] border-[hsl(var(--score-1))] text-[hsl(var(--score-1))]' },
-  { value: 2, selected: 'bg-[hsl(var(--score-2-bg))] border-[hsl(var(--score-2))] text-[hsl(var(--score-2))]' },
-  { value: 3, selected: 'bg-[hsl(var(--score-3-bg))] border-[hsl(var(--score-3))] text-[hsl(var(--score-3))]' },
-  { value: 4, selected: 'bg-[hsl(var(--score-4-bg))] border-[hsl(var(--score-4))] text-[hsl(var(--score-4))]' },
+  { value: 1, selected: 'bg-[hsl(var(--score-1-bg))] border-[hsl(var(--score-1))] text-[hsl(var(--score-1-ink))]' },
+  { value: 2, selected: 'bg-[hsl(var(--score-2-bg))] border-[hsl(var(--score-2))] text-[hsl(var(--score-2-ink))]' },
+  { value: 3, selected: 'bg-[hsl(var(--score-3-bg))] border-[hsl(var(--score-3))] text-[hsl(var(--score-3-ink))]' },
+  { value: 4, selected: 'bg-[hsl(var(--score-4-bg))] border-[hsl(var(--score-4))] text-[hsl(var(--score-4-ink))]' },
 ];
 
 const COACH_BASELINE_INTRO_DISMISSED_KEY = (doctorStaffId: string) =>

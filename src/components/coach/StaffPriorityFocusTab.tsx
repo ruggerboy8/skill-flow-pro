@@ -117,7 +117,9 @@ export function StaffPriorityFocusTab({ rawData }: StaffPriorityFocusTabProps) {
                         className="font-semibold px-2 py-0.5 rounded-full"
                         style={(() => {
                           const tokens = scoreBucketTokens(scoreBucket(score.confidence_score ?? NaN));
-                          return { backgroundColor: tokens.bg, color: tokens.text };
+                          // ink, not the vivid `text` token, for on-tint text —
+                          // `text` fails contrast at this size in light mode.
+                          return { backgroundColor: tokens.bg, color: tokens.ink };
                         })()}
                       >
                         Confidence: {score.confidence_score}/4

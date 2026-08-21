@@ -109,7 +109,9 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
   // green traffic light — see src/lib/confidenceScoreRamp.ts (DASH-1a).
   function getConfidenceStyle(avg: number): React.CSSProperties {
     const tokens = scoreBucketTokens(scoreBucket(avg));
-    return { backgroundColor: tokens.bg, color: tokens.text, borderColor: tokens.text };
+    // ink for text (contrast-safe on the tinted bg), vivid `text` reserved
+    // for the border accent.
+    return { backgroundColor: tokens.bg, color: tokens.ink, borderColor: tokens.text };
   }
 
   function hexToRgba(hex: string, alpha: number): string {
@@ -248,7 +250,7 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
                   >
                     <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: richColor }} />
                     <span className="text-xs font-medium text-muted-foreground">{domain}</span>
-                    <span className="text-sm font-bold" style={{ color: tokens.text }}>{avg.toFixed(1)}</span>
+                    <span className="text-sm font-bold" style={{ color: tokens.ink }}>{avg.toFixed(1)}</span>
                     <span className="text-2xs text-muted-foreground">n={ratings}</span>
                   </div>
                 );

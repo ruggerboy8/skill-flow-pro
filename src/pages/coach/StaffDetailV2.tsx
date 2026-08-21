@@ -446,7 +446,7 @@ export default function StaffDetailV2() {
                 >
                   <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: richColor }} />
                   <span className="text-xs font-medium text-muted-foreground">{domain}</span>
-                  <span className="text-sm font-bold" style={{ color: tokens.text }}>{avg.toFixed(1)}</span>
+                  <span className="text-sm font-bold" style={{ color: tokens.ink }}>{avg.toFixed(1)}</span>
                 </div>
               );
             })}

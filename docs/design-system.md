@@ -200,9 +200,31 @@ var, same as `--score-*`. Several `DeliveryStatus`/`TrackStatus` values delibera
 See `StatusBadge.tsx`'s `statusConfig` for the full, current mapping — it is
 the single source of truth, this doc is a summary of it.
 
+**`--status-*-ink`** (added DSN-3 slice 3, post-QA): a darker, higher-
+contrast variant for `complete`, `late`, `missing`, `excused`, `pending`,
+`released`, and `info`, for when a status color is used as literal TEXT or
+a small icon — not a border, dot, or other non-text accent. **The vivid
+base tokens fail WCAG contrast as text**, both on their own `-bg` (as low
+as 1.78:1) and against a plain white/card background (as low as 1.98:1) —
+computed with the WCAG relative-luminance formula, not assumed safe by
+precedent. Light values are a direct HSL conversion of each token's
+Tailwind `-800` family shade (the same "`-800` text on `-100` bg" pairing
+the pre-token hand-rolled classes already used); dark values use the same
+hue/saturation with lightness pushed to 80%, matching `--score-*-ink`'s
+shape. Full derivation and the computed contrast table are in
+`docs/dev/token-migration-pattern.md` §5c. **`StatusBadge.tsx` itself does
+not yet consume `-ink`** — every state in its `statusConfig` still pairs
+vivid text with its `-bg`, the same pattern this fix disproved. That's a
+real, if long-standing and unaudited, gap in the single most-used status
+component in the app; flagged as a follow-up, not fixed as part of this
+migration slice (out of its named scope, and a shared component with a
+much bigger blast radius than the new consumers this slice added).
+
 **Always render a status through `<StatusBadge status="..." />`** rather
 than hand-rolling a pill. If you need the raw token outside a badge context,
-use the `--status-*` CSS var directly via inline style.
+use the `--status-*` CSS var directly via inline style — and reach for the
+matching `-ink` variant whenever that raw usage is text or a small icon,
+not `-bg`'s pale tint accent.
 
 ### Win banner colors
 

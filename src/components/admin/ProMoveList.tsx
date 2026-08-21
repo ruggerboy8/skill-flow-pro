@@ -496,11 +496,13 @@ export function ProMoveList({
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
+                          {/* QA fix: -ink, not the vivid base — this is text
+                              sitting directly on its own -bg tint. */}
                           <span className={`inline-block text-xs font-medium px-1.5 py-0.5 rounded cursor-default ${
                             proMove.curriculum_priority >= 0.7
-                              ? 'bg-[hsl(var(--status-complete-bg))] text-[hsl(var(--status-complete))]'
+                              ? 'bg-[hsl(var(--status-complete-bg))] text-[hsl(var(--status-complete-ink))]'
                               : proMove.curriculum_priority >= 0.4
-                              ? 'bg-[hsl(var(--status-late-bg))] text-[hsl(var(--status-late))]'
+                              ? 'bg-[hsl(var(--status-late-bg))] text-[hsl(var(--status-late-ink))]'
                               : 'bg-muted text-muted-foreground'
                           }`}>
                             P{Math.round(proMove.curriculum_priority * 10)}
@@ -599,9 +601,13 @@ export function ProMoveList({
       {/* Retirement Warning Dialog */}
       <AlertDialog open={!!retirementWarning} onOpenChange={(open) => !open && setRetirementWarning(null)}>
         <AlertDialogContent>
+          {/* QA fix: -ink, not vivid — both the icon and the paragraph below
+              render on the dialog's plain white/card background, and vivid
+              --status-late computes to ~1.98:1 there, failing even the 3:1
+              non-text bar, let alone 4.5:1 for the paragraph text. */}
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-[hsl(var(--status-late))]" />
+              <AlertTriangle className="w-5 h-5 text-[hsl(var(--status-late-ink))]" />
               Pro-Move Has Future Assignments
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
@@ -614,7 +620,7 @@ export function ProMoveList({
                     </li>
                   ))}
                 </ul>
-                <p className="text-[hsl(var(--status-late))]">
+                <p className="text-[hsl(var(--status-late-ink))]">
                   Please update these weeks in the Global Assignment Builder after retiring.
                 </p>
               </div>

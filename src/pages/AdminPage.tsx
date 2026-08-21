@@ -94,18 +94,31 @@ export default function AdminPage() {
         }
         beforeTabs={
           showSetupBanner ? (
-            <div className="flex items-start gap-4 rounded-lg border border-amber-300 bg-amber-50 p-4">
-              <Wand2 className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+            // DSN-3 slice 3 QA fix: migrated now that --status-late-ink
+            // exists. -ink everywhere text or a non-text icon sits on the
+            // status-late-bg tint (heading, body, both icons) — computed
+            // contrast: status-late-ink on status-late-bg is 6.46:1,
+            // matching the original amber-800-on-amber-50 standard (6.84:1)
+            // and clearing it comfortably for the amber-900 heading too
+            // (8.75:1 original vs 6.46:1 here, still well over 4.5:1). The
+            // "Start Setup" button uses -ink as a solid fill with white
+            // text (7.19:1) — the original amber-600 button fill actually
+            // failed contrast itself (white text on it computed to
+            // ~3.19:1), so this is a real accessibility improvement, not
+            // just parity. No darker -ink shade exists for a hover-darken
+            // effect, so hover states use opacity/black-overlay instead.
+            <div className="flex items-start gap-4 rounded-lg border border-[hsl(var(--status-late)_/_0.3)] bg-[hsl(var(--status-late-bg))] p-4">
+              <Wand2 className="h-5 w-5 text-[hsl(var(--status-late-ink))] mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-amber-900">Complete your practice setup</p>
-                <p className="text-sm text-amber-800 mt-0.5">
+                <p className="text-sm font-semibold text-[hsl(var(--status-late-ink))]">Complete your practice setup</p>
+                <p className="text-sm text-[hsl(var(--status-late-ink))] mt-0.5">
                   Confirm your positions, locations, and submission deadlines before inviting staff.
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <Button
                   size="sm"
-                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                  className="bg-[hsl(var(--status-late-ink))] hover:opacity-90 text-white"
                   onClick={() => setWizardOpen(true)}
                 >
                   <Wand2 className="h-3.5 w-3.5 mr-1.5" />
@@ -114,7 +127,7 @@ export default function AdminPage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-amber-600 hover:text-amber-800 hover:bg-amber-100"
+                  className="h-8 w-8 text-[hsl(var(--status-late-ink))] hover:bg-black/5"
                   onClick={() => setBannerDismissed(true)}
                 >
                   <X className="h-4 w-4" />

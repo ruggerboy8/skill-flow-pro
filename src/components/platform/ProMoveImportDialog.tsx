@@ -370,17 +370,21 @@ export function ProMoveImportDialog({ open, onOpenChange, roleId, roleName, role
               {/* DSN-3 slice 3: row-outcome tags → --status-complete (new)
                   /--status-info (update, reusing the blue "informational"
                   token — this row already exists and will be overwritten,
-                  not an error)/--status-missing (error). Outline badges have
-                  no bg fill, so the vivid tokens are safe here — no
-                  text-on-tint contrast concern. */}
+                  not an error)/--status-missing (error).
+                  QA fix: -ink, not the vivid base. Outline badges have no bg
+                  fill, but "no tint behind it" turned out not to mean "no
+                  contrast problem" — computed against plain white,
+                  status-complete is ~2.30:1 and status-missing ~3.78:1,
+                  both failing 4.5:1 for this badge-sized text. -ink clears
+                  7:1+ against white too. */}
               <div className="flex gap-3 text-sm">
-                <Badge variant="outline" className="text-[hsl(var(--status-complete))] border-[hsl(var(--status-complete)_/_0.3)]">
+                <Badge variant="outline" className="text-[hsl(var(--status-complete-ink))] border-[hsl(var(--status-complete)_/_0.3)]">
                   <CheckCircle className="h-3.5 w-3.5 mr-1" /> New: {newCount}
                 </Badge>
-                <Badge variant="outline" className="text-[hsl(var(--status-info))] border-[hsl(var(--status-info)_/_0.3)]">
+                <Badge variant="outline" className="text-[hsl(var(--status-info-ink))] border-[hsl(var(--status-info)_/_0.3)]">
                   <Clock className="h-3.5 w-3.5 mr-1" /> Update: {updateCount}
                 </Badge>
-                <Badge variant="outline" className="text-[hsl(var(--status-missing))] border-[hsl(var(--status-missing)_/_0.3)]">
+                <Badge variant="outline" className="text-[hsl(var(--status-missing-ink))] border-[hsl(var(--status-missing)_/_0.3)]">
                   <AlertCircle className="h-3.5 w-3.5 mr-1" /> Errors: {errorCount}
                 </Badge>
               </div>
@@ -400,9 +404,9 @@ export function ProMoveImportDialog({ open, onOpenChange, roleId, roleName, role
                       <TableRow key={row.index}>
                         <TableCell>
                           <div className="flex items-center gap-1.5">
-                            {row.status === 'new' && <CheckCircle className="h-4 w-4 text-[hsl(var(--status-complete))]" />}
-                            {row.status === 'update' && <Clock className="h-4 w-4 text-[hsl(var(--status-info))]" />}
-                            {row.status === 'error' && <AlertCircle className="h-4 w-4 text-[hsl(var(--status-missing))]" />}
+                            {row.status === 'new' && <CheckCircle className="h-4 w-4 text-[hsl(var(--status-complete-ink))]" />}
+                            {row.status === 'update' && <Clock className="h-4 w-4 text-[hsl(var(--status-info-ink))]" />}
+                            {row.status === 'error' && <AlertCircle className="h-4 w-4 text-[hsl(var(--status-missing-ink))]" />}
                             <span className="text-xs capitalize">{row.status}</span>
                           </div>
                         </TableCell>
@@ -433,7 +437,7 @@ export function ProMoveImportDialog({ open, onOpenChange, roleId, roleName, role
           {/* STEP 4: Complete */}
           {step === 'complete' && results && (
             <div className="text-center space-y-4 py-8">
-              <CheckCircle className="h-12 w-12 text-[hsl(var(--status-complete))] mx-auto" />
+              <CheckCircle className="h-12 w-12 text-[hsl(var(--status-complete-ink))] mx-auto" />
               <div className="space-y-1">
                 <p className="text-sm">Created: <strong>{(results as any).created || 0}</strong></p>
                 <p className="text-sm">Updated: <strong>{(results as any).updated || 0}</strong></p>

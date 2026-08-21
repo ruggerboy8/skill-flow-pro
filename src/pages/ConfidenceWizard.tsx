@@ -1188,7 +1188,12 @@ export default function ConfidenceWizard() {
             disabled={!canProceed || submitting}
             className={cn(
               "flex-[2] rounded-full transition-all duration-300",
-              submitPhase === 'done' && "bg-[hsl(var(--status-complete))] hover:bg-[hsl(var(--status-complete))]"
+              // QA fix: -ink as the solid fill, not vivid — this button has
+              // literal white "Saved" text on it, and white-on-vivid-status-
+              // complete computes to ~2.30:1, failing even the 3:1 bar. -ink
+              // clears 7.19:1. Visible change: a darker forest green instead
+              // of bright emerald — see the pattern doc's behavior-changes note.
+              submitPhase === 'done' && "bg-[hsl(var(--status-complete-ink))] hover:bg-[hsl(var(--status-complete-ink))]"
             )}
           >
             {submitPhase === 'done' ? (
@@ -1233,8 +1238,10 @@ export default function ConfidenceWizard() {
           <div className="p-6 space-y-4">
             <AlertDialogHeader>
               <div className="flex items-center gap-3">
+                {/* QA fix: -ink icon, not vivid — status-late on its own
+                    -bg computes to ~1.78:1, failing even the 3:1 non-text bar. */}
                 <div className="h-10 w-10 rounded-full bg-[hsl(var(--status-late-bg))] flex items-center justify-center">
-                  <AlertCircle className="h-5 w-5 text-[hsl(var(--status-late))]" />
+                  <AlertCircle className="h-5 w-5 text-[hsl(var(--status-late-ink))]" />
                 </div>
                 <AlertDialogTitle className="text-lg">Unsure? That's okay.</AlertDialogTitle>
               </div>

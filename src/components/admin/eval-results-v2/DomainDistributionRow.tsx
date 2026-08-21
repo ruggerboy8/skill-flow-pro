@@ -159,7 +159,12 @@ function DomainHeader({ name, avg }: { name: string; avg: number | null }) {
 // and now reads --score-3's blue. This is the same documented behavior
 // change as the token-migration doc's section 7 finding, applied to a new
 // call site — not a bug.
+// QA fix: returns tokens.ink, not tokens.text — this label is literal small
+// bold text (text-sm font-bold) rendered on the plain card background, and
+// the vivid score tokens fail there too (score-3's blue computes to ~3.55:1
+// against white, under the 4.5:1 normal-text minimum even though this text
+// isn't sitting on a matching score-bg tint).
 function getScoreColor(score: number | null): string {
   const tokens = scoreBucketTokens(scoreBucket(score ?? NaN));
-  return tokens.text;
+  return tokens.ink;
 }

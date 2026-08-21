@@ -295,14 +295,16 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
 
   // DSN-3 slice 3: same row-outcome mapping as ProMoveImportDialog.tsx's
   // identical new/update/error tags (status-complete/status-info/status-missing).
+  // QA fix: -ink, not vivid — same contrast failure against plain white as
+  // ProMoveImportDialog.tsx's identical icons.
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'new':
-        return <CheckCircle className="w-4 h-4 text-[hsl(var(--status-complete))]" />;
+        return <CheckCircle className="w-4 h-4 text-[hsl(var(--status-complete-ink))]" />;
       case 'update':
-        return <Clock className="w-4 h-4 text-[hsl(var(--status-info))]" />;
+        return <Clock className="w-4 h-4 text-[hsl(var(--status-info-ink))]" />;
       case 'error':
-        return <AlertCircle className="w-4 h-4 text-[hsl(var(--status-missing))]" />;
+        return <AlertCircle className="w-4 h-4 text-[hsl(var(--status-missing-ink))]" />;
       default:
         return null;
     }
@@ -381,14 +383,16 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
                 </div>
               </div>
 
+              {/* QA fix: -ink, not vivid — same contrast failure against
+                  plain white as ProMoveImportDialog.tsx's identical badges. */}
               <div className="flex gap-4 text-sm">
-                <Badge variant="outline" className="text-[hsl(var(--status-complete))]">
+                <Badge variant="outline" className="text-[hsl(var(--status-complete-ink))]">
                   New: {parsedRows.filter(r => r.status === 'new').length}
                 </Badge>
-                <Badge variant="outline" className="text-[hsl(var(--status-info))]">
+                <Badge variant="outline" className="text-[hsl(var(--status-info-ink))]">
                   Update: {parsedRows.filter(r => r.status === 'update').length}
                 </Badge>
-                <Badge variant="outline" className="text-[hsl(var(--status-missing))]">
+                <Badge variant="outline" className="text-[hsl(var(--status-missing-ink))]">
                   Errors: {parsedRows.filter(r => r.status === 'error').length}
                 </Badge>
               </div>
@@ -416,7 +420,7 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
                         <TableCell>{row.data.role_name}</TableCell>
                         <TableCell>{row.data.competency_name}</TableCell>
                         <TableCell className="max-w-md truncate">{row.data.text}</TableCell>
-                        <TableCell className="text-[hsl(var(--status-missing))] text-sm">{row.error}</TableCell>
+                        <TableCell className="text-[hsl(var(--status-missing-ink))] text-sm">{row.error}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -437,7 +441,7 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
 
           {step === 'complete' && results && (
             <div className="space-y-6 text-center">
-              <CheckCircle className="w-16 h-16 text-[hsl(var(--status-complete))] mx-auto" />
+              <CheckCircle className="w-16 h-16 text-[hsl(var(--status-complete-ink))] mx-auto" />
               <div>
                 <h3 className="text-lg font-medium mb-2">Upload Complete</h3>
                 <div className="space-y-2">
@@ -445,7 +449,7 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
                   <p>Updated: <strong>{(results as any).updated || 0}</strong> existing pro-moves</p>
                   <p>Skipped: <strong>{(results as any).skipped || 0}</strong> deleted IDs</p>
                   {(results as any).errors && (results as any).errors.length > 0 && (
-                    <p className="text-[hsl(var(--status-missing))]">
+                    <p className="text-[hsl(var(--status-missing-ink))]">
                       Errors: <strong>{(results as any).errors.length}</strong> rows failed
                     </p>
                   )}

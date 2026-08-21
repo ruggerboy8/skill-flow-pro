@@ -123,10 +123,18 @@ export function formatMean(mean: number | null): string {
 // green-600/amber-600/red-600 (slightly different shade within the same
 // hue), same as other close-but-not-exact token substitutions in this
 // migration.
+//
+// QA fix: *Color() returns the -ink variant, not the vivid base. These are
+// consumed two ways across eval-results-v2 — paired with *Bg() on the same
+// element (LocationCardV2) and standalone on a plain white/card background
+// (OrgSummaryStrip, LocationSummaryPanel, DomainSnapshotTable,
+// StaffResultsTableV2). The vivid tokens fail WCAG contrast in BOTH cases
+// (as low as 1.98:1 even against plain white), not just against their own
+// -bg tint — computed, not assumed. -ink clears 7.19:1+ in both cases.
 export function getTopBoxColor(rate: number): string {
-  if (rate >= 40) return 'text-[hsl(var(--status-complete))]';
-  if (rate >= 25) return 'text-[hsl(var(--status-late))]';
-  return 'text-[hsl(var(--status-missing))]';
+  if (rate >= 40) return 'text-[hsl(var(--status-complete-ink))]';
+  if (rate >= 25) return 'text-[hsl(var(--status-late-ink))]';
+  return 'text-[hsl(var(--status-missing-ink))]';
 }
 
 export function getTopBoxBg(rate: number): string {
@@ -136,9 +144,9 @@ export function getTopBoxBg(rate: number): string {
 }
 
 export function getMismatchColor(rate: number): string {
-  if (rate < 30) return 'text-[hsl(var(--status-complete))]';
-  if (rate < 50) return 'text-[hsl(var(--status-late))]';
-  return 'text-[hsl(var(--status-missing))]';
+  if (rate < 30) return 'text-[hsl(var(--status-complete-ink))]';
+  if (rate < 50) return 'text-[hsl(var(--status-late-ink))]';
+  return 'text-[hsl(var(--status-missing-ink))]';
 }
 
 export function getMismatchBg(rate: number): string {

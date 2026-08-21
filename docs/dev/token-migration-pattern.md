@@ -234,11 +234,188 @@ next-highest-count remaining files from slice 2's §6 list.
 | `src/components/admin/eval-results-v2/LocationDomainDistribution.tsx` | 11 | 0 | Identical fix to `DomainDistributionRow.tsx` above (duplicated distribution-bar component, kept in sync), plus the Obs/Self mean labels using the same `getScoreColor()`. |
 | `src/pages/ConfidenceWizard.tsx` | 11 | 5 | The "done" submit-button state → `--status-complete`; the "Unsure? That's okay" intervention-modal icon box → `--status-late`. The glass-card `dark:bg-slate-*`/`dark:border-slate-700/40` classes (5) are the decorative pattern slice 2 already named this file for — left alone. |
 | `src/pages/PerformanceWizard.tsx` | 9 | 3 | The "That's a Pro Move!" growth-celebration modal → `--win-growth`/`-bg` (a literal match for the token's documented purpose, and it already has real `.dark` overrides, so no `dark:` class was needed at all); the "done" submit-button state → `--status-complete`. Same glass-card gap (3) left alone. |
-| `src/components/admin/StepBar.tsx` | 8 | 0 | Generic step-progress indicator: completed → `--status-complete` (solid fill); current → `primary`/`primary-foreground` (brand chrome — "the active step" is exactly the primary-action semantic, decision-tree bucket 2); upcoming/label text → `muted`/`muted-foreground` (already tokens). |
+| `src/components/admin/StepBar.tsx` | 8 | 0 | Generic step-progress indicator: completed → `--status-complete-ink` (solid fill); current → `primary`/`primary-foreground` (brand chrome — "the active step" is exactly the primary-action semantic, decision-tree bucket 2); upcoming/label text → `muted`/`muted-foreground` (already tokens). |
+
+**Post-QA correction, same shape as slice 2's:** every `→ --status-complete`/
+`--status-late`/`--status-missing`/`--status-info` mapping in the table
+above that renders as literal text or a small icon sitting on that token's
+own `-bg` (or even on a plain white/card background) was revised to the
+`-ink` variant after this slice's QA pass found the vivid tokens fail WCAG
+contrast — as low as 1.78:1, not just "borderline." Vivid tokens are still
+correct for borders, solid dot fills, and other non-text/non-icon accents.
+Full detail, the new `--status-*-ink` tokens, and the contrast numbers are
+in §5c.
+
+## 5c. Post-QA fix: `--status-*-ink` (the vivid-on-tint contrast bug)
+
+QA on this slice hand-computed contrast and found the "reuse the same
+tinted-bg-plus-colored-text pairing already proven via StatusBadge" claim
+in §7's QA-fix notes (slice 2) was wrong for at least amber and green: a
+vivid `--status-*` token as TEXT (or a small non-text icon) — whether on
+its own `-bg` tint or even on a plain white/card background — routinely
+fails WCAG contrast. This wasn't caught earlier because slice 2's QA fix
+only checked `--score-*` against its `-bg`, and everyone since (including
+this slice, initially) assumed `--status-*` was already proven safe by
+precedent rather than by actually computing it.
+
+**The fix: `--status-*-ink`, one per token that ever carries text (`complete`,
+`late`, `missing`, `pending`, `excused`, `released`, `info`), added to
+`src/index.css` in both `:root` and `.dark`, same `-bg`+`-ink` shape as
+`--score-*-ink`.**
+
+Light values are a direct HSL conversion of the Tailwind `-800` shade of
+each token's own color family — `green-800`, `amber-800`, `red-800`,
+`slate-800`, `blue-800` — the same "`-800` text on `-100` bg" pairing the
+original hand-rolled classes this whole migration replaces already used.
+Not an invented design choice, same rule as `--status-info`'s derivation.
+`status-pending`/`status-excused` share one ink value (`slate-800`) because
+their vivid/`-bg` pair already share one value; `status-released`/`status-info`
+share one (`blue-800`) for the same reason — both are "blue," 5° apart in
+hue, from the same Tailwind family.
+
+```css
+--status-complete-ink: 142 64% 24%;
+--status-late-ink: 23 82% 31%;
+--status-missing-ink: 0 70% 35%;
+--status-excused-ink: 217 33% 18%;
+--status-pending-ink: 217 33% 18%;
+--status-released-ink: 226 71% 40%;
+--status-info-ink: 226 71% 40%;
+```
+
+Dark values use the same H/S with L pushed to 80% (matching `--score-*-ink`'s
+dark-mode approach exactly). **Flagged, not silently shipped:** unlike
+`--score-*-bg`, `--status-*-bg` has no `.dark` override (deliberately
+mode-invariant, same as `--status-info`), and `.dark` isn't wired to any
+toggle anywhere in this app today. So this `.dark` ink block is 100% dead
+code right now — but if a dark-mode toggle ships (DSN-7) before
+`--status-*-bg` also gets real `.dark` values, these ink darks would render
+against the unchanged light `-bg` pastel at ~1.2–1.8:1, which is worse than
+the bug they exist to fix. Do not enable dark mode for any `--status-*`
+consumer without giving `--status-*-bg` real dark values at the same time.
+
+**Computed contrast** (WCAG relative-luminance formula, not eyeballed —
+verified against the original hand-rolled classes' contrast too):
+
+| Pair | Contrast | vs. old class (for reference) |
+|---|---|---|
+| `--status-complete-ink` on `--status-complete-bg` | 6.46:1 | `green-800` on `green-100`: 6.49:1 |
+| `--status-late-ink` on `--status-late-bg` | 6.46:1 | `amber-800` on `amber-100`: 6.37:1 |
+| `--status-missing-ink` on `--status-missing-bg` | 6.85:1 | `red-800` on `red-100`: 6.80:1 |
+| `--status-pending-ink` / `--status-excused-ink` on their `-bg` | 13.09:1 | — |
+| `--status-released-ink` on `--status-released-bg` | 7.54:1 | `blue-800` on `blue-100`: 7.15:1 |
+| `--status-info-ink` on `--status-info-bg` | 8.11:1 | — |
+
+For comparison, the vivid tokens this replaces, on their own `-bg`:
+`--status-complete` 2.06:1, `--status-late` 1.78:1, `--status-missing`
+3.08:1, `--status-pending`/`--status-excused` 3.21:1, `--status-released`
+4.21:1, `--status-info` 4.79:1 — all under the 4.5:1 normal-text minimum
+except `info`, and `late`/`complete` fail even the 3:1 non-text-graphics
+bar. Against plain white (the case for badges/text NOT sitting on a
+matching tint — `--status-complete` 2.30:1, `--status-late` 1.98:1) the
+same tokens still fail, which is why this fix applies to every
+vivid-as-text-or-icon site, tinted or not, not only the ones literally on
+their own `-bg`.
+
+**Every consumer routed through `-ink`:**
+- `src/lib/doctorStatus.ts` — all five `colorClass` strings.
+- `src/types/evalMetricsV2.ts` — `getTopBoxColor()`/`getMismatchColor()`
+  (the six eval-results-v2 consumers — `LocationCardV2.tsx`,
+  `OrgSummaryStrip.tsx`, `LocationSummaryPanel.tsx`, `DomainSnapshotTable.tsx`,
+  `StaffResultsTableV2.tsx`, and `doctorStatus.ts` via `DoctorJourneyStatusPill`
+  — all inherit the fix automatically since they only ever call these two
+  functions, never hardcode the color themselves). `getTopBoxBg()`/
+  `getMismatchBg()` are unchanged — those are correctly used as backgrounds.
+- `EditUserDrawer.tsx` (Backfill banner's expiry text), `ProMoveList.tsx`
+  (priority badge, retirement-warning dialog), `DoctorReviewPrep.tsx`
+  (`PROGRESS_OPTIONS`, "Prep Complete" badge, coach's-pick badge, Step 0
+  checkmark circle solid fill), `CombinedPrepView.tsx` (identical
+  `STATUS_CONFIG` icon color), `ProMoveImportDialog.tsx` and
+  `BulkUpload.tsx` (row-outcome badges/icons — the "outline badges have no
+  bg fill, so vivid is safe" reasoning in slice 3's original ledger row was
+  wrong; vivid fails against plain white too), `ConfidenceWizard.tsx` /
+  `PerformanceWizard.tsx` (the "Saved" submit-button solid fill and the
+  intervention-modal icon box), `StepBar.tsx` (the completed-step solid
+  fill and connector line).
+- `DomainDistributionRow.tsx`/`LocationDomainDistribution.tsx`'s
+  `getScoreColor()` — this is `--score-*`, not `--status-*` (out of this QA
+  round's named scope), but the same audit found the identical bug (vivid
+  `--score-3` on plain white computes to 3.55:1) and `--score-*-ink` already
+  existed, so it was fixed at zero token-design cost: `tokens.text` →
+  `tokens.ink`.
+- **`AdminPage.tsx`'s setup banner — migrated, now that the blocker is
+  gone.** This was the file that originally exposed the whole problem
+  (§8's contrast finding, below) — it's now on `--status-late-ink`
+  throughout, including as a solid-fill button background. See §8 for the
+  before/after.
+
+**Deliberately NOT routed through an ink token:**
+- `PerformanceWizard.tsx`'s "That is exactly the growth we're looking for"
+  paragraph used vivid `--win-growth` as text, which also fails (2.59:1
+  against the dialog's plain white background). `--win-growth` is outside
+  this QA round's named scope (only `--status-*` got an `-ink` family), and
+  inventing a `--win-growth-ink` for one call site is a bigger decision than
+  this fix warrants — the text now uses plain `text-foreground` instead,
+  and the win-growth icon circle above it still carries the framing.
+- Pre-existing, already-shipped (slice 1/2, not touched by this slice)
+  vivid-on-tint sites — `RecordingStartCard.tsx`, `RecordingProcessCard.tsx`,
+  `CoachBaselineWizard.tsx`, `coachingSessionStatus.ts`, `surveyStatus.ts`,
+  `DoctorMaterialsSheet.tsx`, `DoctorProMoveDrawer.tsx`,
+  `src/components/ui/toaster.tsx`, `SurveyTakePage.tsx` — have the same
+  underlying issue (confirmed by the same contrast math) but are out of
+  this branch's diff entirely. Flagged here, not fixed, per this role's
+  "note it for a separate ticket" rule; worth a dedicated app-wide
+  accessibility pass rather than scope-creeping it into this slice.
+- **`StatusBadge.tsx` itself** — the single source of truth every
+  `<StatusBadge />` consumer app-wide renders through — still uses vivid
+  `--status-*` as text on its own `-bg` for every state. This is the
+  original pattern the (now-corrected) "already proven via StatusBadge"
+  claim was based on, and it's the highest-leverage place to fix this
+  properly, but it wasn't named in this QA round's scope and touching the
+  shared component used by dozens of screens is a materially bigger change
+  than routing this slice's own new consumers through the tokens that
+  already exist. Recommended as the next ticket.
+
+### Border fidelity: `/0.3` opacity, not full-strength
+
+Five borders in this slice used a full-strength token color
+(`border-[hsl(var(--token))]`) where the original hand-rolled class was a
+pale tint (`border-blue-200/50`, `border-green-200`, etc.) — a visibly
+heavier border than intended. Fixed to the `/0.3` opacity-modifier
+convention this migration already established in `ProMoveImportDialog.tsx`
+(`border-[hsl(var(--token)_/_0.3)]`): `EditUserDrawer.tsx`'s Backfill
+section, `DoctorReviewPrep.tsx`'s Step 0 and Step 4 cards,
+`DoctorHome.tsx`'s "Baseline Complete" and "Prep Submitted" cards.
+
+### Behavior change: `StepBar.tsx`'s current-step color
+
+`StepBar.tsx`'s "current step" indicator moved from a hardcoded
+`bg-blue-500` (bright blue) to `bg-primary` (brand navy) — a real, visible
+hue change, not just a shade adjustment, and it was missing from this
+slice's original disclosures. The reasoning stands (decision tree §1.2:
+"the active step" is exactly the primary-action semantic, and `primary`
+already *is* brand navy), but flagging it explicitly here per this
+migration's own rule that every visible recolor gets recorded, not just the
+threshold/banding ones.
+
+### `dark:` variants dropped on migrated info-banner sites
+
+Every blue "info banner" site this slice touched
+(`EditUserDrawer.tsx`, `DoctorReviewPrep.tsx`, and `AdminPage.tsx`'s
+amber banner) had a hand-patched `dark:` class pair on the original
+Tailwind classes. These were dropped, not preserved, when migrating to
+`--status-info`/`--status-late` — consistent with those tokens having no
+`.dark` override (mode-invariant, same as every other `--status-*` base
+token per §2's "normalize to the single token value" case) and with `.dark`
+not being wired to any toggle in this app today, so it's dormant, not a
+live regression. Recorded on the record for DSN-7: when a dark-mode toggle
+ships, these banners will need real dark-mode `-bg`/`-ink` values added
+(same as the `.dark` ink caveat above), not just inherit whatever the
+light-mode token currently resolves to.
 
 ## 6. Remaining unmigrated surfaces (post slice-3 baseline)
 
-70 files still carry at least one hardcoded palette class, 384 instances
+69 files still carry at least one hardcoded palette class, 374 instances
 total. `OnTimeRateWidget.tsx` and `LocationSubmissionWidget.tsx` (30 each)
 remain out of scope (Command Center / `RegionalDashboard`, owned by DASH
 tickets).
@@ -255,9 +432,12 @@ Highest-count remaining files, for whoever scopes the next slice:
 | `src/components/clinical/DirectorPrepComposer.tsx` | 13 (excluded — owned by another agent tonight) |
 | `src/components/admin/ProMoveList.tsx` | 12 (down from 19 in slice 3 — the remaining 12 are the video/script/audio/link material-type icon chips, see §8) |
 | `src/components/home/ChristmasWelcome.tsx` | 12 (purely decorative seasonal banner gradient — considered and left alone, see §8) |
-| `src/pages/AdminPage.tsx` | 10 (considered and left alone — real contrast finding, see §8) |
 | `src/components/admin/SlotPreview.tsx` | 9 |
-| ... 61 more files, 1-8 instances each | see `scripts/hardcoded-colors-baseline.json` for the full per-file list |
+| `src/components/admin/AdminUsersTab.tsx` | 8 |
+| ... 60 more files, 1-8 instances each | see `scripts/hardcoded-colors-baseline.json` for the full per-file list |
+
+`AdminPage.tsx` (10, previously the top of this list with a contrast finding)
+migrated post-QA — see §5c and §8.
 
 Run `node scripts/check-hardcoded-colors.mjs --update-baseline` after any
 future migration slice lands to see the current full list and confirm the
@@ -494,26 +674,25 @@ several call sites. Flag it in QA/visual review specifically; don't assume
   this migration's scope, not something this slice fixed or flagged as a
   bug; noting it only so a future pass doesn't rediscover the same "why is
   this still here" question from scratch.)
-- **`AdminPage.tsx`'s "Complete your practice setup" banner (10 instances)
-  — new contrast finding, left untouched on purpose.** This banner uses
-  three different amber darkness levels for a heading (`amber-900`), body
-  text (`amber-800`), and a solid CTA button (`amber-600`/`amber-700`).
-  `--status-late` (the amber reuse this migration leans on everywhere else)
-  is `hsl(45 93% 47%)` — close to Tailwind's `amber-500` — which computes to
-  roughly **2:1 contrast** against its own `-bg` tint or a white card,
-  well under the 4.5:1 WCAG minimum for normal text. Every other
-  `--status-late` reuse in this slice and slice 2 is either a small badge
-  (StatusBadge's own established, if unaudited, pattern) or large/bold text
-  (≥18px bold clears the 3:1 large-text bar even at this contrast). This
-  banner's body paragraph and heading are neither. Rather than introduce
-  the first prominent-paragraph use of a token that may not actually be
-  readable there, this slice left the whole banner hardcoded and is
-  flagging the underlying gap: **`--status-late` (and every other
-  `--status-*` base token) has no `-ink` variant**, unlike `--score-*`,
-  even though the same slice-2 QA finding that added `-ink` for scores
-  ("vivid-on-tint fails contrast for text") applies equally to status
-  tokens — it just hasn't been caught elsewhere yet because no other
-  consumer puts status-colored text at paragraph size. Worth a real
-  accessibility pass on `StatusBadge.tsx` and a `--status-*-ink` token
-  family as a follow-up ticket; not something to invent inline in a
-  migration slice.
+- **`AdminPage.tsx`'s "Complete your practice setup" banner — migrated
+  post-QA, originally left untouched, now resolved. See §5c.** This banner
+  uses three different amber darkness levels for a heading (`amber-900`),
+  body text (`amber-800`), and a solid CTA button (`amber-600`/`amber-700`).
+  This slice's first pass computed vivid `--status-late`'s contrast at
+  roughly 2:1 against its own `-bg` tint or a white card — well under the
+  4.5:1 WCAG minimum for normal text — and, **incorrectly**, reasoned that
+  every other `--status-late` reuse elsewhere in this slice was safe because
+  it was either a small badge or "large/bold text (≥18px bold clears the
+  3:1 large-text bar even at this contrast)". **That mitigation claim was
+  wrong — QA recomputed the actual numbers at 2.06–2.3:1, which fails even
+  the 3:1 bar, not just the 4.5:1 text bar** — and the "small badge is safe"
+  half wasn't verified either; both turned out to be affected. The real fix
+  wasn't leaving this banner alone, it was closing the gap this entry
+  correctly identified: **`--status-late` (and every other `--status-*` base
+  token) had no `-ink` variant.** `--status-*-ink` now exists (§5c) and this
+  banner is migrated onto it — `--status-late-ink` on its own `-bg` computes
+  to 6.46:1, matching the original `amber-800`-on-`amber-50` standard
+  (6.84:1). The `--status-late`/`--score-*` inconsistency this bullet
+  originally flagged is resolved for `--status-*`; `StatusBadge.tsx` itself
+  (the pattern everyone assumed was already proven) is still unaudited —
+  see §5c's "deliberately NOT routed through an ink token" list.

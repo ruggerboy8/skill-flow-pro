@@ -1,5 +1,5 @@
 {
-  "total": 384,
+  "total": 374,
   "files": {
     "src/components/NumberScale.tsx": 3,
     "src/components/admin/AdminUsersTab.tsx": 8,
@@ -51,7 +51,6 @@
     "src/lib/coachingSessionStatus.ts": 8,
     "src/lib/constants/domains.ts": 16,
     "src/lib/highlights.ts": 2,
-    "src/pages/AdminPage.tsx": 10,
     "src/pages/ConfidenceWizard.tsx": 5,
     "src/pages/EvaluationReview.tsx": 3,
     "src/pages/EvaluationViewer.tsx": 2,

@@ -75,10 +75,13 @@ export default function DoctorHome() {
 
     if (baseline?.status === 'completed') {
       return (
-        <Card className="border-[hsl(var(--status-complete))] bg-[hsl(var(--status-complete-bg))]">
+        // QA fix: /0.3 border opacity (original green-200 border was a pale
+        // tint) and -ink icon color (vivid --status-complete on its own -bg
+        // computes to ~2.06:1, failing even the 3:1 non-text-graphics bar).
+        <Card className="border-[hsl(var(--status-complete)_/_0.3)] bg-[hsl(var(--status-complete-bg))]">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-8 w-8 text-[hsl(var(--status-complete))]" />
+              <CheckCircle2 className="h-8 w-8 text-[hsl(var(--status-complete-ink))]" />
               <div>
                 <CardTitle>Baseline Complete</CardTitle>
                 <CardDescription>
@@ -271,12 +274,14 @@ export default function DoctorHome() {
         </Card>
       ))}
 
-      {/* Submitted preps — informational */}
+      {/* Submitted preps — informational.
+          QA fix: same /0.3 border + -ink icon fix as the "Baseline Complete"
+          card above. */}
       {submittedPrepSessions.map(s => (
-        <Card key={s.id} className="border-[hsl(var(--status-complete))] bg-[hsl(var(--status-complete-bg))]">
+        <Card key={s.id} className="border-[hsl(var(--status-complete)_/_0.3)] bg-[hsl(var(--status-complete-bg))]">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-8 w-8 text-[hsl(var(--status-complete))]" />
+              <CheckCircle2 className="h-8 w-8 text-[hsl(var(--status-complete-ink))]" />
               <div>
                 <CardTitle>Prep Submitted</CardTitle>
                 <CardDescription>

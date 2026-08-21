@@ -516,8 +516,13 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
 
           {/* Backfill — DSN-3 slice 3: this is the blue "info banner" pattern
               the token-migration doc flags by name for this file; now on the
-              new --status-info token instead of hardcoded blue. */}
-          <div className="space-y-3 p-4 bg-[hsl(var(--status-info-bg))] rounded-lg border border-[hsl(var(--status-info))]">
+              new --status-info token instead of hardcoded blue. QA fix:
+              border uses the /0.3 opacity modifier (matches the pale tint of
+              the original blue-200 border at 50% opacity, and the convention
+              already used in ProMoveImportDialog.tsx); paragraph text on the
+              tint uses -ink, not the vivid base — the icon stays vivid since
+              it's non-text (3:1 bar, already clears it). */}
+          <div className="space-y-3 p-4 bg-[hsl(var(--status-info-bg))] rounded-lg border border-[hsl(var(--status-info)_/_0.3)]">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Wrench className="h-5 w-5 text-[hsl(var(--status-info))]" />
@@ -531,12 +536,12 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
               When enabled, this user can backfill missing confidence scores for past weeks. Permission auto-expires in 7 days.
             </p>
             {allowBackfill && user?.allow_backfill_until && new Date(user.allow_backfill_until) > new Date() && (
-              <p className="text-xs font-medium text-[hsl(var(--status-info))]">
+              <p className="text-xs font-medium text-[hsl(var(--status-info-ink))]">
                 Expires: {format(new Date(user.allow_backfill_until), 'MMM d, yyyy')} ({differenceInDays(new Date(user.allow_backfill_until), new Date())} days remaining)
               </p>
             )}
             {allowBackfill && (!user?.allow_backfill_until || new Date(user.allow_backfill_until) <= new Date()) && (
-              <p className="text-xs font-medium text-[hsl(var(--status-info))]">
+              <p className="text-xs font-medium text-[hsl(var(--status-info-ink))]">
                 Will expire: {format(addDays(new Date(), 7), 'MMM d, yyyy')}
               </p>
             )}

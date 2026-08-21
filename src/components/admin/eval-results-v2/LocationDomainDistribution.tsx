@@ -174,9 +174,13 @@ function DomainHeader({ name, avg }: { name: string; avg: number | null }) {
 // (cutoffs move from >=3.0 green/>=2.5 amber/else red to scoreBucket()'s
 // <2 / <3 / <4 / =4 tiers; a 3.0-3.9 average now reads --score-3's blue
 // instead of green). Not a bug — see the token-migration doc section 7.
+// QA fix: returns tokens.ink, not tokens.text — same rationale as the
+// identical function in DomainDistributionRow.tsx (this label is small
+// bold text on a plain card background, and vivid score tokens fail there
+// too, not just on a matching score-bg tint).
 function getScoreColor(score: number | null): string {
   const tokens = scoreBucketTokens(scoreBucket(score ?? NaN));
-  return tokens.text;
+  return tokens.ink;
 }
 
 function aggregateDomainData(rows: EvalDistributionRow[]): DomainData[] {

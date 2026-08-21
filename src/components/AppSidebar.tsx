@@ -11,6 +11,9 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { ProMovesLogo } from '@/components/ProMovesLogo';
+import { SignalP } from '@/components/brand/SignalP';
+import { cn } from '@/lib/utils';
 
 interface AppSidebarProps {
   navigation: Array<{
@@ -56,8 +59,18 @@ export function AppSidebar({ navigation, backfillMissingCount = 0 }: AppSidebarP
       collapsible="icon"
     >
       <SidebarContent>
-        <div className="flex items-center gap-2 p-4 border-b">
-          <span className="font-bold text-xl tracking-wide">{isCollapsed ? 'PM' : 'ProMoves'}</span>
+        {/* DSN-8a: brand mark replaces the old text wordmark. Expanded shows
+            the full lockup (Signal P + wordmark, from the promoves-brand
+            kit); collapsed shows the standalone Signal P mark alone,
+            centered the way other collapsed sidebar icons are. Reuses the
+            sidebar's own isCollapsed state (from useSidebar()) rather than
+            inventing a parallel one. */}
+        <div className={cn('flex items-center p-4 border-b', isCollapsed ? 'justify-center' : 'gap-2')}>
+          {isCollapsed ? (
+            <SignalP size={24} label="Pro Moves" />
+          ) : (
+            <ProMovesLogo className="text-xl" />
+          )}
         </div>
         
         <SidebarGroup>

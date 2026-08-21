@@ -350,13 +350,9 @@ export default function Layout() {
                   </Button>
                 )}
 
-                {/* DSN-8: guaranteed Pro Moves wordmark in the secondary
-                    header position. Quiet (muted, no border/background) and
-                    hidden below sm where the header has no room to spare —
-                    the center org cascade above is the only mark that must
-                    always show. */}
-                <ProMovesLogo className="hidden text-sm opacity-70 sm:inline-block" />
-
+                {/* DSN-8a: the secondary header wordmark that used to sit
+                    here (DSN-8) was removed — the sidebar's own brand mark
+                    (AppSidebar) is now the app's non-org logo placement. */}
                 <NavLink to="/profile" aria-label="Profile">
                   <Button variant="outline" size="icon">
                     <User className="w-4 h-4" />

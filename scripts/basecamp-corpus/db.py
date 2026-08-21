@@ -68,14 +68,16 @@ class Postgrest:
             detail = e.read().decode(errors="replace")
             raise RuntimeError(f"{method} {path} -> HTTP {e.code}: {detail}") from e
 
-    def select_all(self, table: str, columns: str, page_size: int = 1000) -> list[dict]:
-        """Fetch every row, paging with offset/limit."""
+    def select_all(self, table: str, columns: str, filters: dict | None = None,
+                   page_size: int = 1000) -> list[dict]:
+        """Fetch every row matching `filters` ({col: value} -> eq), paging."""
         rows: list[dict] = []
         offset = 0
+        eq = {col: f"eq.{value}" for col, value in (filters or {}).items()}
         while True:
             page = self._request("GET", table, params={
                 "select": columns, "limit": page_size, "offset": offset,
-                "order": "id.asc",
+                "order": "id.asc", **eq,
             })
             rows.extend(page)
             if len(page) < page_size:
@@ -86,6 +88,9 @@ class Postgrest:
         if records:
             self._request("POST", table, body=records, prefer="return=minimal")
 
-    def update_by_item_id(self, table: str, item_id: str, patch: dict) -> None:
-        self._request("PATCH", table, params={"source_item_id": f"eq.{item_id}"},
-                      body=patch, prefer="return=minimal")
+    def update_by_item_id(self, table: str, org_id: str, item_id: str, patch: dict) -> None:
+        """Update the row keyed by the composite (org_id, source_item_id)."""
+        self._request("PATCH", table, params={
+            "org_id": f"eq.{org_id}",
+            "source_item_id": f"eq.{item_id}",
+        }, body=patch, prefer="return=minimal")

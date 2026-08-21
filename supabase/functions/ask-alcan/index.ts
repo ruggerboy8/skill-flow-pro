@@ -36,6 +36,9 @@ const CHARS_PER_TOKEN = 4;
 
 const MODEL = 'claude-sonnet-5';
 
+// Questions are questions, not documents. Anything longer is a paste-in.
+const MAX_QUESTION_CHARS = 4000;
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -121,9 +124,18 @@ Deno.serve(async (req) => {
 
     if (!ANTHROPIC_API_KEY) return json({ error: 'ANTHROPIC_API_KEY not configured' }, 500);
 
-    const { question, conversation_id: conversationId } = await req.json();
+    let body: { question?: unknown; conversation_id?: unknown };
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: 'Invalid JSON body' }, 400);
+    }
+    const { question, conversation_id: conversationId } = body;
     if (typeof question !== 'string' || !question.trim() || typeof conversationId !== 'string') {
       return json({ error: 'question and conversation_id required' }, 400);
+    }
+    if (question.length > MAX_QUESTION_CHARS) {
+      return json({ error: `question exceeds ${MAX_QUESTION_CHARS} characters` }, 400);
     }
 
     // The conversation must exist and belong to the asker. (RLS already
@@ -137,6 +149,19 @@ Deno.serve(async (req) => {
     if (!convo || convo.staff_id !== me.id) {
       return json({ error: 'Conversation not found' }, 404);
     }
+
+    // Prior turns of this conversation, oldest first, capped at the last 10
+    // messages (5 exchanges) — enough context for follow-ups without growing
+    // the request unboundedly. History rides AFTER the cache breakpoint, so
+    // it never disturbs the cached corpus prefix.
+    const { data: priorMessages } = await supabase
+      .from('ask_messages')
+      .select('role, content')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true });
+    const history = ((priorMessages ?? []) as { role: 'user' | 'assistant'; content: string }[])
+      .filter((m) => m.content.trim().length > 0)
+      .slice(-10);
 
     // Load the eligible corpus (kept + canon, Alcan org).
     const { data: docs, error: docsErr } = await supabase
@@ -173,23 +198,29 @@ Deno.serve(async (req) => {
     }
 
     // Document blocks form a stable prefix; cache_control goes on the LAST
-    // document so system + all documents are cached. The question follows
-    // the cached prefix.
-    const content: Anthropic.ContentBlockParam[] = packed.map(({ doc, text }, i) => ({
+    // document so system + all documents are cached. Everything volatile —
+    // conversation history, then the new question — comes after the cache
+    // breakpoint. (Consecutive same-role messages are allowed; the API
+    // combines them into one turn.)
+    const documentContent: Anthropic.ContentBlockParam[] = packed.map(({ doc, text }, i) => ({
       type: 'document' as const,
       source: { type: 'text' as const, media_type: 'text/plain' as const, data: text },
       title: doc.title,
       citations: { enabled: true },
       ...(i === packed.length - 1 ? { cache_control: { type: 'ephemeral' as const } } : {}),
     }));
-    content.push({ type: 'text', text: question.trim() });
+    const messages: Anthropic.MessageParam[] = [
+      { role: 'user', content: documentContent },
+      ...history.map((m) => ({ role: m.role, content: m.content })),
+      { role: 'user', content: question.trim() },
+    ];
 
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 4096,
       system: buildSystemPrompt((areas ?? []).map((a: { area_name: string }) => a.area_name)),
-      messages: [{ role: 'user', content }],
+      messages,
     });
 
     // Packed-size + cache log: this line is how we learn when the spike
@@ -233,9 +264,9 @@ Deno.serve(async (req) => {
     // FROZEN response contract (ASK-2 additivity guarantee): exactly this shape.
     return json({ answer, citations });
   } catch (err) {
+    // Detail stays server-side (function logs); the client gets a generic 500.
     console.error('ask-alcan error:', err);
-    const message = err instanceof Error ? err.message : String(err);
-    return json({ error: message }, 500);
+    return json({ error: 'Something went wrong answering that. Please try again.' }, 500);
   }
 });
 

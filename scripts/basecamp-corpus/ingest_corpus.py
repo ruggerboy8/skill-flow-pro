@@ -29,7 +29,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from corpus_lib import classify_row, parse_extracted_text, row_to_document  # noqa: E402
+from corpus_lib import (  # noqa: E402
+    ALCAN_ORG_ID, classify_row, parse_extracted_text, row_to_document,
+)
 from db import get_client  # noqa: E402
 
 # Fields the ingest owns and may refresh on re-run. Curation fields
@@ -83,9 +85,13 @@ def main() -> None:
           f"skipped (skip/blank/video): {counters['skipped']}  "
           f"title+link only (no body): {counters['no_body']}")
 
+    # Idempotency is keyed on the composite (org_id, source_item_id); this
+    # script only ever works within the Alcan org, so scope every read/write
+    # to it and match the DB's unique constraint.
     client = get_client()
     existing_rows = client.select_all(
-        "corpus_documents", "source_item_id", page_size=1000)
+        "corpus_documents", "source_item_id",
+        filters={"org_id": ALCAN_ORG_ID}, page_size=1000)
     existing = {r["source_item_id"] for r in existing_rows if r["source_item_id"]}
 
     to_insert = [d for d in docs if d["source_item_id"] not in existing]
@@ -103,12 +109,16 @@ def main() -> None:
 
     for i, doc in enumerate(to_update, 1):
         patch = {k: doc[k] for k in CONTENT_FIELDS}
-        client.update_by_item_id("corpus_documents", doc["source_item_id"], patch)
+        client.update_by_item_id(
+            "corpus_documents", ALCAN_ORG_ID, doc["source_item_id"], patch)
         if i % 100 == 0 or i == len(to_update):
             print(f"  updated {i}/{len(to_update)}")
 
-    # Self-check: every importable ledger item must now exist exactly once.
-    after = client.select_all("corpus_documents", "source_item_id", page_size=1000)
+    # Self-check: every importable ledger item must now exist exactly once
+    # within the org.
+    after = client.select_all(
+        "corpus_documents", "source_item_id",
+        filters={"org_id": ALCAN_ORG_ID}, page_size=1000)
     have = [r["source_item_id"] for r in after if r["source_item_id"]]
     if len(have) != len(set(have)):
         sys.exit("SELF-CHECK FAILED: duplicate source_item_id rows in corpus_documents.")

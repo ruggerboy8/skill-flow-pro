@@ -34,7 +34,8 @@ python3 scripts/basecamp-corpus/ingest_corpus.py
 - Imports rows whose recommendation is keep/maybe as `unreviewed`.
 - Videos are skipped entirely (they wait for transcripts). Items whose
   extracted text has no body (PDFs in this phase) import title + link only.
-- Idempotent on `source_item_id`: re-running inserts nothing twice; existing
+- Idempotent on the composite `(org_id, source_item_id)` key (matching the
+  DB unique constraint): re-running inserts nothing twice; existing
   rows get their content fields refreshed, and **status / expert area /
   review fields are never touched**, so a re-run cannot clobber curation.
 - Ends with a self-check (no duplicates, no missing ledger items) and fails

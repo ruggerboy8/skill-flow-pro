@@ -127,10 +127,14 @@ export function useAskMutations() {
       if (data?.error) throw new Error(data.error);
       return data as AskAlcanResponse;
     },
-    onSuccess: (_data, args) => {
-      queryClient.invalidateQueries({ queryKey: ['ask', 'messages', args.conversationId] });
-      queryClient.invalidateQueries({ queryKey: ['ask', 'conversations'] });
-    },
+    // Awaiting the invalidations keeps the mutation pending until the
+    // refetched messages have landed, so the page can hold its optimistic
+    // pending bubble until the real rows are on screen (no flash).
+    onSuccess: (_data, args) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['ask', 'messages', args.conversationId] }),
+        queryClient.invalidateQueries({ queryKey: ['ask', 'conversations'] }),
+      ]),
   });
 
   return { createConversation, ask };

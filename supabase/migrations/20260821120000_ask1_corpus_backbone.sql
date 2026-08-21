@@ -45,7 +45,7 @@ create table if not exists public.corpus_documents (
   source_kind    text not null default 'basecamp'
                    check (source_kind in ('basecamp','authored','external')),
   source_url     text,             -- Basecamp deep link
-  source_item_id text unique,      -- ingest idempotency key (NULL for authored docs)
+  source_item_id text,             -- ingest idempotency key (NULL for authored docs)
   posted_at      timestamptz,      -- original posting date
   stale_risk     boolean not null default false,
   location_scope text,
@@ -53,7 +53,11 @@ create table if not exists public.corpus_documents (
   reviewed_by    uuid references public.staff(id) on delete set null,
   reviewed_at    timestamptz,
   created_at     timestamptz not null default now(),
-  updated_at     timestamptz not null default now()
+  updated_at     timestamptz not null default now(),
+  -- Idempotency key is per-org: a future second org's Basecamp item ids
+  -- must not collide with Alcan's. (Rows with NULL source_item_id — authored
+  -- docs — are unconstrained; Postgres unique treats NULLs as distinct.)
+  unique (org_id, source_item_id)
 );
 
 create index if not exists idx_corpus_documents_status

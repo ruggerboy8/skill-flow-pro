@@ -78,7 +78,10 @@ only; flip to canon-only later by changing one constant.
 ## The spike surface (batch 2)
 
 - New route `/ask`, visible only to super-admins in the Alcan org (reuse the
-  surveys gate). Simple chat UI: question box, streaming optional (fine to be
+  surveys gate). As built, the gate deliberately follows the surveys gate's
+  current semantics: super-admin from any org gets in (so Tim isn't locked
+  out), while the corpus data itself is Alcan-scoped; revisit for
+  multi-tenant. Simple chat UI: question box, streaming optional (fine to be
   request/response like every other function), answer with citation chips
   that deep-link to source_url, conversation history in the sidebar.
 - New edge function `ask-alcan` (verify_jwt = true):
@@ -126,7 +129,8 @@ in this build enforce that:
    and links to Basecamp.
 3. Ask something the corpus can't answer ("what's our 401k match?") → bot
    declines and names where the question should go; no fabrication.
-4. As a non-super-admin: /ask route absent, ask-alcan returns 403.
+4. As a non-super-admin: /ask self-redirects home for non-super-admins;
+   data protected server-side (RLS + ask-alcan 403).
 5. Anon: both new tables unreadable (RLS check), function 401s.
 6. Sheet round-trip: mark one row reject in the Sheet, run sync_decisions,
    confirm the document leaves the bot's answer set.

@@ -101,6 +101,18 @@ export default function AskPage() {
   }, [messages]);
   const { data: citedDocs } = useCitedDocuments(citedIds);
 
+  // The pending bubble stays up until the refetched rows are on screen (the
+  // ask mutation resolves only after invalidation completes). Once the real
+  // row for this question has landed, stop rendering the optimistic copy so
+  // the two never show together.
+  const pendingAlreadyPersisted = useMemo(() => {
+    if (!pendingQuestion) return false;
+    return (messages ?? []).some(
+      (m) => m.role === 'user' && m.content === pendingQuestion,
+    );
+  }, [messages, pendingQuestion]);
+  const showPending = !!pendingQuestion && !pendingAlreadyPersisted;
+
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -204,10 +216,10 @@ export default function AskPage() {
             {(messages ?? []).map((m) => (
               <MessageBubble key={m.id} message={m} docs={citedDocs} />
             ))}
-            {pendingQuestion && (
+            {showPending && (
               <>
                 <MessageBubble
-                  message={{ role: 'user', content: pendingQuestion, cited_document_ids: [] }}
+                  message={{ role: 'user', content: pendingQuestion!, cited_document_ids: [] }}
                   docs={citedDocs}
                 />
                 <div className="flex justify-start">

@@ -26,7 +26,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from corpus_lib import plan_decision_updates  # noqa: E402
+from corpus_lib import ALCAN_ORG_ID, plan_decision_updates  # noqa: E402
 from db import get_client  # noqa: E402
 
 
@@ -42,9 +42,12 @@ def main() -> None:
     if sheet_rows and not {"item_id", "decision"} <= set(sheet_rows[0].keys()):
         sys.exit("CSV must have item_id and decision columns.")
 
+    # Statuses are matched and written per-org (composite key
+    # org_id + source_item_id); this script only handles the Alcan org.
     client = get_client()
     existing_rows = client.select_all(
-        "corpus_documents", "source_item_id,status", page_size=1000)
+        "corpus_documents", "source_item_id,status",
+        filters={"org_id": ALCAN_ORG_ID}, page_size=1000)
     existing = {r["source_item_id"]: r["status"]
                 for r in existing_rows if r["source_item_id"]}
 
@@ -65,7 +68,8 @@ def main() -> None:
         return
 
     for i, (item_id, status) in enumerate(updates.items(), 1):
-        client.update_by_item_id("corpus_documents", item_id, {"status": status})
+        client.update_by_item_id(
+            "corpus_documents", ALCAN_ORG_ID, item_id, {"status": status})
         if i % 100 == 0 or i == len(updates):
             print(f"  updated {i}/{len(updates)}")
     print("Done.")

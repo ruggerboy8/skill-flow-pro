@@ -240,6 +240,13 @@ not just a different hex. Two concrete boundary changes:
    green (`--score-4`, 160°) for a full 4.0. **A domain averaging 3.5 used
    to render green; it now renders blue.** Nothing between 3.0 and 3.9 will
    read as "green/done" anymore — only a perfect 4.0 average does.
+   **(DSN-9, 2026-08-21): this is stale.** The blue described here made the
+   band 2 above stand out more, not less, once it became the common case —
+   the opposite of what a "good" tier should do. `--score-3` is now a light
+   yellow-green (lime hue, 84°) instead of blue, so 3.0-3.9 reads as a
+   lighter, yellower green next to `--score-4`'s green rather than as an
+   unrelated blue. The 2.5/3.0 boundary-shift analysis above is unaffected;
+   only the hue changed.
 3. **`LocationSkillGaps.tsx` also had two disagreeing schemes in the same
    file** — its per-move badge (`getConfidenceColor`, cutoffs 2.0/3.0)
    didn't match its domain chips (cutoffs 2.5/3.0), so the same 2.3 average

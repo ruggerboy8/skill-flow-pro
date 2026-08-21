@@ -40,10 +40,13 @@ const SCORE_LABELS = [
   { value: 4, label: 'I am a master, I do it all the time', short: '4' },
 ];
 
+// DSN-9: entry 3's selected/dot fills were hardcoded to pastel/solid blue,
+// a duplicate of the old blue --score-3 token. Switched to the token
+// itself so this can't drift from the score ramp again.
 const SCORE_COLORS: Record<number, { selected: string; dot: string }> = {
   1: { selected: 'bg-amber-100 border-amber-400 text-amber-800', dot: 'bg-amber-400' },
   2: { selected: 'bg-orange-100 border-orange-400 text-orange-800', dot: 'bg-orange-400' },
-  3: { selected: 'bg-blue-100 border-blue-400 text-blue-800', dot: 'bg-blue-400' },
+  3: { selected: 'bg-[hsl(var(--score-3-bg))] border-[hsl(var(--score-3))] text-[hsl(var(--score-3-ink))]', dot: 'bg-[hsl(var(--score-3))]' },
   4: { selected: 'bg-emerald-100 border-emerald-400 text-emerald-800', dot: 'bg-emerald-400' },
 };
 

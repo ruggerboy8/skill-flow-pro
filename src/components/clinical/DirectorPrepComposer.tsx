@@ -30,9 +30,12 @@ interface Props {
 
 const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
 
+// DSN-9: entry 3 was a hardcoded solid blue fill, a duplicate of the old
+// blue --score-3 token. Switched to the token itself so this can't drift
+// from the score ramp again.
 const SCORE_COLORS: Record<number, string> = {
   4: 'bg-emerald-500',
-  3: 'bg-blue-500',
+  3: 'bg-[hsl(var(--score-3))]',
   2: 'bg-amber-500',
   1: 'bg-orange-500',
 };

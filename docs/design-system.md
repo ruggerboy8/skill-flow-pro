@@ -162,12 +162,24 @@ background, falling back to `--foreground` for an unrecognized domain.
 Each has a `-bg` pastel variant (`--score-1-bg` ... `--score-4-bg`) and a
 `-ink` variant (`--score-1-ink` ... `--score-4-ink`), defined in both
 `:root` and `.dark` with different values, following the same shape as the
-domain-ink tokens. Unlike domain-ink (which `getDomainInk()` exposes and
-`RoleRadar.tsx` consumes), **no `--score-*-ink` token has any consumer in
-`src/` today** — they're defined but unused, not a parallel in-use pattern.
-No `bg-score-N` / `text-score-N` Tailwind utilities exist for the base
-score tokens either — consume via inline `style`, same pattern as
-`DomainDetail.tsx`.
+domain-ink tokens. `--score-*-ink` tokens do have consumers (e.g.
+`RatingBandCollapsible.tsx`, `CoachBaselineWizard.tsx`,
+`ClinicalBaselineResults.tsx`) — the text color for a rating label sitting on
+its `-bg` pastel, corrected 2026-08-21 (DSN-9) from an earlier "unused"
+claim here. No `bg-score-N` / `text-score-N` Tailwind utilities exist for the
+base score tokens; consume via inline `style` (`DomainDetail.tsx`,
+`CompetencyAccordion.tsx`) or a Tailwind arbitrary-value class
+(`bg-[hsl(var(--score-N))]`, as `RatingBandCollapsible.tsx` and
+`CoachBaselineWizard.tsx` do).
+
+The ramp is a light-to-dark learning gradient, not a red/green traffic
+light — confidence/skill scores never render red. As of DSN-9 (2026-08-21)
+it reads orange (`--score-1`) -> amber (`--score-2`) -> light yellow-green
+(`--score-3`, lime-500/lime-100/lime-800 territory) -> green (`--score-4`,
+emerald). `--score-3` was blue (hue 211°) before DSN-9, which broke the
+gradient read; it's now hue 84°, 39° from `--score-2`'s amber and 76° from
+`--score-4`'s green, so bands 3 and 4 stay visually distinct while both
+reading as "green."
 
 ### Status colors
 

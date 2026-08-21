@@ -69,15 +69,20 @@ class Postgrest:
             raise RuntimeError(f"{method} {path} -> HTTP {e.code}: {detail}") from e
 
     def select_all(self, table: str, columns: str, filters: dict | None = None,
-                   page_size: int = 1000) -> list[dict]:
-        """Fetch every row matching `filters` ({col: value} -> eq), paging."""
+                   page_size: int = 1000, order: str = "id.asc") -> list[dict]:
+        """Fetch every row matching `filters` ({col: value} -> eq), paging.
+
+        `order` must be a stable, deterministic sort so paging can't skip or
+        repeat rows; override it for tables whose primary key isn't `id`
+        (e.g. corpus_chunk_sync_state, keyed on document_id).
+        """
         rows: list[dict] = []
         offset = 0
         eq = {col: f"eq.{value}" for col, value in (filters or {}).items()}
         while True:
             page = self._request("GET", table, params={
                 "select": columns, "limit": page_size, "offset": offset,
-                "order": "id.asc", **eq,
+                "order": order, **eq,
             })
             rows.extend(page)
             if len(page) < page_size:
@@ -87,6 +92,18 @@ class Postgrest:
     def insert(self, table: str, records: list[dict]) -> None:
         if records:
             self._request("POST", table, body=records, prefer="return=minimal")
+
+    def delete(self, table: str, filters: dict) -> None:
+        """Delete rows matching `filters` ({col: value} -> eq)."""
+        eq = {col: f"eq.{value}" for col, value in filters.items()}
+        self._request("DELETE", table, params=eq, prefer="return=minimal")
+
+    def upsert(self, table: str, records: list[dict], on_conflict: str) -> None:
+        """Insert rows, or update in place on a conflicting key (ASK-2's
+        corpus_chunk_sync_state dirty-flag bookkeeping)."""
+        if records:
+            self._request("POST", table, params={"on_conflict": on_conflict}, body=records,
+                          prefer="resolution=merge-duplicates,return=minimal")
 
     def update_by_item_id(self, table: str, org_id: str, item_id: str, patch: dict) -> None:
         """Update the row keyed by the composite (org_id, source_item_id)."""

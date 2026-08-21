@@ -1,4 +1,4 @@
-# ASK-1: Basecamp corpus ingest scripts
+# ASK-1 / ASK-2: Basecamp corpus ingest + embedding scripts
 
 Imports the sorted Basecamp harvest into the `corpus_documents` table so the
 Ask Alcan spike has something to answer from while curation continues. See
@@ -58,11 +58,37 @@ python3 scripts/basecamp-corpus/sync_decisions.py path/to/decisions.csv
 - `canon` rows are never demoted (expert sign-off outranks the Sheet), and
   decisions for items missing from the corpus are warned about, not created.
 
-## Tests
-
-Pure logic (text parsing, ledger-row -> document mapping, decision
-planning) lives in `corpus_lib.py` and is tested without any database:
+## embed_corpus.py — corpus_documents -> corpus_chunks (ASK-2)
 
 ```bash
-cd scripts/basecamp-corpus && python3 -m unittest test_corpus_lib -v
+python3 scripts/basecamp-corpus/embed_corpus.py --dry-run   # always first
+python3 scripts/basecamp-corpus/embed_corpus.py
+```
+
+- **The ASK-2 migration must be applied first:**
+  `supabase/migrations/20260821140000_ask2_hybrid_search.sql`.
+- Chunks every `kept`/`canon` document that is dirty (new, or changed since
+  its last chunking — see `corpus_chunk_sync_state`, maintained by a trigger
+  on `corpus_documents`) and embeds each chunk with OpenAI
+  `text-embedding-3-small`.
+- **Requires `OPENAI_API_KEY` in `scripts/basecamp-corpus/.env`** (see
+  `.env.example`) to produce real vectors. Without it, the script still
+  writes chunks with full-text-searchable content and `embedding = NULL`,
+  and leaves those documents marked dirty — a future run with the key
+  present finishes the job. It never pretends a chunk has an embedding it
+  doesn't.
+- Idempotent per document: re-running only touches documents still marked
+  dirty; a document's old chunks are fully replaced (not merged) each time
+  it's re-chunked, since edits can change chunk boundaries and counts.
+- Safe to run after every `ingest_corpus.py` / `sync_decisions.py` batch.
+
+## Tests
+
+Pure logic lives in modules with no database or network dependency, and is
+tested directly:
+
+```bash
+cd scripts/basecamp-corpus
+python3 -m unittest test_corpus_lib -v   # ASK-1: text parsing, ledger mapping, decisions
+python3 -m unittest test_chunk_lib -v    # ASK-2: chunking, dirty-tracking, vector formatting
 ```

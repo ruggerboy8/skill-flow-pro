@@ -14,8 +14,7 @@ import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { format } from 'date-fns';
 import { getDomainColor, getDomainColorRaw, getDomainColorRichRaw } from '@/lib/domainColors';
 import { SchedulingInviteComposer } from '@/components/clinical/SchedulingInviteComposer';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import DOMPurify from 'dompurify';
 
 interface Props {
@@ -1136,7 +1135,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
           </div>
         </CardHeader>
         <CardContent>
-          <ReactQuill
+          <RichTextEditor
             value={coachNote}
             onChange={setCoachNote}
             modules={quillModules}

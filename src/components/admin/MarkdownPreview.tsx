@@ -1,6 +1,5 @@
 import { Label } from '@/components/ui/label';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 
 interface MarkdownPreviewProps {
   value: string;
@@ -45,8 +44,7 @@ export function MarkdownPreview({ value, onChange, maxChars = 10000 }: MarkdownP
         </span>
       </div>
       
-      <ReactQuill
-        theme="snow"
+      <RichTextEditor
         value={value}
         onChange={onChange}
         modules={modules}

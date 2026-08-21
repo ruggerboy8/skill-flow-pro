@@ -20,6 +20,9 @@ verify_jwt = true
 [functions.ask-alcan]
 verify_jwt = true
 
+[functions.ask-alcan-v2]
+verify_jwt = true
+
 [functions.backfill-format-evaluator-notes]
 verify_jwt = false
 

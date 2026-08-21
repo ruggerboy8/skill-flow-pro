@@ -1,5 +1,16 @@
 // Utility functions for Recommender Panel
 
+// lastPracticedWeeks should always be a number, but it can arrive as the
+// string "999" when it crosses the JSON boundary from the sequencer-rank
+// edge function, even though every type in this file says number. Every
+// function below that reads lastPracticedWeeks (for the 999 "never
+// practiced" sentinel or the >= 8 staleness threshold) funnels the value
+// through this single helper, so a stringified sentinel is never treated
+// differently from the numeric one in one place and not another. See COR-5.
+function normalizeWeeks(value: unknown): number {
+  return typeof value === 'string' ? Number(value) : (value as number);
+}
+
 // Formatting and display utilities
 export function formatPrimaryReason(move: {
   primaryReasonCode: 'LOW_CONF' | 'RETEST' | 'NEVER' | 'STALE' | 'TIE';
@@ -7,6 +18,8 @@ export function formatPrimaryReason(move: {
   lowConfShare: number | null;
   lastPracticedWeeks: number;
 }): string {
+  const weeks = normalizeWeeks(move.lastPracticedWeeks);
+
   switch (move.primaryReasonCode) {
     case 'LOW_CONF': {
       const pct = move.lowConfShare != null ? Math.round(move.lowConfShare * 100) : null;
@@ -17,8 +30,19 @@ export function formatPrimaryReason(move: {
     case 'NEVER':
       return 'Never practiced yet';
     case 'STALE': {
-      const w = move.lastPracticedWeeks === 999 ? null : move.lastPracticedWeeks;
-      return w != null ? `Not practiced in ${w} weeks` : 'Not practiced recently';
+      // A STALE reason code paired with the 999 "never practiced" sentinel is
+      // contradictory upstream data (never-practiced moves should carry a
+      // NEVER reason code, not STALE) and the type system does not prevent
+      // it. Rather than silently falling back to a vague message, surface it
+      // loudly so the bad data gets noticed and traced back to its source.
+      if (weeks === 999) {
+        console.warn(
+          'formatPrimaryReason: STALE reason code with lastPracticedWeeks=999 (the "never practiced" sentinel) — conflicting upstream data.',
+          move
+        );
+        return 'Conflicting data: marked stale but never practiced';
+      }
+      return `Not practiced in ${weeks} weeks`;
     }
     case 'TIE':
     default:
@@ -26,7 +50,8 @@ export function formatPrimaryReason(move: {
   }
 }
 
-export function formatLastPracticed(weeks: number): string {
+export function formatLastPracticed(weeksInput: number): string {
+  const weeks = normalizeWeeks(weeksInput);
   if (weeks === 999) return 'Never';
   if (weeks === 0) return 'This week';
   if (weeks === 1) return '1 wk ago';
@@ -39,48 +64,61 @@ export interface BadgeInfo {
   tooltip: string;
 }
 
+// At most 2 badges are ever shown (screen real estate on the recommender
+// card/row). When more than 2 signal conditions fire on the same move, this
+// order decides which ones survive the cap:
+//
+//   New (never practiced) > Low Conf > Retest > Stale
+//
+// "New" is deliberately ranked first. A move that has never been practiced
+// is the single highest-signal fact a coach can see about it, so it must
+// never be the one silently dropped by the cap, even on the rare move where
+// Low Conf and Retest also fire (e.g. a never-practiced move that already
+// has a retest scheduled and a low-confidence rating on record). See COR-5.
+const BADGE_PRIORITY: readonly string[] = ['New', 'Low Conf', 'Retest', 'Stale'];
+
 export function getBadges(move: {
   lowConfShare: number | null;
   retestDue: boolean;
   lastPracticedWeeks: number;
   primaryReasonCode: string;
 }): BadgeInfo[] {
-  const badges: BadgeInfo[] = [];
-  
-  // Priority 1: Low confidence (>=33% rated 1-2)
+  const weeks = normalizeWeeks(move.lastPracticedWeeks);
+
+  const candidates: Record<string, BadgeInfo> = {};
+
   if (move.primaryReasonCode === 'LOW_CONF' || (move.lowConfShare !== null && move.lowConfShare >= 0.33)) {
-    badges.push({
+    candidates['Low Conf'] = {
       label: 'Low Conf',
       tooltip: 'High share of 1–2 scores recently',
-    });
+    };
   }
-  
-  // Priority 2: Retest due
+
   if (move.retestDue) {
-    badges.push({
+    candidates['Retest'] = {
       label: 'Retest',
       tooltip: 'Return soon to verify improvement',
-    });
+    };
   }
-  
-  // Priority 3: Never practiced
-  if (move.lastPracticedWeeks === 999) {
-    badges.push({
+
+  if (weeks === 999) {
+    candidates['New'] = {
       label: 'New',
       tooltip: 'Never practiced yet',
-    });
+    };
   }
-  
-  // Priority 4: Stale (8+ weeks, not retest, not never)
-  if (!move.retestDue && move.lastPracticedWeeks !== 999 && move.lastPracticedWeeks >= 8) {
-    badges.push({
+
+  // Stale (8+ weeks, not retest, not never)
+  if (!move.retestDue && weeks !== 999 && weeks >= 8) {
+    candidates['Stale'] = {
       label: 'Stale',
       tooltip: 'Not practiced in 8+ weeks',
-    });
+    };
   }
-  
-  // Return max 2 badges
-  return badges.slice(0, 2);
+
+  return BADGE_PRIORITY.filter((label) => candidates[label])
+    .map((label) => candidates[label])
+    .slice(0, 2);
 }
 
 // Filtering and sorting functions
@@ -107,14 +145,15 @@ export function applyFilters(
   // Apply signal filters (union - include if ANY match)
   if (filters.signals.length > 0) {
     result = result.filter((move) => {
+      const weeks = normalizeWeeks(move.lastPracticedWeeks);
       return filters.signals.some((signal) => {
         switch (signal) {
           case 'low_conf':
             return move.lowConfShare !== null && move.lowConfShare >= 0.33;
           case 'never':
-            return move.lastPracticedWeeks === 999;
+            return weeks === 999;
           case 'stale':
-            return move.lastPracticedWeeks >= 8 && move.lastPracticedWeeks !== 999;
+            return weeks >= 8 && weeks !== 999;
           case 'retest':
             return move.retestDue === true;
           default:
@@ -146,8 +185,10 @@ export function applyFilters(
           return b.lowConfShare - a.lowConfShare;
         }
         // 4. lastPracticedWeeks desc (999 sorts highest)
-        if (b.lastPracticedWeeks !== a.lastPracticedWeeks) {
-          return b.lastPracticedWeeks - a.lastPracticedWeeks;
+        const aWeeks4 = normalizeWeeks(a.lastPracticedWeeks);
+        const bWeeks4 = normalizeWeeks(b.lastPracticedWeeks);
+        if (bWeeks4 !== aWeeks4) {
+          return bWeeks4 - aWeeks4;
         }
         // 5. proMoveId asc
         return a.proMoveId - b.proMoveId;
@@ -164,8 +205,10 @@ export function applyFilters(
       }
       case 'weeks': {
         // 1. lastPracticedWeeks desc (999 sorts highest)
-        if (b.lastPracticedWeeks !== a.lastPracticedWeeks) {
-          return b.lastPracticedWeeks - a.lastPracticedWeeks;
+        const aWeeks = normalizeWeeks(a.lastPracticedWeeks);
+        const bWeeks = normalizeWeeks(b.lastPracticedWeeks);
+        if (bWeeks !== aWeeks) {
+          return bWeeks - aWeeks;
         }
         // 2. finalScore desc
         return b.finalScore - a.finalScore;

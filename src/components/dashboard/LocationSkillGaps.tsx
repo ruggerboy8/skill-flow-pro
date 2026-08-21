@@ -9,8 +9,8 @@ import { ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor, getDomainColorRich } from '@/lib/domainColors';
 import { getDomainOrderIndex } from '@/lib/domainUtils';
+import { scoreBucket, scoreBucketTokens } from '@/lib/confidenceScoreRamp';
 import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
-import { cn } from '@/lib/utils';
 
 interface SkillGap {
   action_id: number;
@@ -105,10 +105,13 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
     .sort((a, b) => a[0] - b[0]);
   const lookbackLabel = lookback === 'all' ? 'all time' : `${lookback} weeks`;
 
-  function getConfidenceColor(avg: number): string {
-    if (avg < 2.0) return 'bg-red-100 text-red-800 border-red-200';
-    if (avg < 3.0) return 'bg-amber-100 text-amber-800 border-amber-200';
-    return 'bg-green-100 text-green-800 border-green-200';
+  // Confidence scores use the 1-4 score-ramp gradient, never a red/amber/
+  // green traffic light — see src/lib/confidenceScoreRamp.ts (DASH-1a).
+  function getConfidenceStyle(avg: number): React.CSSProperties {
+    const tokens = scoreBucketTokens(scoreBucket(avg));
+    // ink for text (contrast-safe on the tinted bg), vivid `text` reserved
+    // for the border accent.
+    return { backgroundColor: tokens.bg, color: tokens.ink, borderColor: tokens.text };
   }
 
   function hexToRgba(hex: string, alpha: number): string {
@@ -131,9 +134,10 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
       >
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium leading-tight flex-1">{gap.action_statement}</p>
-          <Badge 
-            variant="outline" 
-            className={`shrink-0 ${getConfidenceColor(gap.avg_confidence)}`}
+          <Badge
+            variant="outline"
+            className="shrink-0"
+            style={getConfidenceStyle(gap.avg_confidence)}
           >
             {gap.avg_confidence.toFixed(1)} / 4
           </Badge>
@@ -235,13 +239,18 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
             <div className="flex flex-wrap gap-2">
               {domainAvgs.map(({ domain, avg, ratings }) => {
                 const richColor = getDomainColorRich(domain);
-                const bgCls = avg >= 3.0 ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200/50' : avg >= 2.5 ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200/50' : 'bg-rose-50 dark:bg-rose-950/20 border-rose-200/50';
-                const textCls = avg >= 3.0 ? 'text-emerald-700 dark:text-emerald-400' : avg >= 2.5 ? 'text-amber-700 dark:text-amber-400' : 'text-rose-700 dark:text-rose-400';
+                // Confidence scores use the 1-4 score-ramp gradient, never a
+                // red/amber/green traffic light — see confidenceScoreRamp.ts (DASH-1a).
+                const tokens = scoreBucketTokens(scoreBucket(avg));
                 return (
-                  <div key={domain} className={cn('flex items-center gap-2 rounded-lg border px-3 py-2', bgCls)}>
+                  <div
+                    key={domain}
+                    className="flex items-center gap-2 rounded-lg border px-3 py-2"
+                    style={{ backgroundColor: tokens.bg, borderColor: tokens.text }}
+                  >
                     <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: richColor }} />
                     <span className="text-xs font-medium text-muted-foreground">{domain}</span>
-                    <span className={cn('text-sm font-bold', textCls)}>{avg.toFixed(1)}</span>
+                    <span className="text-sm font-bold" style={{ color: tokens.ink }}>{avg.toFixed(1)}</span>
                     <span className="text-2xs text-muted-foreground">n={ratings}</span>
                   </div>
                 );

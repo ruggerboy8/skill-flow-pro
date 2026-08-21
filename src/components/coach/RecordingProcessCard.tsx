@@ -109,9 +109,9 @@ export function RecordingProcessCard({
             </div>
           </div>
         ) : isPausedWithRecording ? (
-          <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg space-y-3">
+          <div className="p-4 bg-[hsl(var(--status-late-bg))] border border-[hsl(var(--status-late))]/30 rounded-lg space-y-3">
             <div className="flex items-center gap-3">
-              <div className="w-3 h-3 rounded-full bg-amber-500" />
+              <div className="w-3 h-3 rounded-full bg-[hsl(var(--status-late))]" />
               <div className="flex-1">
                 <p className="text-sm font-medium">Recording paused</p>
                 <p className="text-xs text-muted-foreground">
@@ -171,14 +171,14 @@ export function RecordingProcessCard({
             </div>
           </div>
         ) : hasRestoredRecording ? (
-          <div className="space-y-3 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <div className="space-y-3 p-4 bg-[hsl(var(--status-late-bg))] border border-[hsl(var(--status-late))]/30 rounded-lg">
             <div className="flex items-center gap-2">
-              <Mic className="w-4 h-4 text-amber-600" />
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+              <Mic className="w-4 h-4 text-[hsl(var(--status-late))]" />
+              <p className="text-sm font-medium text-[hsl(var(--status-late))]">
                 Previously recorded observation found
               </p>
             </div>
-            <p className="text-sm text-amber-700 dark:text-amber-300">
+            <p className="text-sm text-[hsl(var(--status-late))]">
               You have an unprocessed recording from a previous session.
             </p>
             

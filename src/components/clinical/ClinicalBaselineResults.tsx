@@ -9,7 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { DoctorMaterialsSheet } from '@/components/doctor/DoctorMaterialsSheet';
 import { ReflectionSection } from '@/components/doctor/ReflectionSection';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { getDomainColorRichRaw } from '@/lib/domainColors';
@@ -43,11 +43,19 @@ interface GroupedData {
 
 const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
 
+// DSN-3 QA fix: this map was invisible to the hardcoded-color ratchet (raw
+// hsl() literals, not Tailwind classes) but hardcoded the same red/amber/
+// blue/green traffic light the ratchet-visible fixes elsewhere in this file
+// removed. Band 1 now shares --score-1 (orange), matching RatingBandCollapsible
+// and the rest of the DASH-1a score ramp: confidence/skill scores never
+// render red. bg/text use the -bg/-ink pair (tuned for tinted-surface
+// contrast); border/activeBorder derive from the vivid --score-N at two
+// opacities rather than inventing separate light/dark shades.
 const SCORE_COLORS: Record<number, { bg: string; border: string; text: string; activeBorder: string }> = {
-  4: { bg: 'hsl(160 60% 95%)', border: 'hsl(160 50% 80%)', text: 'hsl(160 80% 25%)', activeBorder: 'hsl(160 60% 40%)' },
-  3: { bg: 'hsl(210 80% 95%)', border: 'hsl(210 60% 80%)', text: 'hsl(210 80% 30%)', activeBorder: 'hsl(210 70% 45%)' },
-  2: { bg: 'hsl(38 90% 95%)', border: 'hsl(38 70% 75%)', text: 'hsl(38 80% 30%)', activeBorder: 'hsl(38 80% 45%)' },
-  1: { bg: 'hsl(0 70% 95%)', border: 'hsl(0 60% 80%)', text: 'hsl(0 70% 35%)', activeBorder: 'hsl(0 65% 45%)' },
+  4: { bg: 'hsl(var(--score-4-bg))', border: 'hsl(var(--score-4) / 0.3)', text: 'hsl(var(--score-4-ink))', activeBorder: 'hsl(var(--score-4))' },
+  3: { bg: 'hsl(var(--score-3-bg))', border: 'hsl(var(--score-3) / 0.3)', text: 'hsl(var(--score-3-ink))', activeBorder: 'hsl(var(--score-3))' },
+  2: { bg: 'hsl(var(--score-2-bg))', border: 'hsl(var(--score-2) / 0.3)', text: 'hsl(var(--score-2-ink))', activeBorder: 'hsl(var(--score-2))' },
+  1: { bg: 'hsl(var(--score-1-bg))', border: 'hsl(var(--score-1) / 0.3)', text: 'hsl(var(--score-1-ink))', activeBorder: 'hsl(var(--score-1))' },
   0: { bg: 'hsl(0 0% 95%)', border: 'hsl(0 0% 80%)', text: 'hsl(0 0% 40%)', activeBorder: 'hsl(0 0% 50%)' },
 };
 
@@ -317,15 +325,15 @@ export function ClinicalBaselineResults({
   if (status !== 'completed') {
     return (
       <Card className="border-0 shadow-lg overflow-hidden">
-        <div className="bg-gradient-to-br from-amber-50 via-amber-50/50 to-background dark:from-amber-950/30 dark:via-amber-950/10 p-6">
+        <div className="bg-gradient-to-br from-[hsl(var(--status-late-bg))] to-background p-6">
           <div className="flex items-start gap-4">
-            <div className="p-3 rounded-xl bg-amber-100 dark:bg-amber-900/30">
-              <Clock className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+            <div className="p-3 rounded-xl" style={{ backgroundColor: 'hsl(var(--status-late-bg))' }}>
+              <Clock className="h-8 w-8" style={{ color: 'hsl(var(--status-late))' }} />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-3">
                 <h2 className="text-xl font-semibold">Baseline Assessment</h2>
-                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/50 dark:text-amber-300">In Progress</Badge>
+                <StatusBadge status="in_progress" label="In Progress" />
               </div>
               <div className="mt-4 space-y-2">
                 <div className="flex justify-between text-sm">
@@ -347,15 +355,15 @@ export function ClinicalBaselineResults({
     <Collapsible defaultOpen className="space-y-4">
       <Card className="overflow-hidden border-0 shadow-lg">
         <CollapsibleTrigger className="w-full">
-          <div className="bg-gradient-to-br from-emerald-50 via-emerald-50/50 to-background dark:from-emerald-950/30 dark:via-emerald-950/10 p-5">
+          <div className="bg-gradient-to-br from-[hsl(var(--status-complete-bg))] to-background p-5">
             <div className="flex items-center gap-4">
-              <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
-                <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+              <div className="p-2.5 rounded-xl" style={{ backgroundColor: 'hsl(var(--status-complete-bg))' }}>
+                <CheckCircle2 className="h-6 w-6" style={{ color: 'hsl(var(--status-complete))' }} />
               </div>
               <div className="flex-1 text-left">
                 <div className="flex items-center gap-3">
                   <h2 className="text-lg font-semibold">Baseline Self-Assessment</h2>
-                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-300">Complete</Badge>
+                  <StatusBadge status="completed" label="Complete" />
                 </div>
                 {completedAt && (
                   <p className="text-sm text-muted-foreground mt-0.5">
@@ -535,8 +543,8 @@ export function ClinicalBaselineResults({
                                   setSelectedItem(item);
                                 }
                               }}
-                              className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left group ${hasBigDiff ? 'ring-1 ring-inset ring-amber-300 dark:ring-amber-700' : ''}`}
-                              style={{ backgroundColor: hasBigDiff ? 'hsl(38 90% 97%)' : colors.bg }}
+                              className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left group ${hasBigDiff ? 'ring-1 ring-inset ring-[hsl(var(--status-late))]' : ''}`}
+                              style={{ backgroundColor: hasBigDiff ? 'hsl(var(--status-late-bg))' : colors.bg }}
                             >
                               {(() => {
                                 const selfColors = SCORE_COLORS[item.score];

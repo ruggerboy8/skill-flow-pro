@@ -41,13 +41,13 @@ describe('scoreBucket', () => {
 });
 
 describe('scoreBucketTokens', () => {
-  it('maps each bucket to its matching --score-N tokens', () => {
-    expect(scoreBucketTokens(1)).toEqual({ text: 'hsl(var(--score-1))', bg: 'hsl(var(--score-1-bg))' });
-    expect(scoreBucketTokens(4)).toEqual({ text: 'hsl(var(--score-4))', bg: 'hsl(var(--score-4-bg))' });
+  it('maps each bucket to its matching --score-N tokens, including ink for on-tint text', () => {
+    expect(scoreBucketTokens(1)).toEqual({ text: 'hsl(var(--score-1))', bg: 'hsl(var(--score-1-bg))', ink: 'hsl(var(--score-1-ink))' });
+    expect(scoreBucketTokens(4)).toEqual({ text: 'hsl(var(--score-4))', bg: 'hsl(var(--score-4-bg))', ink: 'hsl(var(--score-4-ink))' });
   });
 
-  it('falls back to the muted no-data treatment for an undefined bucket', () => {
-    expect(scoreBucketTokens(undefined)).toEqual({ text: 'hsl(var(--muted-foreground))', bg: 'transparent' });
+  it('falls back to the muted no-data treatment for an undefined bucket, ink included', () => {
+    expect(scoreBucketTokens(undefined)).toEqual({ text: 'hsl(var(--muted-foreground))', bg: 'transparent', ink: 'hsl(var(--muted-foreground))' });
   });
 });
 

@@ -23,34 +23,40 @@ interface ResourceData {
   content_md: string | null;
 }
 
+// DSN-3 slice 2: 3 of 4 categories map onto existing --status-* tokens
+// (amber "attention" reuse, released blue, complete green). "Gut Check
+// Questions" (purple) is left as a hardcoded palette class on purpose —
+// no existing token fits, and reusing e.g. --status-released here would
+// make it visually indistinguishable from "Scripting". Flagged for a
+// future ticket rather than inventing a token in this migration slice.
 const MATERIAL_SECTIONS = [
-  { 
-    type: 'doctor_why', 
-    title: 'Why It Matters', 
+  {
+    type: 'doctor_why',
+    title: 'Why It Matters',
     icon: Lightbulb,
-    color: 'text-amber-600 dark:text-amber-400',
-    bgColor: 'bg-amber-50 dark:bg-amber-950/30',
-    borderColor: 'border-amber-200 dark:border-amber-800',
+    color: 'text-[hsl(var(--status-late))]',
+    bgColor: 'bg-[hsl(var(--status-late-bg))]',
+    borderColor: 'border-[hsl(var(--status-late))]/30',
   },
-  { 
-    type: 'doctor_script', 
-    title: 'Scripting', 
+  {
+    type: 'doctor_script',
+    title: 'Scripting',
     icon: MessageSquareQuote,
-    color: 'text-blue-600 dark:text-blue-400',
-    bgColor: 'bg-blue-50 dark:bg-blue-950/30',
-    borderColor: 'border-blue-200 dark:border-blue-800',
+    color: 'text-[hsl(var(--status-released))]',
+    bgColor: 'bg-[hsl(var(--status-released-bg))]',
+    borderColor: 'border-[hsl(var(--status-released))]/30',
   },
-  { 
-    type: 'doctor_good_looks_like', 
-    title: 'What Good Looks Like', 
+  {
+    type: 'doctor_good_looks_like',
+    title: 'What Good Looks Like',
     icon: CheckCircle2,
-    color: 'text-emerald-600 dark:text-emerald-400',
-    bgColor: 'bg-emerald-50 dark:bg-emerald-950/30',
-    borderColor: 'border-emerald-200 dark:border-emerald-800',
+    color: 'text-[hsl(var(--status-complete))]',
+    bgColor: 'bg-[hsl(var(--status-complete-bg))]',
+    borderColor: 'border-[hsl(var(--status-complete))]/30',
   },
-  { 
-    type: 'doctor_gut_check', 
-    title: 'Gut Check Questions', 
+  {
+    type: 'doctor_gut_check',
+    title: 'Gut Check Questions',
     icon: HelpCircle,
     color: 'text-purple-600 dark:text-purple-400',
     bgColor: 'bg-purple-50 dark:bg-purple-950/30',

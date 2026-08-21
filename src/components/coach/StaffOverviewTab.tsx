@@ -3,6 +3,7 @@ import { subWeeks } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { getDomainColorVar, getDomainColorVarRaw } from '@/lib/domainColors';
+import { scoreBucket, scoreBucketTokens } from '@/lib/confidenceScoreRamp';
 import { DomainConfidenceTrend } from '@/components/coach/DomainConfidenceTrend';
 import { ClipboardList } from 'lucide-react';
 
@@ -18,17 +19,8 @@ interface StaffOverviewTabProps {
   evalCount?: number;
 }
 
-function getScoreColor(avg: number): string {
-  if (avg >= 3.0) return 'text-emerald-600 dark:text-emerald-400';
-  if (avg >= 2.5) return 'text-amber-600 dark:text-amber-400';
-  return 'text-rose-600 dark:text-rose-400';
-}
-
-function getScoreBg(avg: number): string {
-  if (avg >= 3.0) return 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200/50';
-  if (avg >= 2.5) return 'bg-amber-50 dark:bg-amber-950/30 border-amber-200/50';
-  return 'bg-rose-50 dark:bg-rose-950/30 border-rose-200/50';
-}
+// Confidence scores use the 1-4 score-ramp gradient, never a red/amber/
+// green traffic light — see src/lib/confidenceScoreRamp.ts (DASH-1a).
 
 export function StaffOverviewTab({ rawData, evalCount = 0 }: StaffOverviewTabProps) {
   // Domain confidence averages over the last 6 weeks
@@ -81,10 +73,12 @@ export function StaffOverviewTab({ rawData, evalCount = 0 }: StaffOverviewTabPro
               {lowestDomains.map(({ domain, avg }) => {
                 const richRaw = getDomainColorVarRaw(domain);
                 const richColor = getDomainColorVar(domain);
+                const tokens = scoreBucketTokens(scoreBucket(avg));
                 return (
                   <div
                     key={domain}
-                    className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${getScoreBg(avg)}`}
+                    className="flex items-center gap-3 rounded-xl border px-4 py-3"
+                    style={{ backgroundColor: tokens.bg, borderColor: tokens.text }}
                   >
                     <div
                       className="w-3 h-3 rounded-full shrink-0"
@@ -97,7 +91,7 @@ export function StaffOverviewTab({ rawData, evalCount = 0 }: StaffOverviewTabPro
                       >
                         {domain}
                       </p>
-                      <p className={`text-xl font-black ${getScoreColor(avg)}`}>
+                      <p className="text-xl font-black" style={{ color: tokens.ink }}>
                         {avg.toFixed(1)}<span className="text-xs font-normal text-muted-foreground ml-0.5">/4</span>
                       </p>
                     </div>

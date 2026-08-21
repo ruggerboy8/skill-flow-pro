@@ -270,7 +270,7 @@ original hand-rolled classes this whole migration replaces already used.
 Not an invented design choice, same rule as `--status-info`'s derivation.
 `status-pending`/`status-excused` share one ink value (`slate-800`) because
 their vivid/`-bg` pair already share one value; `status-released`/`status-info`
-share one (`blue-800`) for the same reason — both are "blue," 5° apart in
+share one (`blue-800`) for the same reason — both are "blue," 10° apart in
 hue, from the same Tailwind family.
 
 ```css

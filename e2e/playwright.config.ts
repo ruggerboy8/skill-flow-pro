@@ -25,15 +25,18 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
  * steady frame timing) for the five specific presentation clips -- a
  * different job from a fast, repeatable structural tripwire. What it DOES
  * reuse directly, rather than re-implementing, is demo-capture's own
- * building blocks: BASE_URL below, and `globalSetup`, which is the exact
- * same login/storageState script (demo-capture/setup/create-storage-states.ts)
- * the DEMO-1b specs use -- so there is exactly one place that knows how to
- * sign a persona in and save its session, not two.
+ * env/config plumbing: BASE_URL below, and `globalSetup` (./setup/global-setup.ts)
+ * imports credsFor/storageStatePath/AUTH_DIR straight from
+ * demo-capture/config.ts, mirroring the same login flow demo-capture's own
+ * script uses. It's a separate globalSetup, not that script reused
+ * directly, because demo-capture's signs in all three demo personas
+ * unconditionally -- this harness's one spec only ever needs one (see
+ * e2e/persona.ts and ./setup/global-setup.ts for why).
  *
  * Run with:
  *   npx playwright test --config=e2e/playwright.config.ts
- * See e2e/README.md for prerequisites -- same demo org + credentials as
- * demo-capture (see demo-capture/README.md "Env vars").
+ * See e2e/README.md for prerequisites -- one persona's credentials, reused
+ * from demo-capture's env vars (see demo-capture/README.md "Env vars").
  */
 export default defineConfig({
   testDir: "./specs",
@@ -42,8 +45,7 @@ export default defineConfig({
   retries: 0,
   timeout: 30_000,
   reporter: [["list"]],
-  // Reuses demo-capture's login script verbatim (see file header above).
-  globalSetup: "../demo-capture/setup/create-storage-states.ts",
+  globalSetup: "./setup/global-setup.ts",
   use: {
     baseURL: BASE_URL,
     headless: true,

@@ -10,35 +10,42 @@ boundary is supposed to live.
 
 This is a separate config from `demo-capture/playwright.config.ts` on
 purpose -- that harness is tuned for recording 1080p conference b-roll, a
-different job. What it reuses directly from `demo-capture/`, rather than
-reinventing, is the login/storageState flow: `e2e/playwright.config.ts`'s
-`globalSetup` is the exact same script
-(`demo-capture/setup/create-storage-states.ts`) demo-capture's own specs use,
-and the spec imports `demo-capture/config.ts` and `demo-capture/lib/` helpers
-directly instead of duplicating them.
+different job, and its `globalSetup` unconditionally signs in all three demo
+personas (staff, coach, admin), which this one spec doesn't need. What this
+harness reuses from `demo-capture/`, rather than duplicating, is its
+env/config plumbing -- `e2e/setup/global-setup.ts` (this config's
+`globalSetup`) imports `credsFor`/`storageStatePath`/`AUTH_DIR`/`BASE_URL`
+straight from `demo-capture/config.ts` and mirrors its login flow, but signs
+in only the **one** persona this spec actually loads (`e2e/persona.ts`,
+default `admin`) -- so running this tripwire never demands credentials for
+personas it never uses.
 
 ## Prerequisites
 
-Same as `demo-capture/` -- see `demo-capture/README.md` "Prerequisites" and
-"Env vars" in full. Short version:
+Mostly the same as `demo-capture/` -- see `demo-capture/README.md`
+"Prerequisites" in full -- but this harness needs credentials for only one
+persona, not all three:
 
 1. The demo org must be seeded (`scripts/demo-seed/`, DEMO-1a).
-2. `demo-capture/.env` filled in with at least `DEMO_ADMIN_PASSWORD` (this
-   spec logs in as the `admin` persona by default -- see `PRF3A_LOGIN`
-   below).
+2. `demo-capture/.env` filled in with just the one persona's password this
+   spec logs in as -- by default `DEMO_ADMIN_PASSWORD` (see `PRF3A_LOGIN`
+   below to log in as a different persona instead).
 3. Playwright's browser binary installed: `npx playwright install chromium`.
 4. The app running locally: `npm run dev` (port 8080 by default).
 
 ## Env vars
 
-Reuses every var `demo-capture/.env` already defines (`DEMO_CAPTURE_BASE_URL`,
-`DEMO_ADMIN_EMAIL`/`DEMO_ADMIN_PASSWORD`, etc. -- see
-`demo-capture/README.md` "Env vars"). One addition:
+Reuses the relevant vars `demo-capture/.env` already defines
+(`DEMO_CAPTURE_BASE_URL`, and whichever persona's `DEMO_<PERSONA>_EMAIL` /
+`DEMO_<PERSONA>_PASSWORD` -- see `demo-capture/README.md` "Env vars"). One
+addition:
 
 - `PRF3A_LOGIN` -- optional, defaults to `admin`. Which seeded persona
-  (`staff` | `coach` | `admin`) this spec logs in as. The spec needs a
-  persona whose sidebar shows an "Admin" link (see its ACCESS NOTE); override
-  this if the seeded `demo-admin` doesn't carry those flags.
+  (`staff` | `coach` | `admin`) this spec logs in as -- this is the ONLY
+  persona `e2e/setup/global-setup.ts` signs in, and the only one whose
+  password needs to be set. The spec needs a persona whose sidebar shows an
+  "Admin" link (see its ACCESS NOTE); override this if the seeded
+  `demo-admin` doesn't carry those flags.
 
 ## How to run
 
@@ -63,6 +70,12 @@ README describes for its own build):
 - Every locator here is grounded in reading the real component source
   (`src/components/Layout.tsx`, `src/components/AppSidebar.tsx`,
   `src/components/RouteLoadingFallback.tsx`, `src/App.tsx`), not guessed.
+- `e2e/setup/global-setup.ts` signs in only the selected persona: with only
+  `DEMO_ADMIN_PASSWORD` set (a fake value, real dev server running), a run
+  proceeds straight to the login attempt for `admin` and fails there against
+  the live Supabase project -- it does not ask for `DEMO_STAFF_PASSWORD` or
+  `DEMO_COACH_PASSWORD` first the way pointing this config at
+  demo-capture's own globalSetup used to.
 
 **Not verified, because no demo org / credentials were available locally:**
 

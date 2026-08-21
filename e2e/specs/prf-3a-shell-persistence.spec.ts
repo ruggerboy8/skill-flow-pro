@@ -24,13 +24,15 @@
  *
  * PATTERNS REUSED FROM demo-capture (DEMO-1b), not reinvented here:
  * - storageState-based login: `test.use({ storageState: storageStatePath(...) })`,
- *   same as every demo-capture spec. The actual sign-in flow is the same
- *   script (demo-capture/setup/create-storage-states.ts), wired in as this
- *   config's globalSetup -- see e2e/playwright.config.ts.
+ *   same as every demo-capture spec. The sign-in flow itself
+ *   (e2e/setup/global-setup.ts, this config's globalSetup) mirrors
+ *   demo-capture's own script, scoped to just the one persona this spec
+ *   needs -- see that file's header comment for why it isn't the same
+ *   script reused directly.
  * - `waitReady` (networkidle wait) from demo-capture/lib/waitReady.ts.
- * - `optionalEnv` from demo-capture/lib/env.ts, for the same "not
- *   hardcoded, one-line override" persona convention demo-capture's
- *   DEMO_CLIPn_LOGIN vars use (see below).
+ * - the persona override convention: PERSONA (e2e/persona.ts, via
+ *   demo-capture/lib/env.ts's `optionalEnv`) is the same "not hardcoded,
+ *   one-line override" pattern demo-capture's DEMO_CLIPn_LOGIN vars use.
  *
  * ACCESS NOTE (same class of uncertainty demo-capture's own specs flag):
  * the sidebar's "Admin" link only renders for staff with admin-ish
@@ -43,11 +45,9 @@
  * seeded login is known to carry those flags.
  */
 import { test, expect } from "@playwright/test";
-import { storageStatePath, type Persona } from "../../demo-capture/config.ts";
+import { storageStatePath } from "../../demo-capture/config.ts";
 import { waitReady } from "../../demo-capture/lib/waitReady.ts";
-import { optionalEnv } from "../../demo-capture/lib/env.ts";
-
-const PERSONA = optionalEnv(process.env, "PRF3A_LOGIN", "admin") as Persona;
+import { PERSONA } from "../persona.ts";
 
 test.use({ storageState: storageStatePath(PERSONA) });
 

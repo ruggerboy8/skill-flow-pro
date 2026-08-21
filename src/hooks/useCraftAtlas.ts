@@ -13,7 +13,19 @@ export interface AtlasCompetency {
   domainName: string;
   title: string;
   subtitle: string | null;
-  description: string | null;
+  /**
+   * competencies.friendly_description — the aspirational identity line
+   * ("you are the patient's advocate in the chair"), styled as a serif
+   * block quote on the Explore competency page. This is the field the old
+   * `description` used to carry; renamed for clarity alongside the new
+   * formalDescription (MOB-Explore-rebuild).
+   */
+  friendlyDescription: string | null;
+  /**
+   * competencies.description — the formal definition, shown in a quiet box
+   * on the Explore competency page. Newly loaded (MOB-Explore-rebuild §0/§5).
+   */
+  formalDescription: string | null;
   observerScore: number | null;
   observerNote: string | null;
   proMoves: ProMoveDetail[];
@@ -81,10 +93,12 @@ export function useCraftAtlas() {
         return { competencies: [], periodLabel: null, evaluatorFirstName: null };
       }
 
-      // 1. Competencies across ALL domains for the merged roles.
+      // 1. Competencies across ALL domains for the merged roles. `description`
+      // (the formal definition) is loaded here alongside friendly_description
+      // for the Explore competency page — see MOB-Explore-rebuild spec §0.
       const { data: competencies, error: compError } = await supabase
         .from('competencies')
-        .select('competency_id, name, tagline, friendly_description, role_id, domain_id')
+        .select('competency_id, name, tagline, friendly_description, description, role_id, domain_id')
         .in('role_id', roleIds)
         .eq('status', 'Active')
         .order('competency_id');
@@ -184,11 +198,16 @@ export function useCraftAtlas() {
       const proMovesByCompetency = new Map<number, ProMoveDetail[]>();
 
       if (compIds.length > 0) {
+        // Explicit order so "Next move" and the numbered move list are
+        // stable/reproducible — MOB-Explore-rebuild spec §5. Previously
+        // unordered (DB-default, effectively nondeterministic).
         const { data: allProMoves } = await supabase
           .from('pro_moves')
           .select('action_id, action_statement, description, competency_id')
           .in('competency_id', compIds)
-          .eq('active', true);
+          .eq('active', true)
+          .order('curriculum_priority', { ascending: true, nullsFirst: false })
+          .order('action_id');
 
         const { data: userScores } = await supabase
           .from('weekly_scores')
@@ -258,7 +277,8 @@ export function useCraftAtlas() {
           domainName,
           title: c.name || '',
           subtitle: c.tagline,
-          description: (c as any).friendly_description || null,
+          friendlyDescription: (c as any).friendly_description || null,
+          formalDescription: (c as any).description || null,
           observerScore: competencyScores.get(c.competency_id) ?? null,
           observerNote: competencyNotes.get(c.competency_id) ?? null,
           proMoves: proMovesByCompetency.get(c.competency_id) || [],

@@ -279,7 +279,10 @@ async function persistExchange(
   citedDocumentIds: string[],
 ): Promise<void> {
   const { error: msgErr } = await supabase.from('ask_messages').insert([
-    { conversation_id: convo.id, role: 'user', content: question.trim() },
+    // cited_document_ids must be explicit: PostgREST bulk inserts null-fill
+    // columns missing from a row rather than applying the column default,
+    // and the column is NOT NULL.
+    { conversation_id: convo.id, role: 'user', content: question.trim(), cited_document_ids: [] },
     {
       conversation_id: convo.id,
       role: 'assistant',

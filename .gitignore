@@ -44,3 +44,4 @@ e2e/playwright-report/
 .claude/worktrees/
 promoves-brand/exports/*.otf
 scripts/basecamp-corpus/.env
+scripts/basecamp-corpus/.mirror_watermark.json

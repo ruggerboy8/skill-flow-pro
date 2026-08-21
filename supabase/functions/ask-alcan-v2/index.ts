@@ -149,7 +149,19 @@ async function embedQuery(text: string, apiKey: string): Promise<number[] | null
 /** Hybrid search via the SECURITY INVOKER search_corpus SQL function, on
  * the caller-scoped client so RLS applies. Tries with the query embedding
  * first; if the RPC call itself errors (e.g. a parameter-casting issue),
- * retries full-text-only rather than failing the whole tool call. */
+ * retries full-text-only rather than failing the whole tool call.
+ *
+ * QA fix (ASK-2): search_corpus has no org_id parameter (it only filters
+ * status in kept/canon), unlike v1 which explicitly loads only the Alcan
+ * org's documents. That is harmless today (corpus_documents only has
+ * Alcan-org rows, and every current super admin is in the Alcan org), but
+ * askAlcanAccess.ts is explicit that super admins from OTHER orgs (e.g.
+ * Avenue Dental) are meant to reach Ask Alcan too, and other orgs are
+ * actively coming online. Left as-is, the day another org gets corpus rows
+ * and/or a non-Alcan super admin, search_corpus would surface them. Belt-
+ * and-suspenders post-filter here so v2 cannot leak cross-org documents
+ * even before the SQL function itself is fixed (see the proposed follow-up
+ * migration noted in the PR). */
 async function runSearchCorpus(
   caller: SupabaseClient,
   query: string,
@@ -164,14 +176,32 @@ async function runSearchCorpus(
     if (error) throw error;
     return (data ?? []) as SearchRow[];
   };
-  if (embedding) {
-    try {
-      return await attempt(embedding);
-    } catch (err) {
-      console.error('ask-alcan-v2: search_corpus with embedding failed, retrying FTS-only', err);
-    }
-  }
-  return await attempt(null);
+  const rows = embedding
+    ? await (async () => {
+        try {
+          return await attempt(embedding);
+        } catch (err) {
+          console.error('ask-alcan-v2: search_corpus with embedding failed, retrying FTS-only', err);
+          return await attempt(null);
+        }
+      })()
+    : await attempt(null);
+  return filterToAlcanOrg(caller, rows);
+}
+
+/** QA fix (ASK-2): search_corpus's result rows carry no org_id, so filter
+ * them against corpus_documents (caller-scoped, RLS-governed) before they
+ * ever reach the model. See the comment on runSearchCorpus. */
+async function filterToAlcanOrg(caller: SupabaseClient, rows: SearchRow[]): Promise<SearchRow[]> {
+  if (rows.length === 0) return rows;
+  const { data, error } = await caller
+    .from('corpus_documents')
+    .select('id')
+    .eq('org_id', ALCAN_ORG_ID)
+    .in('id', rows.map((r) => r.document_id));
+  if (error) throw error;
+  const allowed = new Set((data ?? []).map((d: { id: string }) => d.id));
+  return rows.filter((r) => allowed.has(r.document_id));
 }
 
 async function runReadDocument(caller: SupabaseClient, documentId: string): Promise<CorpusDoc | null> {
@@ -179,6 +209,9 @@ async function runReadDocument(caller: SupabaseClient, documentId: string): Prom
     .from('corpus_documents')
     .select('id, title, body, summary, status, source_url')
     .eq('id', documentId)
+    // QA fix (ASK-2): v1 scopes its whole corpus load to ALCAN_ORG_ID; this
+    // tool-driven fetch had no equivalent org filter. See runSearchCorpus.
+    .eq('org_id', ALCAN_ORG_ID)
     .in('status', ['kept', 'canon'])
     .maybeSingle();
   if (error) throw error;
@@ -426,7 +459,16 @@ Deno.serve(async (req) => {
       stop_reason: finalResponse.stop_reason,
     }));
 
-    await persistExchange(supabase, convo, question, answer, citations.map((c) => c.document_id));
+    // QA fix (ASK-2): the answer is already paid for (an Anthropic call was
+    // made) — a persistence failure must not discard it, matching v1's
+    // explicit handling. Previously this awaited unguarded, so a transient
+    // ask_messages write failure would throw, get caught by the outer
+    // handler below, and return a generic 500 instead of the real answer.
+    try {
+      await persistExchange(supabase, convo, question, answer, citations.map((c) => c.document_id));
+    } catch (persistErr) {
+      console.error('ask-alcan-v2 persist failure (answer still returned):', persistErr);
+    }
 
     // FROZEN response contract (unchanged from v1): exactly this shape.
     return json({ answer, citations });

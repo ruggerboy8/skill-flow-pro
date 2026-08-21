@@ -1,4 +1,5 @@
 // src/App.tsx
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation, useParams } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from "@/components/ui/toaster";
@@ -7,7 +8,7 @@ import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { PwaManager } from "@/components/pwa/PwaManager";
 import { BatchProcessorProvider } from "@/contexts/BatchProcessorContext";
 import { SimProvider } from "@/devtools/SimProvider";
-import { SignalP } from "@/components/brand/SignalP";
+import { RouteLoadingFallback } from "@/components/RouteLoadingFallback";
 
 // Pages (same imports you already have)
 import Login from "@/pages/Login";
@@ -27,31 +28,10 @@ import TeamStaffPage from "@/pages/team/TeamStaffPage";
 
 import ConfidenceWizard from "@/pages/ConfidenceWizard";
 import PerformanceWizard from "@/pages/PerformanceWizard";
-
-// Coach Pages
-import CoachLayoutV2 from "@/pages/coach/CoachLayoutV2";
-import CoachDashboardV2 from "@/pages/coach/CoachDashboardV2";
-import StaffDetailV2 from "@/pages/coach/StaffDetailV2";
-import { EvaluationHub } from "@/pages/coach/EvaluationHub";
-import EvaluationCapture from "@/pages/coach/EvaluationCapture";
-import AdminPage from "@/pages/AdminPage";
-import PlatformPage from "@/pages/PlatformPage";
-import EvalResultsV2 from "@/pages/admin/EvalResultsV2";
-import SurveyBuilderPage from "@/pages/admin/SurveyBuilderPage";
-import SurveyResultsPage from "@/pages/admin/SurveyResultsPage";
-import SurveyTakePage from "@/pages/survey/SurveyTakePage";
-import EvaluationViewer from "@/pages/EvaluationViewer";
-import EvaluationReview from "@/pages/EvaluationReview";
-import EvaluationReviewV2 from "@/pages/EvaluationReviewV2";
-import AdminBuilder from "@/pages/AdminBuilder";
 import NotFound from "@/pages/NotFound";
 import { RequireAccess, allowCoachSurface, allowDashboard, allowFacilitate, allowStaffEvals, allowTraining, allowTeam } from "@/components/RequireAccess";
-import TrainingHome from "@/pages/training/TrainingHome";
 import StatsEvaluations from "@/pages/stats/StatsEvaluations";
-import LocationDetail from "@/pages/dashboard/LocationDetail";
-import RegionalDashboard from "@/pages/dashboard/RegionalDashboard";
-import MyLocationPage from "@/pages/my-location/MyLocationPage";
-import FacilitatePage from "@/pages/facilitate/FacilitatePage";
+import SurveyTakePage from "@/pages/survey/SurveyTakePage";
 
 // My Role pages
 import MyRoleLayout from "@/pages/my-role/MyRoleLayout";
@@ -61,24 +41,69 @@ import DomainDetail from "@/pages/my-role/DomainDetail";
 import CraftAtlasArea from "@/pages/my-role/CraftAtlasArea";
 import ExploreMove from "@/pages/my-role/ExploreMove";
 
-// Clinical Director pages
-import ClinicalLayout from "@/pages/clinical/ClinicalLayout";
-import DoctorManagement from "@/pages/clinical/DoctorManagement";
-import DoctorProMoveLibrary from "@/pages/clinical/DoctorProMoveLibrary";
-import DoctorDetail from "@/pages/clinical/DoctorDetail";
+// PRF-3: everything below is split into its own chunk, lazy-loaded only when
+// its route is actually visited. These are the surfaces an ordinary
+// participant never opens (admin tools, coach/regional dashboards,
+// evaluation review, the recommender/sequencer builder) plus the Clinical
+// Director / Doctor role trees, which are a separate persona's surfaces.
+// Grouped by the priority order in PRF-3, not by folder.
 
-// Doctor pages
-import DoctorLayout from "@/pages/doctor/DoctorLayout";
-import DoctorHome from "@/pages/doctor/DoctorHome";
-import DoctorMyRole from "@/pages/doctor/DoctorMyRole";
-import DoctorDomainDetail from "@/pages/doctor/DoctorDomainDetail";
-import BaselineWizard from "@/pages/doctor/BaselineWizard";
-import DoctorBaselineResults from "@/pages/doctor/DoctorBaselineResults";
-import DoctorReviewPrep from "@/pages/doctor/DoctorReviewPrep";
-import DoctorCoachingHistory from "@/pages/doctor/DoctorCoachingHistory";
-import DoctorMyTeam from "@/pages/doctor/DoctorMyTeam";
-import DoctorTeamRoleDetail from "@/pages/doctor/DoctorTeamRoleDetail";
-import DoctorTeamDomainDetail from "@/pages/doctor/DoctorTeamDomainDetail";
+// Coach / regional dashboards
+const CoachLayoutV2 = lazy(() => import("@/pages/coach/CoachLayoutV2"));
+const CoachDashboardV2 = lazy(() => import("@/pages/coach/CoachDashboardV2"));
+const StaffDetailV2 = lazy(() => import("@/pages/coach/StaffDetailV2"));
+const EvaluationHub = lazy(() =>
+  import("@/pages/coach/EvaluationHub").then((m) => ({ default: m.EvaluationHub }))
+);
+const EvaluationCapture = lazy(() => import("@/pages/coach/EvaluationCapture"));
+const RegionalDashboard = lazy(() => import("@/pages/dashboard/RegionalDashboard"));
+const LocationDetail = lazy(() => import("@/pages/dashboard/LocationDetail"));
+// MyLocationPage (office-manager-only) statically wraps LocationDetail, which
+// in turn statically embeds CoachDashboardV2. Route-level lazy() on
+// LocationDetail/CoachDashboardV2 alone can't split them out of the main
+// bundle while MyLocationPage stays an eager import -- Rollup keeps a module
+// in whatever chunk still reaches it synchronously. Lazy-loading
+// MyLocationPage itself (not part of the participant home path) is what
+// actually moves this whole chain into its own chunk.
+const MyLocationPage = lazy(() => import("@/pages/my-location/MyLocationPage"));
+
+// Admin surfaces
+const AdminPage = lazy(() => import("@/pages/AdminPage"));
+const PlatformPage = lazy(() => import("@/pages/PlatformPage"));
+const EvalResultsV2 = lazy(() => import("@/pages/admin/EvalResultsV2"));
+const SurveyBuilderPage = lazy(() => import("@/pages/admin/SurveyBuilderPage"));
+const SurveyResultsPage = lazy(() => import("@/pages/admin/SurveyResultsPage"));
+
+// Evaluation review flows
+const EvaluationViewer = lazy(() => import("@/pages/EvaluationViewer"));
+const EvaluationReview = lazy(() => import("@/pages/EvaluationReview"));
+const EvaluationReviewV2 = lazy(() => import("@/pages/EvaluationReviewV2"));
+
+// Recommender / sequencer surface
+const AdminBuilder = lazy(() => import("@/pages/AdminBuilder"));
+
+// Other rarely-visited surfaces
+const TrainingHome = lazy(() => import("@/pages/training/TrainingHome"));
+const FacilitatePage = lazy(() => import("@/pages/facilitate/FacilitatePage"));
+
+// Clinical Director pages (separate persona, not part of the participant path)
+const ClinicalLayout = lazy(() => import("@/pages/clinical/ClinicalLayout"));
+const DoctorManagement = lazy(() => import("@/pages/clinical/DoctorManagement"));
+const DoctorProMoveLibrary = lazy(() => import("@/pages/clinical/DoctorProMoveLibrary"));
+const DoctorDetail = lazy(() => import("@/pages/clinical/DoctorDetail"));
+
+// Doctor pages (separate persona, not part of the participant path)
+const DoctorLayout = lazy(() => import("@/pages/doctor/DoctorLayout"));
+const DoctorHome = lazy(() => import("@/pages/doctor/DoctorHome"));
+const DoctorMyRole = lazy(() => import("@/pages/doctor/DoctorMyRole"));
+const DoctorDomainDetail = lazy(() => import("@/pages/doctor/DoctorDomainDetail"));
+const BaselineWizard = lazy(() => import("@/pages/doctor/BaselineWizard"));
+const DoctorBaselineResults = lazy(() => import("@/pages/doctor/DoctorBaselineResults"));
+const DoctorReviewPrep = lazy(() => import("@/pages/doctor/DoctorReviewPrep"));
+const DoctorCoachingHistory = lazy(() => import("@/pages/doctor/DoctorCoachingHistory"));
+const DoctorMyTeam = lazy(() => import("@/pages/doctor/DoctorMyTeam"));
+const DoctorTeamRoleDetail = lazy(() => import("@/pages/doctor/DoctorTeamRoleDetail"));
+const DoctorTeamDomainDetail = lazy(() => import("@/pages/doctor/DoctorTeamDomainDetail"));
 
 // Interpolates the :week param when redirecting legacy /confidence/:week and
 // /performance/:week links to their step-1 wizard route. (A plain <Navigate to>
@@ -110,11 +135,7 @@ function AppRoutes() {
     // DSN-5c: app-level auth gate, before we know whether there's a session.
     // The brand loader in "waiting" mode -- discrete laps, never a
     // continuous spin -- replaces the old ad hoc spinner div here.
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <SignalP mode="waiting" size={48} />
-      </div>
-    );
+    return <RouteLoadingFallback />;
   }
 
   if (!user && pathname === '/') return <LandingPage />;
@@ -123,8 +144,23 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* Full-screen facilitator presentation (no app chrome) */}
-      <Route path="/facilitate" element={<RequireAccess allow={allowFacilitate}><FacilitatePage /></RequireAccess>} />
+      {/* Full-screen facilitator presentation (no app chrome). This route
+          renders outside Layout, so it's the one lazy route App.tsx still
+          needs its own Suspense boundary for -- a full-screen fallback is
+          correct here since there's no persistent shell to preserve.
+          Everything else lazy is nested under Layout below, where the
+          Suspense boundaries live around its <Outlet /> placements instead
+          (PRF-3 QA fix: a single top-level Suspense here was unmounting the
+          whole app shell -- sidebar, header, tab bar -- on every first visit
+          to a lazy route). */}
+      <Route
+        path="/facilitate"
+        element={
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <RequireAccess allow={allowFacilitate}><FacilitatePage /></RequireAccess>
+          </Suspense>
+        }
+      />
       <Route path="/" element={<Layout />}>
         <Route index element={<Index />} />
         <Route path="login" element={<Navigate to="/" replace />} />

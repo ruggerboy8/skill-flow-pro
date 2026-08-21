@@ -2,11 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getDomainColorVar } from '@/lib/domainColors';
 import { getDomainOrderIndex } from '@/lib/domainUtils';
-import { 
-  calcRate, 
+import {
+  calcRate,
   formatMean,
-  type EvalDistributionRow 
+  type EvalDistributionRow
 } from '@/types/evalMetricsV2';
+import { scoreBucket, scoreBucketTokens } from '@/lib/confidenceScoreRamp';
 
 interface LocationDomainDistributionProps {
   data: EvalDistributionRow[];
@@ -77,11 +78,13 @@ function DomainChart({ domain }: { domain: DomainData }) {
   const p3 = Math.round((three / total) * 100);
   const p4 = Math.round((four / total) * 100);
   
+  // DSN-3 slice 3: same --score-1..4 migration as the identical bar in
+  // DomainDistributionRow.tsx (kept in sync).
   const segments = [
-    { score: 1, count: one, percent: p1, color: 'bg-red-500', hoverColor: 'hover:bg-red-600' },
-    { score: 2, count: two, percent: p2, color: 'bg-orange-400', hoverColor: 'hover:bg-orange-500' },
-    { score: 3, count: three, percent: p3, color: 'bg-amber-300', hoverColor: 'hover:bg-amber-400' },
-    { score: 4, count: four, percent: p4, color: 'bg-green-500', hoverColor: 'hover:bg-green-600' },
+    { score: 1, count: one, percent: p1, color: 'hsl(var(--score-1))' },
+    { score: 2, count: two, percent: p2, color: 'hsl(var(--score-2))' },
+    { score: 3, count: three, percent: p3, color: 'hsl(var(--score-3))' },
+    { score: 4, count: four, percent: p4, color: 'hsl(var(--score-4))' },
   ];
 
   return (
@@ -95,9 +98,9 @@ function DomainChart({ domain }: { domain: DomainData }) {
             seg.percent > 0 && (
               <Tooltip key={seg.score}>
                 <TooltipTrigger asChild>
-                  <div 
-                    className={`${seg.color} ${seg.hoverColor} transition-colors cursor-default`}
-                    style={{ width: `${seg.percent}%` }}
+                  <div
+                    className="transition-opacity hover:opacity-80 cursor-default"
+                    style={{ width: `${seg.percent}%`, backgroundColor: seg.color }}
                   />
                 </TooltipTrigger>
                 <TooltipContent side="top" className="text-center">
@@ -126,13 +129,13 @@ function DomainChart({ domain }: { domain: DomainData }) {
       <div className="flex justify-between mt-2 pt-2 border-t text-xs">
         <div className="flex items-center gap-1">
           <span className="text-muted-foreground">Obs:</span>
-          <span className={`font-semibold ${getScoreColor(obsMean)}`}>
+          <span className="font-semibold" style={{ color: getScoreColor(obsMean) }}>
             {formatMean(obsMean)}
           </span>
         </div>
         <div className="flex items-center gap-1">
           <span className="text-muted-foreground">Self:</span>
-          <span className={`font-semibold ${getScoreColor(selfMean)}`}>
+          <span className="font-semibold" style={{ color: getScoreColor(selfMean) }}>
             {formatMean(selfMean)}
           </span>
         </div>
@@ -158,7 +161,7 @@ function DomainHeader({ name, avg }: { name: string; avg: number | null }) {
         {name}
       </div>
       {avg !== null && (
-        <span className={`text-sm font-bold ${avgColor}`}>
+        <span className="text-sm font-bold" style={{ color: avgColor }}>
           {formatMean(avg)}
         </span>
       )}
@@ -166,11 +169,14 @@ function DomainHeader({ name, avg }: { name: string; avg: number | null }) {
   );
 }
 
+// DSN-3 slice 3: reuses the DASH-1a scoreBucket() ramp — same fix and same
+// behavior-change note as the identical function in DomainDistributionRow.tsx
+// (cutoffs move from >=3.0 green/>=2.5 amber/else red to scoreBucket()'s
+// <2 / <3 / <4 / =4 tiers; a 3.0-3.9 average now reads --score-3's blue
+// instead of green). Not a bug — see the token-migration doc section 7.
 function getScoreColor(score: number | null): string {
-  if (score === null) return 'text-muted-foreground';
-  if (score >= 3.0) return 'text-green-600';
-  if (score >= 2.5) return 'text-amber-600';
-  return 'text-red-600';
+  const tokens = scoreBucketTokens(scoreBucket(score ?? NaN));
+  return tokens.text;
 }
 
 function aggregateDomainData(rows: EvalDistributionRow[]): DomainData[] {

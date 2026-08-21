@@ -1077,7 +1077,7 @@ export default function PerformanceWizard() {
             disabled={!hasScore || submitting}
             className={cn(
               "flex-[2] rounded-full transition-all duration-300",
-              submitPhase === 'done' && "bg-emerald-500 hover:bg-emerald-500"
+              submitPhase === 'done' && "bg-[hsl(var(--status-complete))] hover:bg-[hsl(var(--status-complete))]"
             )}
           >
             {submitPhase === 'done' ? (
@@ -1121,18 +1121,23 @@ export default function PerformanceWizard() {
           
           <div className="p-6 space-y-4 text-center">
             <AlertDialogHeader className="space-y-3">
-              <div className="mx-auto h-16 w-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+              {/* DSN-3 slice 3: this is literally the "growth-framed win" case
+                  --win-growth exists for (see design-system.md section 2).
+                  --win-growth already has real .dark overrides, so a plain
+                  arbitrary-value class tracks both modes with no dark:
+                  variant needed. */}
+              <div className="mx-auto h-16 w-16 rounded-full bg-[hsl(var(--win-growth-bg))] flex items-center justify-center">
                 <span className="text-3xl">🚀</span>
               </div>
               <AlertDialogTitle className="text-xl">That's a Pro Move!</AlertDialogTitle>
             </AlertDialogHeader>
-            
+
             <AlertDialogDescription asChild>
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
                   You flagged this as <strong className="text-foreground">low confidence</strong> on Monday and turned it around to a <strong className="text-foreground">{performanceScores[currentFocus?.id || '']}</strong> today.
                 </p>
-                <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                <p className="text-sm font-medium text-[hsl(var(--win-growth))]">
                   That is exactly the growth we're looking for.
                 </p>
               </div>

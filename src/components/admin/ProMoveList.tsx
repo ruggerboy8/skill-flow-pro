@@ -427,7 +427,13 @@ export function ProMoveList({
                   </div>
                 </TableCell>
 
-                {/* Materials Column */}
+                {/* Materials Column.
+                    DSN-3 slice 3: the video/script/audio/link chip colors are
+                    a per-resource-TYPE categorical scheme (blue/green/purple/
+                    blue), not a domain/score/status/win meaning — genuinely
+                    unmapped, same shape as DRIVER_LABELS in
+                    src/lib/constants/domains.ts and the purple pipeline-stage
+                    gap noted in the token-migration doc. Left hardcoded. */}
                 <TableCell className="align-top pl-2">
                   <div className="flex items-center gap-2 pt-1">
                     <TooltipProvider>
@@ -492,9 +498,9 @@ export function ProMoveList({
                         <TooltipTrigger asChild>
                           <span className={`inline-block text-xs font-medium px-1.5 py-0.5 rounded cursor-default ${
                             proMove.curriculum_priority >= 0.7
-                              ? 'bg-green-100 text-green-800'
+                              ? 'bg-[hsl(var(--status-complete-bg))] text-[hsl(var(--status-complete))]'
                               : proMove.curriculum_priority >= 0.4
-                              ? 'bg-amber-100 text-amber-800'
+                              ? 'bg-[hsl(var(--status-late-bg))] text-[hsl(var(--status-late))]'
                               : 'bg-muted text-muted-foreground'
                           }`}>
                             P{Math.round(proMove.curriculum_priority * 10)}
@@ -595,7 +601,7 @@ export function ProMoveList({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              <AlertTriangle className="w-5 h-5 text-[hsl(var(--status-late))]" />
               Pro-Move Has Future Assignments
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
@@ -608,7 +614,7 @@ export function ProMoveList({
                     </li>
                   ))}
                 </ul>
-                <p className="text-amber-600 dark:text-amber-400">
+                <p className="text-[hsl(var(--status-late))]">
                   Please update these weeks in the Global Assignment Builder after retiring.
                 </p>
               </div>

@@ -331,6 +331,10 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
   if (!user) return null;
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+  // DSN-3 slice 3: the teal/amber here are a role-tier color code (one hue
+  // per admin role), not one of the four locked scales and not a status —
+  // left hardcoded rather than forcing them onto --status-late/-released and
+  // making a role badge visually indistinguishable from a submission status.
   const getCurrentStatusBadge = () => {
     if (user.is_super_admin) return <Badge variant="destructive">Super Admin</Badge>;
     if ((user as any).is_clinical_director) return <Badge className="bg-teal-600 hover:bg-teal-700 text-white">Clinical Director</Badge>;
@@ -483,7 +487,10 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
             </p>
           </div>
 
-          {/* Pause Account */}
+          {/* Pause Account — DSN-3 slice 3: same "amber notice banner" gap the
+              token-migration doc flags for ThisWeekPanel's paused-account
+              banner; left hardcoded and flagged rather than guessed at, per
+              that doc's note to decide it alongside --status-info. */}
           <div className="space-y-3 p-4 bg-amber-50/50 dark:bg-amber-950/20 rounded-lg border border-amber-200/50 dark:border-amber-800/50">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -507,11 +514,13 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
             )}
           </div>
 
-          {/* Backfill */}
-          <div className="space-y-3 p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+          {/* Backfill — DSN-3 slice 3: this is the blue "info banner" pattern
+              the token-migration doc flags by name for this file; now on the
+              new --status-info token instead of hardcoded blue. */}
+          <div className="space-y-3 p-4 bg-[hsl(var(--status-info-bg))] rounded-lg border border-[hsl(var(--status-info))]">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Wrench className="h-5 w-5 text-blue-600" />
+                <Wrench className="h-5 w-5 text-[hsl(var(--status-info))]" />
                 <Label htmlFor="backfill-toggle" className="text-sm font-semibold cursor-pointer">
                   Temporary Backfill Access
                 </Label>
@@ -522,18 +531,22 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
               When enabled, this user can backfill missing confidence scores for past weeks. Permission auto-expires in 7 days.
             </p>
             {allowBackfill && user?.allow_backfill_until && new Date(user.allow_backfill_until) > new Date() && (
-              <p className="text-xs font-medium text-blue-600">
+              <p className="text-xs font-medium text-[hsl(var(--status-info))]">
                 Expires: {format(new Date(user.allow_backfill_until), 'MMM d, yyyy')} ({differenceInDays(new Date(user.allow_backfill_until), new Date())} days remaining)
               </p>
             )}
             {allowBackfill && (!user?.allow_backfill_until || new Date(user.allow_backfill_until) <= new Date()) && (
-              <p className="text-xs font-medium text-blue-600">
+              <p className="text-xs font-medium text-[hsl(var(--status-info))]">
                 Will expire: {format(addDays(new Date(), 7), 'MMM d, yyyy')}
               </p>
             )}
           </div>
 
-          {/* Doctor Portal Access (additive — works alongside any role, including Clinical Director) */}
+          {/* Doctor Portal Access (additive — works alongside any role, including Clinical Director).
+              DSN-3 slice 3: decorative color-coding to visually separate this
+              settings block from the others below, not a domain/score/status/
+              win meaning — left hardcoded per the decision tree's rule against
+              forcing decorative choices onto a semantic token. */}
           <div className="space-y-3 p-4 bg-teal-50/50 dark:bg-teal-950/20 rounded-lg border border-teal-200/50 dark:border-teal-800/50">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -553,7 +566,9 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
             </p>
           </div>
 
-          {/* Clinical Director Access (additive — independent of role preset) */}
+          {/* Clinical Director Access (additive — independent of role preset).
+              Same decorative section-accent reasoning as Doctor Portal Access
+              above — left hardcoded. */}
           <div className="space-y-3 p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-lg border border-indigo-200/50 dark:border-indigo-800/50">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

@@ -111,29 +111,40 @@ export function formatMean(mean: number | null): string {
   return mean.toFixed(1);
 }
 
-// Color thresholds for metrics
+// Color thresholds for metrics.
+// DSN-3 slice 3: these are org/location-level EVALUATION QUALITY metrics
+// (top-box rate, observer/self mismatch rate) — not a 1-4 staff confidence
+// self-rating, so the DASH-1a "confidence scores never render red" rule
+// does not apply here. A low top-box rate or high mismatch rate is a real
+// problem worth flagging red, so this reuses the --status-* good/warning/bad
+// family (same semantic as complete/late/missing) rather than the
+// non-alarm --score-* ramp. Recolor only — thresholds are unchanged. The
+// token values are a close but not pixel-identical match to the original
+// green-600/amber-600/red-600 (slightly different shade within the same
+// hue), same as other close-but-not-exact token substitutions in this
+// migration.
 export function getTopBoxColor(rate: number): string {
-  if (rate >= 40) return 'text-green-600';
-  if (rate >= 25) return 'text-amber-600';
-  return 'text-red-600';
+  if (rate >= 40) return 'text-[hsl(var(--status-complete))]';
+  if (rate >= 25) return 'text-[hsl(var(--status-late))]';
+  return 'text-[hsl(var(--status-missing))]';
 }
 
 export function getTopBoxBg(rate: number): string {
-  if (rate >= 40) return 'bg-green-50';
-  if (rate >= 25) return 'bg-amber-50';
-  return 'bg-red-50';
+  if (rate >= 40) return 'bg-[hsl(var(--status-complete-bg))]';
+  if (rate >= 25) return 'bg-[hsl(var(--status-late-bg))]';
+  return 'bg-[hsl(var(--status-missing-bg))]';
 }
 
 export function getMismatchColor(rate: number): string {
-  if (rate < 30) return 'text-green-600';
-  if (rate < 50) return 'text-amber-600';
-  return 'text-red-600';
+  if (rate < 30) return 'text-[hsl(var(--status-complete))]';
+  if (rate < 50) return 'text-[hsl(var(--status-late))]';
+  return 'text-[hsl(var(--status-missing))]';
 }
 
 export function getMismatchBg(rate: number): string {
-  if (rate < 30) return 'bg-green-50';
-  if (rate < 50) return 'bg-amber-50';
-  return 'bg-red-50';
+  if (rate < 30) return 'bg-[hsl(var(--status-complete-bg))]';
+  if (rate < 50) return 'bg-[hsl(var(--status-late-bg))]';
+  return 'bg-[hsl(var(--status-missing-bg))]';
 }
 
 // Gap interpretation

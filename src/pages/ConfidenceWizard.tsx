@@ -1188,7 +1188,7 @@ export default function ConfidenceWizard() {
             disabled={!canProceed || submitting}
             className={cn(
               "flex-[2] rounded-full transition-all duration-300",
-              submitPhase === 'done' && "bg-emerald-500 hover:bg-emerald-500"
+              submitPhase === 'done' && "bg-[hsl(var(--status-complete))] hover:bg-[hsl(var(--status-complete))]"
             )}
           >
             {submitPhase === 'done' ? (
@@ -1233,8 +1233,8 @@ export default function ConfidenceWizard() {
           <div className="p-6 space-y-4">
             <AlertDialogHeader>
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                <div className="h-10 w-10 rounded-full bg-[hsl(var(--status-late-bg))] flex items-center justify-center">
+                  <AlertCircle className="h-5 w-5 text-[hsl(var(--status-late))]" />
                 </div>
                 <AlertDialogTitle className="text-lg">Unsure? That's okay.</AlertDialogTitle>
               </div>

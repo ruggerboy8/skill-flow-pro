@@ -75,10 +75,10 @@ export default function DoctorHome() {
 
     if (baseline?.status === 'completed') {
       return (
-        <Card className="border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30">
+        <Card className="border-[hsl(var(--status-complete))] bg-[hsl(var(--status-complete-bg))]">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+              <CheckCircle2 className="h-8 w-8 text-[hsl(var(--status-complete))]" />
               <div>
                 <CardTitle>Baseline Complete</CardTitle>
                 <CardDescription>
@@ -220,6 +220,9 @@ export default function DoctorHome() {
 
       {/* All pending meeting summaries needing confirmation */}
       {pendingMeetings.map(s => (
+        // DSN-3 slice 3: purple has no matching token (same
+        // meeting_pending gap flagged elsewhere in this migration) — left
+        // hardcoded rather than guessed at.
         <Card key={s.id} className="border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/30">
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -270,10 +273,10 @@ export default function DoctorHome() {
 
       {/* Submitted preps — informational */}
       {submittedPrepSessions.map(s => (
-        <Card key={s.id} className="border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30">
+        <Card key={s.id} className="border-[hsl(var(--status-complete))] bg-[hsl(var(--status-complete-bg))]">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+              <CheckCircle2 className="h-8 w-8 text-[hsl(var(--status-complete))]" />
               <div>
                 <CardTitle>Prep Submitted</CardTitle>
                 <CardDescription>

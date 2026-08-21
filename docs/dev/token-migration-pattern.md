@@ -184,9 +184,61 @@ for a same-semantic-different-color fix (finding 6).
 | `src/components/coach/StaffPriorityFocusTab.tsx` | 9 | 1 | Confidence badge (1 or 2) → `scoreBucketTokens(scoreBucket(...))`. One `dark:bg-slate-800` card-surface class left hardcoded (decorative glass-card pattern, see §7). |
 | `src/components/my-role/ScoreHistoryV2.tsx` | 9 | 6 | QA fix (finding 6): staff-facing "Exempt" week badge (3 instances) was hardcoded amber while the coach-facing equivalent in `StaffDetailV2.tsx` already used `--status-excused` (gray) — same semantic state, two colors. Migrated to match. The remaining 6 are an unrelated blue "backfill" button, untouched and out of scope for this finding. |
 
-## 6. Remaining unmigrated surfaces (post slice-2 baseline)
+## 5a. New token: `--status-info`
 
-79 files still carry at least one hardcoded palette class, 549 instances
+Slice 2 flagged a blue "informational notice" pattern
+(`border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20` +
+matching text) with no token, appearing in `EditUserDrawer.tsx` and
+`DoctorReviewPrep.tsx`. Slice 3 added `--status-info` / `--status-info-bg`
+in `src/index.css`, same structure as every other `--status-*` pair
+(mode-invariant, no `.dark` override — matches the sibling tokens, not an
+invented design decision):
+
+```css
+--status-info: 221 83% 53%;
+--status-info-bg: 214 100% 97%;
+```
+
+These are a direct HSL conversion of Tailwind's own `blue-600` (`#2563eb`)
+and `blue-50` (`#eff6ff`) — the exact hex already in use at every call site
+this token replaces, not a new color choice. No Tailwind utility class was
+added (consistent with every other `--status-*`/`--score-*` token); consume
+via `text-[hsl(var(--status-info))]` / `bg-[hsl(var(--status-info-bg))]` or
+inline `style`. Also reused (beyond the original blue-banner gap) for the
+"this row already exists and will be updated" case in row-outcome tag
+schemes (`ProMoveImportDialog.tsx`, `BulkUpload.tsx`) — see §8's row-outcome
+note below for why that reuse, not a new "update" token, was the right call.
+
+## 5b. What slice 3 migrated
+
+Baseline: 549 → 384 (165 instances, 12 files with real migrations, plus one
+file — `AdminPage.tsx` — deliberately left untouched with a contrast finding
+recorded in §8). Target surfaces: slice 2's deferred list
+(`EditUserDrawer.tsx`, `ProMoveList.tsx`, `DoctorReviewPrep.tsx`) plus the
+next-highest-count remaining files from slice 2's §6 list.
+
+| Surface | Before | After | Notes |
+|---|---|---|---|
+| `src/pages/doctor/DoctorReviewPrep.tsx` | 22 | 2 | `PROGRESS_OPTIONS` → `--status-complete`/`--status-late` (kept in sync with the identical config in `CombinedPrepView.tsx`); `SCORE_COLORS` (1-4 self-score circle) → `--score-1..4`, solid-fill so no `-ink` needed; "Prep Complete" badge → `--status-complete`; the Step 0 prior-action-steps card + circle → `--status-late`; the coach's-pick badge → `--status-late`; the Step 4 scheduling card → the new `--status-info`. The "Awaiting Your Confirmation" purple badge (2) is left hardcoded — same no-matching-token gap as `coachingSessionStatus.ts`'s `meeting_pending` from slice 2. |
+| `src/components/clinical/CombinedPrepView.tsx` | 2 | 0 | Same `PROGRESS_OPTIONS`/`STATUS_CONFIG` fix as `DoctorReviewPrep.tsx` (duplicated config, kept in sync — same pattern as slice 2's `DoctorProMoveDrawer`/`DoctorMaterialsSheet`). |
+| `src/components/admin/EditUserDrawer.tsx` | 26 | 19 | The "Backfill" section is the exact blue info-banner gap this file was named for in slice 2 — migrated to the new `--status-info`. The Clinical Director (teal) / Regional Manager (amber) role badges, the "Pause Account" amber notice banner, and the Doctor Portal / Clinical Director Access decorative section accents (teal/indigo) are left hardcoded — see §8. |
+| `src/components/admin/ProMoveList.tsx` | 19 | 12 | Curriculum-priority badge (high/medium/muted) → `--status-complete`/`--status-late`; the retirement-warning `AlertTriangle` icon and its follow-up text → `--status-late`. The video/script/audio/link material-type icon chips (12) are left hardcoded — see §8. |
+| `src/lib/doctorStatus.ts` | 10 | 0 | All five `DoctorJourneyStatus` stages that render a `colorClass` → tokens. `baseline_in_progress` → `--status-late` (matches `TrackStatus.in_progress`'s existing convention exactly); `baseline_submitted` → `--status-complete`; `coach_baseline_pending`/`ready_for_prep`/`baseline_released` → `--status-released` (blue reuse — "waiting on the next actor," the same reuse pattern already used for `--status-late` elsewhere in this doc). |
+| `src/types/evalMetricsV2.ts` | 12 | 0 | `getTopBoxColor`/`getTopBoxBg`/`getMismatchColor`/`getMismatchBg` → `--status-complete`/`--status-late`/`--status-missing`. These are org/location EVALUATION-QUALITY metrics (top-box rate, observer/self mismatch), not a 1-4 confidence self-rating, so the DASH-1a "never render red" rule does not apply — a low top-box rate is a real problem worth flagging red. Thresholds unchanged, recolor only. |
+| `src/pages/doctor/DoctorHome.tsx` | 17 | 5 | "Baseline Complete" and "Prep Submitted" cards → `--status-complete`. The pending-meeting-confirmation card (purple) is left hardcoded — same `meeting_pending` gap as above. |
+| `src/pages/EvaluationViewer.tsx` | 16 | 2 | `ReadOnlyScore`'s hand-rolled `SCORE_PILLS` map replaced with `scoreBucketTokens()` — the same 1-4 observer/self score `EvaluationHub.tsx` already migrated in slice 1, now sharing one helper instead of a second hardcoded copy (band 1: red → orange, the same DASH-1a hue shift as `RatingBandCollapsible.tsx`). Note-source badge: "Self" (was slate) → `bg-muted`/`text-muted-foreground`; "Observer" (blue) left hardcoded as a source-attribution color with no domain/score/status/win meaning. |
+| `src/components/doctor/DomainAssessmentStep.tsx` | 16 | 0 | `SCORE_COLORS` (1-4 self-rating buttons, doctor baseline) → `scoreBucketTokens()`, `-bg`+`-ink` for the selected fill/text (same pairing CoachBaselineWizard already uses) and vivid for the legend dot. **Real hue swap, not just a softer shade — see the "Behavior changes" section below.** |
+| `src/components/platform/ProMoveImportDialog.tsx` | 10 | 0 | Row-outcome tags (new/update/error) → `--status-complete`/`--status-info`/`--status-missing`. Outline badges have no bg fill, so the vivid tokens are safe with no text-on-tint contrast concern. |
+| `src/components/admin/BulkUpload.tsx` | 13 | 0 | Same row-outcome mapping as `ProMoveImportDialog.tsx` (an older, parallel CSV-upload flow with the identical new/update/error pattern). Also migrated its decorative gray dropzone border/text to `border-muted-foreground/30`/`text-muted-foreground` (generic UI chrome, not a status). |
+| `src/components/admin/eval-results-v2/DomainDistributionRow.tsx` | 11 | 0 | 1-4 rating-distribution bar segments → `--score-1..4` (solid fill, band 1 red → orange); `getScoreColor()` (mean-score text) → `scoreBucketTokens(scoreBucket(...))`, replacing a hand-rolled `>=3.0`/`>=2.5` traffic light. **Real threshold/hue change — see "Behavior changes" below.** Per-segment hover-darken (no darker score-token shade exists) replaced with `hover:opacity-80`. |
+| `src/components/admin/eval-results-v2/LocationDomainDistribution.tsx` | 11 | 0 | Identical fix to `DomainDistributionRow.tsx` above (duplicated distribution-bar component, kept in sync), plus the Obs/Self mean labels using the same `getScoreColor()`. |
+| `src/pages/ConfidenceWizard.tsx` | 11 | 5 | The "done" submit-button state → `--status-complete`; the "Unsure? That's okay" intervention-modal icon box → `--status-late`. The glass-card `dark:bg-slate-*`/`dark:border-slate-700/40` classes (5) are the decorative pattern slice 2 already named this file for — left alone. |
+| `src/pages/PerformanceWizard.tsx` | 9 | 3 | The "That's a Pro Move!" growth-celebration modal → `--win-growth`/`-bg` (a literal match for the token's documented purpose, and it already has real `.dark` overrides, so no `dark:` class was needed at all); the "done" submit-button state → `--status-complete`. Same glass-card gap (3) left alone. |
+| `src/components/admin/StepBar.tsx` | 8 | 0 | Generic step-progress indicator: completed → `--status-complete` (solid fill); current → `primary`/`primary-foreground` (brand chrome — "the active step" is exactly the primary-action semantic, decision-tree bucket 2); upcoming/label text → `muted`/`muted-foreground` (already tokens). |
+
+## 6. Remaining unmigrated surfaces (post slice-3 baseline)
+
+70 files still carry at least one hardcoded palette class, 384 instances
 total. `OnTimeRateWidget.tsx` and `LocationSubmissionWidget.tsx` (30 each)
 remain out of scope (Command Center / `RegionalDashboard`, owned by DASH
 tickets).
@@ -197,15 +249,15 @@ Highest-count remaining files, for whoever scopes the next slice:
 |---|---|
 | `src/components/coach/OnTimeRateWidget.tsx` | 30 (dashboard, excluded) |
 | `src/components/dashboard/LocationSubmissionWidget.tsx` | 30 (dashboard, excluded) |
-| `src/components/admin/EditUserDrawer.tsx` | 26 |
 | `src/components/home/ThisWeekPanel.tsx` | 25 (see §7 — mostly the decorative glass-border pattern plus the unmapped amber notice banner) |
-| `src/pages/doctor/DoctorReviewPrep.tsx` | 22 (shares the blue "backfill" info-banner pattern with `EditUserDrawer.tsx` — do them together, see the `--status-info` gap below) |
-| `src/components/admin/ProMoveList.tsx` | 19 |
-| `src/pages/doctor/DoctorHome.tsx` | 17 |
-| `src/components/doctor/DomainAssessmentStep.tsx` | 16 |
-| `src/lib/constants/domains.ts` | 16 |
-| `src/pages/EvaluationViewer.tsx` | 16 |
-| ... 70 more files, 1-13 instances each | see `scripts/hardcoded-colors-baseline.json` for the full per-file list |
+| `src/components/admin/EditUserDrawer.tsx` | 19 (down from 26 in slice 3 — see §8; the remaining 19 are a role-tier badge color code and two decorative settings-section accents, left hardcoded on purpose) |
+| `src/lib/constants/domains.ts` | 16 (the `DRIVER_LABELS` 4-category tag scheme — see §8, same "no matching token" reasoning as the purple pipeline-stage gap) |
+| `src/components/clinical/DirectorPrepComposer.tsx` | 13 (excluded — owned by another agent tonight) |
+| `src/components/admin/ProMoveList.tsx` | 12 (down from 19 in slice 3 — the remaining 12 are the video/script/audio/link material-type icon chips, see §8) |
+| `src/components/home/ChristmasWelcome.tsx` | 12 (purely decorative seasonal banner gradient — considered and left alone, see §8) |
+| `src/pages/AdminPage.tsx` | 10 (considered and left alone — real contrast finding, see §8) |
+| `src/components/admin/SlotPreview.tsx` | 9 |
+| ... 61 more files, 1-8 instances each | see `scripts/hardcoded-colors-baseline.json` for the full per-file list |
 
 Run `node scripts/check-hardcoded-colors.mjs --update-baseline` after any
 future migration slice lands to see the current full list and confirm the
@@ -254,25 +306,46 @@ recategorizes what coaching staff visually read as "needs attention" at
 several call sites. Flag it in QA/visual review specifically; don't assume
 "same avg, different hex" the way most of this migration's other fixes are.
 
-- **`--status-info`-shaped gap.** The blue "informational notice" pattern
+**Slice 3 additions to the same finding:**
+
+4. **`DomainDistributionRow.tsx` and `LocationDomainDistribution.tsx`**
+   (`getScoreColor()`, the eval-results-v2 domain-average label) had the
+   exact same `>=3.0` green / `>=2.5` amber / else red scheme as the three
+   files above, now on `scoreBucketTokens(scoreBucket(...))` — same two
+   boundary changes (2.5→2.0 low-tier line, 3.0-3.9 green→blue) apply here
+   too.
+5. **`DomainAssessmentStep.tsx`'s `SCORE_COLORS` is a different kind of
+   change: a hue SWAP, not a threshold shift.** This is a doctor
+   self-rating scale (1 = worst, 4 = best), not a confidence average, so
+   `scoreBucket()` doesn't apply — it's a direct 1:1 recolor onto
+   `--score-1..4`. But the original tier order was **amber for 1, orange
+   for 2** — the *opposite* of the DASH-1a ramp's **orange for 1 (`--score-1`),
+   amber for 2 (`--score-2`)**. The migration doesn't just soften either
+   color, it swaps which hue tier 1 vs tier 2 wears: a doctor who previously
+   rated themselves "1 - I rarely do this" saw an amber button; they'll now
+   see orange, and the tier that used to be orange (rating 2) is now amber.
+   Tiers 3 (blue) and 4 (green/emerald) are unchanged in hue. Flag this
+   specifically in visual QA — it reads as "the colors got shuffled," not
+   just "got recolored."
+
+- **`--status-info`-shaped gap — RESOLVED in slice 3.** See §5a above: the
+  blue "informational notice" pattern
   (`border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20`
-  + matching text/button treatment) appears in at least three files
-  (`Index.tsx`, migrated in slice 1; `EditUserDrawer.tsx` and
-  `DoctorReviewPrep.tsx`, still not migrated). It doesn't cleanly fit
-  domain, score, status, or win, and isn't decorative either. A real
-  `--status-info` (or `--info-*`) token pair, with light and dark values
-  chosen on purpose, would be a cleaner fix than more ad hoc brand-token
-  mappings. Candidate for a DSN-5d or DSN-3 slice-3 follow-up.
-- **Amber "notice" banners (distinct from the info-banner gap above).**
-  `ThisWeekPanel.tsx`'s paused-account and exempt-week banners, and the
-  identical pattern in `WeekBuilderPanel.tsx` / `DoctorReviewPrep.tsx`, use
+  + matching text) is now `--status-info`/`-bg`, migrated at both remaining
+  call sites (`EditUserDrawer.tsx`'s Backfill section,
+  `DoctorReviewPrep.tsx`'s scheduling-confirmation card), matching
+  `Index.tsx`'s slice-1 migration.
+- **Amber "notice" banners (distinct from the info-banner gap above) —
+  still open.** `ThisWeekPanel.tsx`'s paused-account and exempt-week
+  banners, `EditUserDrawer.tsx`'s "Pause Account" section (considered again
+  in slice 3, deliberately left alone — see §8), and the identical pattern
+  in `WeekBuilderPanel.tsx` / `DoctorReviewPrep.tsx`, use
   `bg-amber-50 border-amber-200` + amber text as a general "heads up,
   nothing to do" notice — not a status pill, a whole banner. Mapping it to
   `--status-excused` (the closest semantic match — "no penalty this week")
   would flip the banner from amber to neutral gray, a bigger visual change
   than a like-for-like migration should make unilaterally. Left hardcoded
-  and flagged rather than guessed at; worth deciding alongside the
-  `--status-info` gap above since both are "banner, not pill" cases.
+  and flagged rather than guessed at.
 - **Pipeline stages with no matching token (sky, purple).**
   `coachingSessionStatus.ts`'s `scheduling_invite_sent` (sky) and
   `meeting_pending` (purple), and `MATERIAL_SECTIONS`'s "Gut Check
@@ -283,7 +356,10 @@ several call sites. Flag it in QA/visual review specifically; don't assume
   distinct categories indistinguishable, which defeats the point of the
   color coding. Left hardcoded rather than guessed at. If a future ticket
   adds more non-alarm hues to the token set, these are the two consumers
-  waiting for them.
+  waiting for them. **Slice 3 found two more `meeting_pending`-purple
+  consumers of the same gap**: `DoctorReviewPrep.tsx`'s "Awaiting Your
+  Confirmation" badge and `DoctorHome.tsx`'s pending-meeting-confirmation
+  card — both left hardcoded for the same reason.
 - **Score band 1 hue shift (flag for visual QA, not a gap).**
   `RatingBandCollapsible.tsx` and `LocationSkillGaps.tsx` /
   `StaffOverviewTab.tsx` / `StaffDetailV2.tsx` / `StaffPriorityFocusTab.tsx`
@@ -382,3 +458,62 @@ several call sites. Flag it in QA/visual review specifically; don't assume
   same vivid-on-tint pattern in `scoreTextStyle()` but predates this slice
   and wasn't touched — worth a follow-up ticket rather than scope-creeping
   it into this QA fix.
+
+## 8. Slice 3 findings: items considered and deliberately left alone
+
+- **Role-tier badge color code, `EditUserDrawer.tsx`'s `getCurrentStatusBadge()`.**
+  Clinical Director (teal) and Regional Manager (amber, solid-fill) are a
+  per-role color code, not a domain/score/status/win meaning and not
+  generic chrome either. Reusing `--status-late`'s amber for "Regional
+  Manager" would make a role badge visually indistinguishable from a
+  submission-status pill sitting in the same admin table. Left hardcoded.
+- **Decorative settings-section accents, `EditUserDrawer.tsx`'s "Doctor
+  Portal Access" (teal) and "Clinical Director Access" (indigo) blocks.**
+  These exist purely to help an admin visually tell the toggle sections
+  apart on a long form — no domain/score/status/win meaning, and forcing
+  them onto shared chrome tokens (`border`/`muted`) would flatten every
+  section to the same gray and defeat the point. Left hardcoded (decision
+  tree §1.4).
+- **Material-type icon chips, `ProMoveList.tsx`'s Materials column
+  (video=blue, script=green, audio=purple, link=blue).** A per-resource-TYPE
+  categorical scheme, structurally identical to `DRIVER_LABELS` below and to
+  the purple pipeline-stage gap — purple has no token, and forcing the
+  other three onto existing tokens while purple stays hardcoded would be a
+  half-migrated, inconsistent chip set. Left hardcoded as a set.
+- **`DRIVER_LABELS` in `src/lib/constants/domains.ts` (16 instances,
+  `C`/`R`/`E`/`D` sequencer-driver tags: blue/purple/amber/green).** Same
+  4-category reasoning as the material-type chips above — no locked scale
+  fits "why was this Pro Move recommended," and purple again has no token.
+  Left hardcoded as a set rather than migrating 3 of 4 and leaving purple
+  behind.
+- **`ChristmasWelcome.tsx` (12 instances, all in one gradient banner).**
+  Purely decorative seasonal styling ("Happy New Year 2025!") with zero
+  domain/score/status/win meaning — decision tree §1.4's textbook case.
+  Left untouched. (Whether this banner should still exist at all — the
+  copy references a year that has passed — is a product question outside
+  this migration's scope, not something this slice fixed or flagged as a
+  bug; noting it only so a future pass doesn't rediscover the same "why is
+  this still here" question from scratch.)
+- **`AdminPage.tsx`'s "Complete your practice setup" banner (10 instances)
+  — new contrast finding, left untouched on purpose.** This banner uses
+  three different amber darkness levels for a heading (`amber-900`), body
+  text (`amber-800`), and a solid CTA button (`amber-600`/`amber-700`).
+  `--status-late` (the amber reuse this migration leans on everywhere else)
+  is `hsl(45 93% 47%)` — close to Tailwind's `amber-500` — which computes to
+  roughly **2:1 contrast** against its own `-bg` tint or a white card,
+  well under the 4.5:1 WCAG minimum for normal text. Every other
+  `--status-late` reuse in this slice and slice 2 is either a small badge
+  (StatusBadge's own established, if unaudited, pattern) or large/bold text
+  (≥18px bold clears the 3:1 large-text bar even at this contrast). This
+  banner's body paragraph and heading are neither. Rather than introduce
+  the first prominent-paragraph use of a token that may not actually be
+  readable there, this slice left the whole banner hardcoded and is
+  flagging the underlying gap: **`--status-late` (and every other
+  `--status-*` base token) has no `-ink` variant**, unlike `--score-*`,
+  even though the same slice-2 QA finding that added `-ink` for scores
+  ("vivid-on-tint fails contrast for text") applies equally to status
+  tokens — it just hasn't been caught elsewhere yet because no other
+  consumer puts status-colored text at paragraph size. Worth a real
+  accessibility pass on `StatusBadge.tsx` and a `--status-*-ink` token
+  family as a follow-up ticket; not something to invent inline in a
+  migration slice.

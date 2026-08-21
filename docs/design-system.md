@@ -183,8 +183,14 @@ Two status families share the `--status-*` tokens, both rendered through
   `in_progress`, `completed`, `locked`.
 
 Base tokens: `--status-complete`, `--status-missing`, `--status-late`,
-`--status-excused`, `--status-pending`, `--status-released` (each with a
-`-bg` variant). Several `DeliveryStatus`/`TrackStatus` values deliberately
+`--status-excused`, `--status-pending`, `--status-released`, `--status-info`
+(each with a `-bg` variant). `--status-info` was added in DSN-3 slice 3 for
+the blue "informational notice" banner pattern (`border-blue-200
+bg-blue-50/50` + matching text) that had no token through slices 1-2 — see
+`docs/dev/token-migration-pattern.md` §5a. It isn't wired into
+`StatusBadge.tsx`'s `statusConfig` (no `SubmissionStatus`/`DeliveryStatus`/
+`TrackStatus` value is literally "info"); consume it directly via the CSS
+var, same as `--score-*`. Several `DeliveryStatus`/`TrackStatus` values deliberately
 **reuse** an existing status token rather than getting their own — e.g.
 `draft` and `viewed` both reuse `--status-late`'s amber as a general
 "warning/in-progress" color, not literally about lateness. `no_eval` and
@@ -276,10 +282,10 @@ The guard, `scripts/check-hardcoded-colors.mjs` (`npm run check:colors`,
 part of `npm run check`), ratchets the count of raw Tailwind palette classes
 in `src/**/*.{ts,tsx}` down over time and fails the build if it goes up.
 
-A known gap flagged by that doc and still open: no `--status-info` token
-exists for the blue "informational notice" pattern used in at least three
-files. Don't invent it in a docs-only or migration ticket — it's a token
-design decision for its own ticket.
+`--status-info` (section 2 above) fills the blue "informational notice" gap
+this doc previously flagged as open — added in DSN-3 slice 3, following the
+existing `--status-*` structure exactly (a direct HSL conversion of the
+Tailwind blue already in use at every call site, not an invented color).
 
 ## 6. Motion (DSN-5c)
 

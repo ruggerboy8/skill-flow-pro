@@ -106,6 +106,17 @@ All colors MUST be HSL.
     /* DSN-4: added for the delivery-status pill (draft/released/… workflow) */
     --status-released: 211 85% 45%;
     --status-released-bg: 211 100% 94%;
+    /* DSN-3 slice 3: fills the "--status-info" gap flagged by slice 2 for
+    the blue "informational notice" banner pattern (border-blue-200
+    bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20 + text-blue-600),
+    repeated across Index.tsx (migrated slice 1), EditUserDrawer.tsx, and
+    DoctorReviewPrep.tsx. Values are a direct HSL conversion of Tailwind's
+    own blue-600 (#2563eb) / blue-50 (#eff6ff), the exact hex already in use
+    at every one of those call sites, not an invented design decision.
+    Mode-invariant, same structure as the other --status-* tokens (no .dark
+    override). */
+    --status-info: 221 83% 53%;
+    --status-info-bg: 214 100% 97%;
 
     /* Win banner colors */
     --win-growth: 160 84% 39%;

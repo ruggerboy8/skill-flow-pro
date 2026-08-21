@@ -3,6 +3,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { TrendingUp } from 'lucide-react';
 import { getDomainColorVar } from '@/lib/domainColors';
 import { formatMean } from '@/types/evalMetricsV2';
+import { scoreBucket, scoreBucketTokens } from '@/lib/confidenceScoreRamp';
 
 interface DomainDistribution {
   name: string;
@@ -67,11 +68,17 @@ function DomainChart({ domain }: { domain: DomainDistribution }) {
   const p3 = Math.round((three / total) * 100);
   const p4 = Math.round((four / total) * 100);
   
+  // DSN-3 slice 3: 1-4 rating distribution bar → --score-1..4, DASH-1a
+  // ramp (band 1 shifts red → orange, same intentional hue change flagged
+  // elsewhere in this migration). Solid-fill segments, so the vivid token
+  // is fine — no text-on-tint contrast concern. The tokens have no darker
+  // "hover" shade, so the per-segment darken-on-hover is replaced with a
+  // simple opacity dim instead of dropping the hover affordance entirely.
   const segments = [
-    { score: 1, count: one, percent: p1, color: 'bg-red-500', hoverColor: 'hover:bg-red-600' },
-    { score: 2, count: two, percent: p2, color: 'bg-orange-400', hoverColor: 'hover:bg-orange-500' },
-    { score: 3, count: three, percent: p3, color: 'bg-amber-300', hoverColor: 'hover:bg-amber-400' },
-    { score: 4, count: four, percent: p4, color: 'bg-green-500', hoverColor: 'hover:bg-green-600' },
+    { score: 1, count: one, percent: p1, color: 'hsl(var(--score-1))' },
+    { score: 2, count: two, percent: p2, color: 'hsl(var(--score-2))' },
+    { score: 3, count: three, percent: p3, color: 'hsl(var(--score-3))' },
+    { score: 4, count: four, percent: p4, color: 'hsl(var(--score-4))' },
   ];
 
   return (
@@ -85,9 +92,9 @@ function DomainChart({ domain }: { domain: DomainDistribution }) {
             seg.percent > 0 && (
               <Tooltip key={seg.score}>
                 <TooltipTrigger asChild>
-                  <div 
-                    className={`${seg.color} ${seg.hoverColor} transition-colors cursor-default`}
-                    style={{ width: `${seg.percent}%` }}
+                  <div
+                    className="transition-opacity hover:opacity-80 cursor-default"
+                    style={{ width: `${seg.percent}%`, backgroundColor: seg.color }}
                   />
                 </TooltipTrigger>
                 <TooltipContent side="top" className="text-center">
@@ -119,12 +126,12 @@ function DomainChart({ domain }: { domain: DomainDistribution }) {
 function DomainHeader({ name, avg }: { name: string; avg: number | null }) {
   const domainColor = getDomainColorVar(name);
   const avgColor = getScoreColor(avg);
-  
+
   return (
     <div className="flex items-center justify-between">
-      <div 
+      <div
         className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-        style={{ 
+        style={{
           backgroundColor: domainColor + '20',
           borderLeft: `3px solid ${domainColor}`,
           color: '#000'
@@ -133,7 +140,7 @@ function DomainHeader({ name, avg }: { name: string; avg: number | null }) {
         {name}
       </div>
       {avg !== null && (
-        <span className={`text-sm font-bold ${avgColor}`}>
+        <span className="text-sm font-bold" style={{ color: avgColor }}>
           {formatMean(avg)}
         </span>
       )}
@@ -141,9 +148,18 @@ function DomainHeader({ name, avg }: { name: string; avg: number | null }) {
   );
 }
 
+// DSN-3 slice 3: reuses the DASH-1a scoreBucket() ramp instead of a
+// hand-rolled red/amber/green traffic light — same fix slice 2 applied to
+// LocationSkillGaps.tsx/StaffOverviewTab.tsx/StaffDetailV2.tsx. NOT a pure
+// recolor: the old cutoffs were >=3.0 green / >=2.5 amber / else red;
+// scoreBucket() buckets [3,4) into --score-3 (BLUE, not green — green is
+// reserved for a full 4.0) and moves the low-tier line from 2.5 to 2.0. A
+// domain averaging 2.6-2.9 used to read amber and now reads --score-2
+// (still amber, no change); a domain averaging 3.0-3.9 used to read green
+// and now reads --score-3's blue. This is the same documented behavior
+// change as the token-migration doc's section 7 finding, applied to a new
+// call site — not a bug.
 function getScoreColor(score: number | null): string {
-  if (score === null) return 'text-muted-foreground';
-  if (score >= 3.0) return 'text-green-600';
-  if (score >= 2.5) return 'text-amber-600';
-  return 'text-red-600';
+  const tokens = scoreBucketTokens(scoreBucket(score ?? NaN));
+  return tokens.text;
 }

@@ -40,9 +40,11 @@ interface Props {
   doctorName?: string;
 }
 
+// DSN-3 slice 3: reuses --status-complete/--status-late, kept in sync with
+// the identical PROGRESS_OPTIONS config in DoctorReviewPrep.tsx.
 const STATUS_CONFIG: Record<string, { label: string; icon: typeof CheckCircle2; colorClass: string }> = {
-  going_well: { label: 'Going well', icon: CheckCircle2, colorClass: 'text-emerald-600' },
-  working_on_it: { label: 'Working on it', icon: Clock, colorClass: 'text-amber-600' },
+  going_well: { label: 'Going well', icon: CheckCircle2, colorClass: 'text-[hsl(var(--status-complete))]' },
+  working_on_it: { label: 'Working on it', icon: Clock, colorClass: 'text-[hsl(var(--status-late))]' },
   not_started: { label: "Haven't started", icon: Circle, colorClass: 'text-muted-foreground' },
 };
 

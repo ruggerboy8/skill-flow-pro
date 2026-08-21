@@ -174,13 +174,19 @@ All colors MUST be HSL.
     /* Score colors (1–4 scale) */
     --score-1: 24 95% 53%;
     --score-2: 45 93% 47%;
-    --score-3: 211 85% 55%;
+    /* DSN-9: was 211 85% 55% (blue) — blue broke the traffic-light read of
+       the ramp. Now a light yellow-green (Tailwind lime-500 territory),
+       greener than --score-2's amber (39° hue separation) and lighter/
+       yellower than --score-4's green (76° hue separation), so the ramp
+       reads orange -> amber -> light green -> green. */
+    --score-3: 84 80% 44%;
     --score-4: 160 84% 39%;
 
     /* Score colors pastel (backgrounds) */
     --score-1-bg: 24 100% 93%;
     --score-2-bg: 45 100% 90%;
-    --score-3-bg: 211 100% 92%;
+    /* DSN-9: was 211 100% 92% (blue) — Tailwind lime-100 territory. */
+    --score-3-bg: 80 89% 89%;
     --score-4-bg: 160 84% 90%;
 
     /* Mobile shell: ink pairs for tinted surfaces + muted text on tint */
@@ -194,7 +200,10 @@ All colors MUST be HSL.
     --missing-ink: 0 70% 35%;
     --score-1-ink: 24 85% 27%;
     --score-2-ink: 40 80% 25%;
-    --score-3-ink: 211 70% 30%;
+    /* DSN-9: was 211 70% 30% (blue) — Tailwind lime-800 territory. 6.41:1
+       against --score-3-bg (80 89% 89%), comfortably above the 4.5:1 text
+       minimum. */
+    --score-3-ink: 86 69% 23%;
     --score-4-ink: 160 84% 20%;
    }
 
@@ -261,13 +270,17 @@ All colors MUST be HSL.
     /* Score colors (1–4 scale) */
     --score-1: 24 95% 53%;
     --score-2: 45 93% 47%;
-    --score-3: 211 85% 55%;
+    /* DSN-9: was 211 85% 55% (blue), see :root above. Base hue/lightness is
+       unchanged between :root and .dark, same as the other three buckets. */
+    --score-3: 84 80% 44%;
     --score-4: 160 84% 39%;
 
     /* Score colors pastel (backgrounds) — dark-tuned, see domain pastels above */
     --score-1-bg: 24 50% 22%;
     --score-2-bg: 45 50% 22%;
-    --score-3-bg: 211 50% 22%;
+    /* DSN-9: was 211 50% 22% (blue) — same hue-keep/halve-saturation/
+       drop-lightness-to-~20s transform used for the other three buckets. */
+    --score-3-bg: 80 50% 21%;
     --score-4-bg: 160 50% 20%;
 
     /* Win banner colors — dark-tuned so the Recognition/Recent Win cards don't
@@ -317,7 +330,10 @@ All colors MUST be HSL.
     --missing-ink: 0 70% 80%;
     --score-1-ink: 24 85% 80%;
     --score-2-ink: 40 80% 80%;
-    --score-3-ink: 211 70% 80%;
+    /* DSN-9: was 211 70% 80% (blue) — same hue/saturation as the light-mode
+       ink above, lightness raised to 80% like the other three buckets.
+       7.02:1 against the dark --score-3-bg. */
+    --score-3-ink: 86 69% 80%;
     --score-4-ink: 160 84% 80%;
   }
 }

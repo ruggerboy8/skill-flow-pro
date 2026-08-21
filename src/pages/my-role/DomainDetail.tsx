@@ -35,24 +35,29 @@ function getAverageBadge(score: number | null): { label: string; icon: typeof Tr
       },
     };
   }
+  // DSN-9 QA follow-up (Codex, PR #76): `color` was the vivid --score-N as
+  // text on -bg, the same mistake fixed in CompetencyAccordion.tsx just
+  // above this component on the page — band 3 measured ~1.9:1 under the
+  // new lime, already failing before that (2.89:1 on the old blue). Routed
+  // through -ink for all three bands: 6.47 / 6.41 / 6.96 : 1.
   if (score >= 3.5) {
     return {
       label: 'Mastery',
       icon: Trophy,
-      style: { backgroundColor: 'hsl(var(--score-4-bg))', color: 'hsl(var(--score-4))' },
+      style: { backgroundColor: 'hsl(var(--score-4-bg))', color: 'hsl(var(--score-4-ink))' },
     };
   }
   if (score >= 2.5) {
     return {
       label: 'Proficient',
       icon: Sparkles,
-      style: { backgroundColor: 'hsl(var(--score-3-bg))', color: 'hsl(var(--score-3))' },
+      style: { backgroundColor: 'hsl(var(--score-3-bg))', color: 'hsl(var(--score-3-ink))' },
     };
   }
   return {
     label: 'Building',
     icon: TrendingUp,
-    style: { backgroundColor: 'hsl(var(--score-2-bg))', color: 'hsl(var(--score-2))' },
+    style: { backgroundColor: 'hsl(var(--score-2-bg))', color: 'hsl(var(--score-2-ink))' },
   };
 }
 

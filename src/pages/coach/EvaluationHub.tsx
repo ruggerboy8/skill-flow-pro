@@ -64,26 +64,33 @@ import { RichTextEditor } from '@/components/ui/RichTextEditor';
 // few hundred lines down in this same file). Style objects instead of
 // className strings because there are no bg-score-N/text-score-N Tailwind
 // utilities defined (score tokens are consumed via inline style elsewhere).
+//
+// DSN-9 QA follow-up (Codex, PR #76): `color` was the vivid --score-N as
+// text on -bg for all four options, the same mistake fixed in
+// CompetencyAccordion.tsx/DomainDetail.tsx — this file's own DSN-3 comment
+// above name-checks both as sibling patterns but didn't actually match
+// them. Routed through -ink for all four bands: 7.24 / 6.47 / 6.41 /
+// 6.96 : 1.
 const SCORE_OPTIONS = [
   {
     value: 1,
     label: '1 - Needs Development',
-    style: { backgroundColor: 'hsl(var(--score-1-bg))', color: 'hsl(var(--score-1))', borderColor: 'hsl(var(--score-1) / 0.4)' },
+    style: { backgroundColor: 'hsl(var(--score-1-bg))', color: 'hsl(var(--score-1-ink))', borderColor: 'hsl(var(--score-1) / 0.4)' },
   },
   {
     value: 2,
     label: '2 - Developing',
-    style: { backgroundColor: 'hsl(var(--score-2-bg))', color: 'hsl(var(--score-2))', borderColor: 'hsl(var(--score-2) / 0.4)' },
+    style: { backgroundColor: 'hsl(var(--score-2-bg))', color: 'hsl(var(--score-2-ink))', borderColor: 'hsl(var(--score-2) / 0.4)' },
   },
   {
     value: 3,
     label: '3 - Proficient',
-    style: { backgroundColor: 'hsl(var(--score-3-bg))', color: 'hsl(var(--score-3))', borderColor: 'hsl(var(--score-3) / 0.4)' },
+    style: { backgroundColor: 'hsl(var(--score-3-bg))', color: 'hsl(var(--score-3-ink))', borderColor: 'hsl(var(--score-3) / 0.4)' },
   },
   {
     value: 4,
     label: '4 - Advanced',
-    style: { backgroundColor: 'hsl(var(--score-4-bg))', color: 'hsl(var(--score-4))', borderColor: 'hsl(var(--score-4) / 0.4)' },
+    style: { backgroundColor: 'hsl(var(--score-4-bg))', color: 'hsl(var(--score-4-ink))', borderColor: 'hsl(var(--score-4) / 0.4)' },
   },
 ];
 
@@ -1722,8 +1729,11 @@ export function EvaluationHub() {
                               <span
                                 className="px-1.5 py-0.5 rounded text-2xs font-medium uppercase tracking-wide"
                                 style={{
+                                  // DSN-9 QA follow-up: same vivid-on-bg
+                                  // contrast bug as SCORE_OPTIONS above,
+                                  // found while fixing that. -ink text.
                                   backgroundColor: 'hsl(var(--score-2-bg))',
-                                  color: 'hsl(var(--score-2))',
+                                  color: 'hsl(var(--score-2-ink))',
                                 }}
                                 title="Based on a single weekly submission — weigh carefully."
                               >

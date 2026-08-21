@@ -472,12 +472,29 @@ not just a different hex. Two concrete boundary changes:
    green (`--score-4`, 160°) for a full 4.0. **A domain averaging 3.5 used
    to render green; it now renders blue.** Nothing between 3.0 and 3.9 will
    read as "green/done" anymore — only a perfect 4.0 average does.
+   **(DSN-9, 2026-08-21): this is stale.** The blue described here made the
+   band 2 above stand out more, not less, once it became the common case —
+   the opposite of what a "good" tier should do. `--score-3` is now a light
+   yellow-green (lime hue, 84°) instead of blue, so 3.0-3.9 reads as a
+   lighter, yellower green next to `--score-4`'s green rather than as an
+   unrelated blue. The 2.5/3.0 boundary-shift analysis above is unaffected;
+   only the hue changed.
 3. **`LocationSkillGaps.tsx` also had two disagreeing schemes in the same
    file** — its per-move badge (`getConfidenceColor`, cutoffs 2.0/3.0)
    didn't match its domain chips (cutoffs 2.5/3.0), so the same 2.3 average
    could show red in one part of the card and amber in another. The
    unification also fixes that internal inconsistency, which is a genuine
    improvement, not just a side effect.
+4. **(DSN-9 QA follow-up, 2026-08-21) `EvaluationViewer.tsx`'s read-only
+   score pills moved from a hand-rolled red/orange/blue/green scheme to the
+   `--score-N` tokens.** This is the same rule as #2 above, applied to a
+   file the original DSN-9 sweep didn't catch because it doesn't share the
+   `--score-3` token's blue hue with anything else — it hardcoded its own
+   independent blue for band 3. Fixing it changes **band 1 from red to
+   orange**: `scoreBucket()`/the rest of the score ramp never renders a 1
+   as red (confidence/skill scores are never a red/green traffic light),
+   but this pill scheme did, so a rating of 1 in `EvaluationViewer.tsx`
+   reads as orange now, matching every other score-1 surface in the app.
 
 None of this is a bug in the migration — the DASH-1a score ramp is the
 system of record and `confidenceScoreRamp.ts` is already tested — but it is

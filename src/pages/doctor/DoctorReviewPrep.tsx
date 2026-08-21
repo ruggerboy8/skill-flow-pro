@@ -44,14 +44,20 @@ import { MeetingConfirmationCard } from '@/components/doctor/MeetingConfirmation
 
 const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
 
-// DSN-3 slice 3: 1-4 self-score → --score-1..4. Solid-fill circle with white
-// text (not tinted-bg-plus-colored-text), so the vivid token is fine here —
-// no -ink needed, same reasoning as CoachBaselineWizard's solid pulse dot.
+// DSN-9 QA follow-up (supersedes DSN-3 slice 3's solid vivid fill here):
+// white text on the solid vivid fill fails 4.5:1 for EVERY band, not just
+// the old blue (band 1: 2.85:1, band 2: 1.98:1, band 3 on the new lime:
+// 2.02:1, band 4: 2.59:1) — dark ink text on the same solid fill still
+// fails all four (2.95-3.64:1). Moved to the established ink-on-bg pattern
+// (bg = -bg pastel, text = -ink, border = vivid) already used by
+// RatingBandCollapsible/CoachBaselineWizard/ClinicalBaselineResults, which
+// clears 4.5:1 for all four bands (6.41-7.24:1); the border keeps the
+// badge's circle-of-color visual weight close to the old solid fill.
 const SCORE_COLORS: Record<number, string> = {
-  4: 'hsl(var(--score-4))',
-  3: 'hsl(var(--score-3))',
-  2: 'hsl(var(--score-2))',
-  1: 'hsl(var(--score-1))',
+  4: 'bg-[hsl(var(--score-4-bg))] border border-[hsl(var(--score-4))] text-[hsl(var(--score-4-ink))]',
+  3: 'bg-[hsl(var(--score-3-bg))] border border-[hsl(var(--score-3))] text-[hsl(var(--score-3-ink))]',
+  2: 'bg-[hsl(var(--score-2-bg))] border border-[hsl(var(--score-2))] text-[hsl(var(--score-2-ink))]',
+  1: 'bg-[hsl(var(--score-1-bg))] border border-[hsl(var(--score-1))] text-[hsl(var(--score-1-ink))]',
 };
 
 function ScoreCircle({ score, label }: { score: number | null | undefined; label?: string }) {
@@ -65,10 +71,7 @@ function ScoreCircle({ score, label }: { score: number | null | undefined; label
   return (
     <div className="flex flex-col items-center gap-0.5">
       {label && <span className="text-[9px] text-muted-foreground">{label}</span>}
-      <span
-        className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold text-white"
-        style={{ backgroundColor: SCORE_COLORS[score] ?? 'hsl(var(--muted))' }}
-      >
+      <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold ${SCORE_COLORS[score] || 'bg-muted text-muted-foreground'}`}>
         {score}
       </span>
     </div>

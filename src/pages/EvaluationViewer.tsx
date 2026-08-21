@@ -23,7 +23,9 @@ import { scoreBucketTokens, type ScoreBucket } from '@/lib/confidenceScoreRamp';
 // SCORE_OPTIONS already migrated in slice 1, just in a read-only pill here —
 // reuses scoreBucketTokens() instead of a second hardcoded copy. Band 1
 // moves from red to --score-1's orange, the same intentional DASH-1a hue
-// shift documented for RatingBandCollapsible.tsx in slice 2.
+// shift documented for RatingBandCollapsible.tsx in slice 2. (DSN-9's QA
+// pass made the same fix independently with hardcoded token classes; this
+// helper-based version supersedes it.)
 function ReadOnlyScore({ value }: { value: number | null }) {
   if (value == null) return <span className="text-xs text-muted-foreground">—</span>;
   const tokens = scoreBucketTokens(value as ScoreBucket);

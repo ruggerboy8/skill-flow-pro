@@ -22,9 +22,17 @@ import { formatInTimeZone } from 'date-fns-tz';
 type ProgressStatus = 'going_well' | 'working_on_it' | 'not_started';
 interface ProgressEntry { title: string; status: ProgressStatus; note: string; }
 
+// DSN-3 slice 3: reuses --status-complete/--status-late, matching the
+// identical going_well/working_on_it/not_started config duplicated in
+// CombinedPrepView.tsx (kept in sync, same as the slice-2 DoctorProMoveDrawer /
+// DoctorMaterialsSheet MATERIAL_SECTIONS duplication).
+// QA fix: -ink, not the vivid base — `color` renders as small button text
+// directly on the default (untinted) button background when not selected,
+// and the vivid tokens fail contrast there too (status-late on white
+// computes to ~1.98:1), not just on their own -bg tint.
 const PROGRESS_OPTIONS: { value: ProgressStatus; label: string; icon: typeof CheckCircle2; color: string }[] = [
-  { value: 'going_well', label: 'Going well', icon: CheckCircle2, color: 'text-emerald-600' },
-  { value: 'working_on_it', label: 'Working on it', icon: Clock, color: 'text-amber-600' },
+  { value: 'going_well', label: 'Going well', icon: CheckCircle2, color: 'text-[hsl(var(--status-complete-ink))]' },
+  { value: 'working_on_it', label: 'Working on it', icon: Clock, color: 'text-[hsl(var(--status-late-ink))]' },
   { value: 'not_started', label: "Haven't started", icon: Circle, color: 'text-muted-foreground' },
 ];
 
@@ -36,10 +44,10 @@ import { MeetingConfirmationCard } from '@/components/doctor/MeetingConfirmation
 
 const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
 
-// DSN-9 QA follow-up: this was a solid vivid fill with white text (entry 3
-// hardcoded blue, now the token). White-on-fill fails 4.5:1 for EVERY band,
-// not just the old blue (band 1: 2.85:1, band 2: 1.98:1, band 3 on the new
-// lime: 2.02:1, band 4: 2.59:1) — dark ink text on the same solid fill still
+// DSN-9 QA follow-up (supersedes DSN-3 slice 3's solid vivid fill here):
+// white text on the solid vivid fill fails 4.5:1 for EVERY band, not just
+// the old blue (band 1: 2.85:1, band 2: 1.98:1, band 3 on the new lime:
+// 2.02:1, band 4: 2.59:1) — dark ink text on the same solid fill still
 // fails all four (2.95-3.64:1). Moved to the established ink-on-bg pattern
 // (bg = -bg pastel, text = -ink, border = vivid) already used by
 // RatingBandCollapsible/CoachBaselineWizard/ClinicalBaselineResults, which
@@ -333,6 +341,9 @@ export default function DoctorReviewPrep() {
           </Link>
           <div>
             <h2 className="text-xl font-bold">Review Meeting Summary</h2>
+            {/* DSN-3 slice 3: no token covers "meeting pending" purple — same
+                gap coachingSessionStatus.ts's meeting_pending status flagged
+                in slice 2; left hardcoded rather than guessed at. */}
             <Badge className="bg-purple-100 text-purple-800 mt-1">Awaiting Your Confirmation</Badge>
           </div>
         </div>
@@ -351,7 +362,7 @@ export default function DoctorReviewPrep() {
           </Link>
           <div>
             <h2 className="text-xl font-bold">Meeting Prep</h2>
-            <Badge className="bg-emerald-100 text-emerald-800 mt-1">✓ Prep Complete</Badge>
+            <Badge className="bg-[hsl(var(--status-complete-bg))] text-[hsl(var(--status-complete-ink))] mt-1">✓ Prep Complete</Badge>
           </div>
         </div>
         <CombinedPrepView
@@ -407,10 +418,14 @@ export default function DoctorReviewPrep() {
       {/* Step 0: Prior Action Steps Progress (follow-ups only) */}
       {isFollowUp && hasPriorSteps && (
         <>
-          <Card className="border-amber-200 bg-amber-50/30 dark:bg-amber-950/10 dark:border-amber-800/30">
+          {/* QA fix: /0.3 border opacity — the original amber-200 border was
+              a pale tint, not the full-strength amber. */}
+          <Card className="border-[hsl(var(--status-late)_/_0.3)] bg-[hsl(var(--status-late-bg))]">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
-                <div className="flex items-center justify-center h-6 w-6 rounded-full bg-amber-500 text-white text-xs font-bold">✓</div>
+                {/* QA fix: -ink solid fill, not vivid — white "✓" on vivid
+                    status-late computes to ~1.98:1, failing even 3:1. */}
+                <div className="flex items-center justify-center h-6 w-6 rounded-full bg-[hsl(var(--status-late-ink))] text-white text-xs font-bold">✓</div>
                 <CardTitle className="text-base">How are your action steps going?</CardTitle>
               </div>
               <CardDescription>Quick update on the goals from your last session.</CardDescription>
@@ -575,7 +590,7 @@ export default function DoctorReviewPrep() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-sm font-medium leading-snug">{pm?.action_statement || `Action #${item.action_id}`}</p>
                               {isSuggested && (
-                                <Badge className="bg-amber-100 text-amber-800 text-2xs px-1.5 py-0">{coachName}'s pick</Badge>
+                                <Badge className="bg-[hsl(var(--status-late-bg))] text-[hsl(var(--status-late-ink))] text-2xs px-1.5 py-0">{coachName}'s pick</Badge>
                               )}
                             </div>
                             {pm?.competencies?.name && (
@@ -663,10 +678,12 @@ export default function DoctorReviewPrep() {
       {isSchedulingInviteSent && (
         <>
           <Separator />
-          <Card className="border-blue-200 bg-blue-50/30 dark:bg-blue-950/10 dark:border-blue-800/30">
+          {/* QA fix: /0.3 border opacity — the original blue-200 border was
+              a pale tint, not the full-strength blue. */}
+          <Card className="border-[hsl(var(--status-info)_/_0.3)] bg-[hsl(var(--status-info-bg))]">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-blue-600" />
+                <Calendar className="h-5 w-5 text-[hsl(var(--status-info))]" />
                 <CardTitle className="text-base">Have You Scheduled Your Meeting?</CardTitle>
               </div>
             </CardHeader>

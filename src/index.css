@@ -106,6 +106,42 @@ All colors MUST be HSL.
     /* DSN-4: added for the delivery-status pill (draft/released/… workflow) */
     --status-released: 211 85% 45%;
     --status-released-bg: 211 100% 94%;
+    /* DSN-3 slice 3: fills the "--status-info" gap flagged by slice 2 for
+    the blue "informational notice" banner pattern (border-blue-200
+    bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20 + text-blue-600),
+    repeated across Index.tsx (migrated slice 1), EditUserDrawer.tsx, and
+    DoctorReviewPrep.tsx. Values are a direct HSL conversion of Tailwind's
+    own blue-600 (#2563eb) / blue-50 (#eff6ff), the exact hex already in use
+    at every one of those call sites, not an invented design decision.
+    Mode-invariant, same structure as the other --status-* tokens (no .dark
+    override). */
+    --status-info: 221 83% 53%;
+    --status-info-bg: 214 100% 97%;
+
+    /* DSN-3 slice 3 QA fix: --status-*-ink. The vivid --status-* tokens
+    above are fine for borders/dots/icons/solid fills, but fail contrast as
+    TEXT sitting on their own -bg tint (as low as ~1.8:1 in light mode —
+    verified by computing WCAG relative-luminance contrast, not eyeballed).
+    Same problem the --score-*-ink tokens already solve for score badges;
+    these are the --status-* equivalent, same -bg/-ink pairing shape.
+    Light values are a direct HSL conversion of the Tailwind -800 shade of
+    each token's own color family (green-800, amber-800, red-800, slate-800,
+    blue-800) — the same "-800 text on -100 bg" pairing the original
+    hand-rolled classes this migration replaced already used, not an
+    invented design choice. status-pending and status-excused share one
+    value (slate-800) because their vivid/-bg pair already share one value.
+    status-released and status-info share one value (blue-800) for the same
+    reason — both are "blue," derived from the same Tailwind family, 5°
+    apart in hue. Computed contrast against each token's own -bg: all land
+    between 6.46:1 and 13.09:1 (AA-normal-text minimum is 4.5:1) — see
+    docs/dev/token-migration-pattern.md §5a for the full table. */
+    --status-complete-ink: 142 64% 24%;
+    --status-late-ink: 23 82% 31%;
+    --status-missing-ink: 0 70% 35%;
+    --status-excused-ink: 217 33% 18%;
+    --status-pending-ink: 217 33% 18%;
+    --status-released-ink: 226 71% 40%;
+    --status-info-ink: 226 71% 40%;
 
     /* Win banner colors */
     --win-growth: 160 84% 39%;
@@ -259,6 +295,29 @@ All colors MUST be HSL.
     --win-perfect: 217 85% 68%;
     --win-perfect-bg: 214 45% 18%;
     --win-perfect-border: 213 50% 30%;
+
+    /* DSN-3 slice 3 QA fix: --status-*-ink dark-mode values, same L=80%
+    lightening as --score-*-ink's dark block (same H/S as the :root value,
+    L pushed to 80% for light-on-dark). FLAGGED, not silently shipped: the
+    --status-* / --status-*-bg tokens these pair with have NO .dark override (documented
+    as deliberately mode-invariant, same as --status-info) and `.dark` is
+    not wired to any toggle anywhere in this app today (next-themes is
+    installed but unused — see src/lib/domainColors.ts's comment), so this
+    block is 100% dead code right now, same as the dormant domain/score
+    dark-mode values elsewhere in this file. Recorded here so it isn't
+    silently wrong later: if a dark-mode toggle ships (DSN-7) before
+    --status-*-bg also gets .dark overrides, these ink values would render
+    against the unchanged LIGHT -bg pastel and read at ~1.2-1.8:1 — worse
+    than the bug this token exists to fix. --status-*-bg needs real .dark
+    values before these ink darks can go live; do not enable dark mode for
+    any --status-* consumer without doing both at once. */
+    --status-complete-ink: 142 64% 80%;
+    --status-late-ink: 23 82% 80%;
+    --status-missing-ink: 0 70% 80%;
+    --status-excused-ink: 217 33% 80%;
+    --status-pending-ink: 217 33% 80%;
+    --status-released-ink: 226 71% 80%;
+    --status-info-ink: 226 71% 80%;
 
     /* Mobile shell: ink pairs, lightened for dark tinted surfaces */
     --muted-tint: 215 20% 70%;

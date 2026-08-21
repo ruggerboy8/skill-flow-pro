@@ -75,10 +75,13 @@ export default function DoctorHome() {
 
     if (baseline?.status === 'completed') {
       return (
-        <Card className="border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30">
+        // QA fix: /0.3 border opacity (original green-200 border was a pale
+        // tint) and -ink icon color (vivid --status-complete on its own -bg
+        // computes to ~2.06:1, failing even the 3:1 non-text-graphics bar).
+        <Card className="border-[hsl(var(--status-complete)_/_0.3)] bg-[hsl(var(--status-complete-bg))]">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+              <CheckCircle2 className="h-8 w-8 text-[hsl(var(--status-complete-ink))]" />
               <div>
                 <CardTitle>Baseline Complete</CardTitle>
                 <CardDescription>
@@ -220,6 +223,9 @@ export default function DoctorHome() {
 
       {/* All pending meeting summaries needing confirmation */}
       {pendingMeetings.map(s => (
+        // DSN-3 slice 3: purple has no matching token (same
+        // meeting_pending gap flagged elsewhere in this migration) — left
+        // hardcoded rather than guessed at.
         <Card key={s.id} className="border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/30">
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -268,12 +274,14 @@ export default function DoctorHome() {
         </Card>
       ))}
 
-      {/* Submitted preps — informational */}
+      {/* Submitted preps — informational.
+          QA fix: same /0.3 border + -ink icon fix as the "Baseline Complete"
+          card above. */}
       {submittedPrepSessions.map(s => (
-        <Card key={s.id} className="border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30">
+        <Card key={s.id} className="border-[hsl(var(--status-complete)_/_0.3)] bg-[hsl(var(--status-complete-bg))]">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+              <CheckCircle2 className="h-8 w-8 text-[hsl(var(--status-complete-ink))]" />
               <div>
                 <CardTitle>Prep Submitted</CardTitle>
                 <CardDescription>

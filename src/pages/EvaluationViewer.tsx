@@ -17,26 +17,26 @@ import { getDomainColor, getDomainColorRaw, getDomainColorRichRaw } from '@/lib/
 import { getDomainOrderIndex } from '@/lib/domainUtils';
 import type { EvaluationWithItems, ExtractedInsights, InsightsPerspective, DomainInsight } from '@/lib/evaluations';
 import { ParticipationSnapshotCard, type ParticipationSnapshot } from '@/components/evaluations/ParticipationSnapshotCard';
+import { scoreBucketTokens, type ScoreBucket } from '@/lib/confidenceScoreRamp';
 
-// DSN-9 QA follow-up: this hand-rolled pill scheme still rendered band 3 as
-// blue (the exact thing DSN-9 removed) and band 1 as red, which the score
-// ramp deliberately never does (confidence/skill scores are never a
-// red/green traffic light — see confidenceScoreRamp.ts). Migrated to the
-// --score-N token family: bg = -bg pastel, text = -ink (clears 4.5:1 for
-// all four bands — 7.24/6.47/6.41/6.96:1), border = vivid. This changes
-// band 1 from red to orange; documented as a behavior change in
-// docs/dev/token-migration-pattern.md.
-const SCORE_PILLS = [
-  { v: 1, cls: 'bg-[hsl(var(--score-1-bg))] text-[hsl(var(--score-1-ink))] border-[hsl(var(--score-1))]' },
-  { v: 2, cls: 'bg-[hsl(var(--score-2-bg))] text-[hsl(var(--score-2-ink))] border-[hsl(var(--score-2))]' },
-  { v: 3, cls: 'bg-[hsl(var(--score-3-bg))] text-[hsl(var(--score-3-ink))] border-[hsl(var(--score-3))]' },
-  { v: 4, cls: 'bg-[hsl(var(--score-4-bg))] text-[hsl(var(--score-4-ink))] border-[hsl(var(--score-4))]' },
-];
-
+// DSN-3 slice 3: this is the same 1-4 observer/self score EvaluationHub.tsx's
+// SCORE_OPTIONS already migrated in slice 1, just in a read-only pill here —
+// reuses scoreBucketTokens() instead of a second hardcoded copy. Band 1
+// moves from red to --score-1's orange, the same intentional DASH-1a hue
+// shift documented for RatingBandCollapsible.tsx in slice 2. (DSN-9's QA
+// pass made the same fix independently with hardcoded token classes; this
+// helper-based version supersedes it.)
 function ReadOnlyScore({ value }: { value: number | null }) {
   if (value == null) return <span className="text-xs text-muted-foreground">—</span>;
-  const pill = SCORE_PILLS.find(p => p.v === value);
-  return <span className={`px-2.5 py-1 rounded border text-sm ${pill?.cls}`}>{value}</span>;
+  const tokens = scoreBucketTokens(value as ScoreBucket);
+  return (
+    <span
+      className="px-2.5 py-1 rounded border text-sm"
+      style={{ backgroundColor: tokens.bg, color: tokens.ink, borderColor: tokens.text }}
+    >
+      {value}
+    </span>
+  );
 }
 
 type RolledNote = {
@@ -562,8 +562,13 @@ export default function EvaluationViewer() {
                             <div className="space-y-3">
                               {notes.map((note, idx) => (
                                 <div key={idx} className="text-sm">
+                                  {/* DSN-3 slice 3: "Self" (was slate) is generic
+                                      neutral chrome, migrated to muted. "Observer"
+                                      is a source-attribution color with no
+                                      domain/score/status/win meaning — left
+                                      hardcoded. */}
                                   <span className={`inline-block px-2 py-0.5 mr-2 rounded text-xs ${
-                                    note.source === 'Observer' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-800'
+                                    note.source === 'Observer' ? 'bg-blue-100 text-blue-800' : 'bg-muted text-muted-foreground'
                                   }`}>
                                     {note.source}
                                   </span>

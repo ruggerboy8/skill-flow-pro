@@ -56,7 +56,7 @@ import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
 import { useAudioRecording, type AudioSegment } from '@/hooks/useAudioRecording';
 import { transcribeWithChunking, type ChunkProgress, CHUNK_SIZE_BYTES } from '@/lib/audioChunking';
 import { useSidebar } from '@/components/ui/sidebar';
-import ReactQuill from 'react-quill';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 
 // DSN-3: migrated off hardcoded red/orange/blue/green classes onto the
 // --score-1..4 tokens — the same 1-4 confidence scale used everywhere else
@@ -1842,8 +1842,7 @@ export function EvaluationHub() {
               {isObservationTranscriptExpanded && (
                 <CardContent className="pt-0">
                   <div className="space-y-4">
-                    <ReactQuill
-                      theme="snow"
+                    <RichTextEditor
                       value={summaryRawTranscript}
                       onChange={handleSummaryTranscriptChange}
                       readOnly={isReadOnly}

@@ -1077,7 +1077,9 @@ export default function PerformanceWizard() {
             disabled={!hasScore || submitting}
             className={cn(
               "flex-[2] rounded-full transition-all duration-300",
-              submitPhase === 'done' && "bg-emerald-500 hover:bg-emerald-500"
+              // QA fix: same -ink solid-fill fix as ConfidenceWizard.tsx's
+              // identical "Saved" button (white text fails at ~2.30:1 vivid).
+              submitPhase === 'done' && "bg-[hsl(var(--status-complete-ink))] hover:bg-[hsl(var(--status-complete-ink))]"
             )}
           >
             {submitPhase === 'done' ? (
@@ -1121,18 +1123,32 @@ export default function PerformanceWizard() {
           
           <div className="p-6 space-y-4 text-center">
             <AlertDialogHeader className="space-y-3">
-              <div className="mx-auto h-16 w-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+              {/* DSN-3 slice 3: this is literally the "growth-framed win" case
+                  --win-growth exists for (see design-system.md section 2).
+                  --win-growth already has real .dark overrides, so a plain
+                  arbitrary-value class tracks both modes with no dark:
+                  variant needed. */}
+              <div className="mx-auto h-16 w-16 rounded-full bg-[hsl(var(--win-growth-bg))] flex items-center justify-center">
                 <span className="text-3xl">🚀</span>
               </div>
               <AlertDialogTitle className="text-xl">That's a Pro Move!</AlertDialogTitle>
             </AlertDialogHeader>
-            
+
             <AlertDialogDescription asChild>
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
                   You flagged this as <strong className="text-foreground">low confidence</strong> on Monday and turned it around to a <strong className="text-foreground">{performanceScores[currentFocus?.id || '']}</strong> today.
                 </p>
-                <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                {/* QA fix: this is literal paragraph text, not an icon/border/
+                    background accent. Vivid --win-growth computes to ~2.59:1
+                    against the dialog's plain white background, failing
+                    4.5:1. --win-growth has no -ink variant (out of this QA
+                    round's named scope — only --status-* got one), and
+                    inventing one for a single call site is a bigger decision
+                    than this fix warrants, so this drops the color rather
+                    than guess at a value. The win-growth icon circle above
+                    still carries the "growth win" framing. */}
+                <p className="text-sm font-medium text-foreground">
                   That is exactly the growth we're looking for.
                 </p>
               </div>

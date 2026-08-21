@@ -1,43 +1,68 @@
-// ASK-1: Ask Alcan — the long-context corpus spike.
+// ASK-2: Ask Alcan v2 — the hybrid search + tool loop assistant.
 //
-// Answers a super admin's question from the curated corpus (kept + canon
-// corpus_documents) with one Claude call using the citations feature. No
-// retrieval infrastructure — the whole eligible corpus is packed into the
-// request (canon first, then kept, newest first), capped at ~150k tokens.
-// The packed-size log below is the signal for when to build ASK-2, and the
-// { answer, citations } response shape is FROZEN: ASK-2 changes how
-// documents are found, never this contract.
+// SHADOW DEPLOY. This is a separate function from the live `ask-alcan`
+// (the long-context spike), deployed under its own name so it can be tested
+// end-to-end with real questions before an attended cutover replaces
+// ask-alcan's code with this. Do not point the frontend at this function
+// until that cutover happens.
 //
-// Prompt caching: system prompt + document blocks form a deterministic,
-// stable prefix with cache_control on the LAST document block, and the
-// user's question comes after it — repeat questions reread the corpus from
-// cache (~10x cheaper). Cache usage is logged alongside packed size.
+// Instead of packing the whole corpus into every request, Claude runs with
+// two tools: search_corpus(query) (hybrid full-text + vector search, fused
+// with reciprocal rank fusion, via the SECURITY INVOKER search_corpus SQL
+// function) and read_document(document_id) (fetch a document's full body,
+// or its title + link for videos and files with no extracted text yet).
+// The model searches, reads, refines, and answers — recovering from a bad
+// first search and staying correct however large the corpus grows.
 //
-// Secrets: ANTHROPIC_API_KEY is a Supabase function secret. Never in the repo.
+// The { answer, citations } response shape is FROZEN, unchanged from v1:
+// ASK-2 changes how documents are found, never this contract.
+//
+// Citations fix (found in live QA): citations used to be built only from
+// documentsRead (documents the model called read_document on), but Sonnet
+// frequently answers straight from the rich search_corpus snippets and
+// skips read_document despite the system prompt asking for it, so citations
+// silently came back empty on well-covered questions. Fixed the same way
+// v1 solves it: Anthropic's native citations feature. Every document the
+// model is shown -- each search_corpus row AND every read_document body --
+// is sent as a `document` content block (citations: {enabled: true}) inside
+// the tool_result, instead of/alongside plain text, and appended in that
+// same order to `citableDocs`. After the loop, citations are recovered from
+// finalResponse.content's document_index citations, mapped back through
+// citableDocs -- see supabase/functions/_shared/citationMapping.ts. A
+// document the model never actually cites (even if surfaced by search)
+// produces no citation, same as before.
+//
+// Retrieval (search_corpus, read_document) runs through a caller-scoped
+// Supabase client carrying the asker's own JWT, so RLS is the real
+// visibility boundary (today: super-admin only, via is_superadmin()) —
+// not just the app-level gate below, which stays as a fast, friendly 403.
+// Conversation persistence stays on the service-role client, as in v1.
+//
+// Secrets: ANTHROPIC_API_KEY and OPENAI_API_KEY are Supabase function
+// secrets. Never in the repo.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Anthropic from 'npm:@anthropic-ai/sdk';
+import { collectCitations, type CitableDoc } from '../_shared/citationMapping.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Same constant as src/lib/askAlcanAccess.ts — the spike answers from the
-// Alcan org's corpus only.
+// Same constant as src/lib/askAlcanAccess.ts and v1 — the Alcan org's
+// corpus only.
 const ALCAN_ORG_ID = 'a1ca0000-0000-0000-0000-000000000001';
 
-// Answer set for the spike: kept + canon. Flip to ['canon'] later.
-const ELIGIBLE_STATUSES = ['kept', 'canon'];
-
-// ~150k tokens of packed corpus, estimated at ~4 chars/token.
-const MAX_PACKED_TOKENS = 150_000;
-const CHARS_PER_TOKEN = 4;
-
 const MODEL = 'claude-sonnet-5';
-
-// Questions are questions, not documents. Anything longer is a paste-in.
+const EMBEDDING_MODEL = 'text-embedding-3-small';
 const MAX_QUESTION_CHARS = 4000;
+const MAX_TOOL_CALLS = 8;
+// A little headroom over MAX_TOOL_CALLS: each iteration can make several
+// tool calls in one turn, so iterations alone don't bound total calls, but
+// this keeps a hung loop from running away.
+const MAX_ITERATIONS = MAX_TOOL_CALLS + 2;
+const SEARCH_MATCH_COUNT = 8;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -46,62 +71,180 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+interface SearchRow {
+  document_id: string;
+  title: string;
+  source_url: string | null;
+  status: string;
+  snippet: string;
+  rank: number;
+}
+
 interface CorpusDoc {
   id: string;
   title: string;
   body: string | null;
   summary: string | null;
   status: string;
-  posted_at: string | null;
   source_url: string | null;
 }
 
-/**
- * Deterministic packing order — canon first, then kept; newest first within
- * a status; stable tiebreak by id. Determinism matters: any reorder changes
- * the prompt prefix and invalidates the cache.
- */
-function packOrder(a: CorpusDoc, b: CorpusDoc): number {
-  if (a.status !== b.status) return a.status === 'canon' ? -1 : 1;
-  const ap = a.posted_at ?? '';
-  const bp = b.posted_at ?? '';
-  if (ap !== bp) return ap > bp ? -1 : 1; // newest first, nulls last
-  return a.id < b.id ? -1 : 1;
-}
-
-function docText(d: CorpusDoc): string {
-  const parts = [`Title: ${d.title}`];
-  if (d.posted_at) parts.push(`Originally posted: ${d.posted_at.slice(0, 10)}`);
-  if (d.summary) parts.push(`Summary: ${d.summary}`);
-  parts.push('', d.body ?? '(Full text not yet extracted — title and summary only.)');
-  return parts.join('\n');
-}
+const tools: Anthropic.Tool[] = [
+  {
+    name: 'search_corpus',
+    description:
+      'Search the Alcan knowledge corpus (kept and canon documents) with a natural-language query. ' +
+      'Returns ranked snippets with document ids, titles, statuses, and links, each provided to you as ' +
+      'citable source content — cite a snippet directly if it answers the question. Call this first for ' +
+      'any question, and call it again with different phrasing if the first pass comes up thin — do not ' +
+      'give up on one query.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'A natural-language search query.' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'read_document',
+    description:
+      "Fetch a document's full text by its document_id (or, for videos and files with no extracted text " +
+      'yet, its title and link), also provided to you as citable source content. Call this when a search ' +
+      'snippet is too thin to answer confidently, or to confirm a number, price, or policy before you ' +
+      'state it — reading is not required to cite a document, but is required before relying on more of ' +
+      'it than the snippet showed you.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        document_id: { type: 'string', description: 'The document_id returned by search_corpus.' },
+      },
+      required: ['document_id'],
+    },
+  },
+];
 
 function buildSystemPrompt(areaNames: string[]): string {
   const areas = areaNames.length > 0 ? areaNames.join(', ') : 'RDA practice, clinical, operations';
-  return `You are Ask Alcan, an internal assistant for Alcan dental practice staff. You answer questions using ONLY the documents provided in this conversation — they are the curated, current company corpus.
+  return `You are Ask Alcan, an internal assistant for Alcan dental practice staff. You have two tools: search_corpus(query) to find candidate documents, and read_document(document_id) to fetch one in full (or its title and link, for videos and files with no extracted text yet).
 
 Rules, in priority order:
-1. Answer only from the provided documents, and cite the documents you used. Never answer from general knowledge about dentistry or business, and NEVER fabricate or guess at a policy, price, number, or procedure.
-2. If the documents do not cover the question, say so plainly and point the person to the expert area that owns that territory (the areas are: ${areas}). One or two warm sentences; no apology theater.
-3. If documents contradict each other on the point being asked, say that plainly, cite both, and name the owning expert area as the place to resolve it. Do not pick a side.
-4. If someone is venting or looking for a sympathetic ear rather than an answer, respond kindly and briefly, and gently point them to a human — their manager or the owning expert area. Do not turn feelings into policy answers.
-5. When a document contains a word-for-word script for talking with families, quote the script verbatim rather than paraphrasing it — exact scripts are how Alcan teaches.
+1. Search before answering. Start with search_corpus, and search again with different phrasing if the first pass comes up thin.
+2. Every document search_corpus or read_document gives you is citable source content — use Claude's citation mechanism on the specific passage you drew a claim from, rather than paraphrasing without a citation. Call read_document when a snippet is too thin to answer from confidently, or to confirm a number, price, or policy before you state it; you do not have to read a document first just to cite it.
+3. Answer only from documents you have been given via these tools, and cite them. Never answer from general knowledge about dentistry or business, and NEVER fabricate or guess at a policy, price, number, or procedure.
+4. If the best source for a question is a video or a file whose text hasn't been extracted yet, say so plainly and still name and cite it, so the person can go watch or open it themselves.
+5. If the documents do not cover the question, say so plainly and point the person to the expert area that owns that territory (the areas are: ${areas}). One or two warm sentences; no apology theater.
+6. If documents contradict each other on the point being asked, say that plainly, cite both, and name the owning expert area as the place to resolve it. Do not pick a side.
+7. If someone is venting or looking for a sympathetic ear rather than an answer, respond kindly and briefly, and gently point them to a human — their manager or the owning expert area. Do not turn feelings into policy answers.
 
-Style: warm, plain, and concise, like a helpful colleague. No em dashes. Answer the actual question first; add context only when it helps. Frame answers as "here's how we do it at Alcan", never as reciting a rule at someone.`;
+Style: warm, plain, and concise, like a helpful colleague. No em dashes. Answer the actual question first; add context only when it helps.`;
+}
+
+/** Embed a query with OpenAI. Returns null (not a thrown error) on any
+ * failure so callers can fall back to full-text-only search. */
+async function embedQuery(text: string, apiKey: string): Promise<number[] | null> {
+  try {
+    const res = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: EMBEDDING_MODEL, input: text }),
+    });
+    if (!res.ok) {
+      console.error('ask-alcan: embedding request failed', res.status, await res.text());
+      return null;
+    }
+    const data = await res.json();
+    return data?.data?.[0]?.embedding ?? null;
+  } catch (err) {
+    console.error('ask-alcan: embedding error', err);
+    return null;
+  }
+}
+
+/** Hybrid search via the SECURITY INVOKER search_corpus SQL function, on
+ * the caller-scoped client so RLS applies. Tries with the query embedding
+ * first; if the RPC call itself errors (e.g. a parameter-casting issue),
+ * retries full-text-only rather than failing the whole tool call.
+ *
+ * QA fix (ASK-2): search_corpus has no org_id parameter (it only filters
+ * status in kept/canon), unlike v1 which explicitly loads only the Alcan
+ * org's documents. That is harmless today (corpus_documents only has
+ * Alcan-org rows, and every current super admin is in the Alcan org), but
+ * askAlcanAccess.ts is explicit that super admins from OTHER orgs (e.g.
+ * Avenue Dental) are meant to reach Ask Alcan too, and other orgs are
+ * actively coming online. Left as-is, the day another org gets corpus rows
+ * and/or a non-Alcan super admin, search_corpus would surface them. Belt-
+ * and-suspenders post-filter here so v2 cannot leak cross-org documents
+ * even before the SQL function itself is fixed (see the proposed follow-up
+ * migration noted in the PR). */
+async function runSearchCorpus(
+  caller: SupabaseClient,
+  query: string,
+  embedding: number[] | null,
+): Promise<SearchRow[]> {
+  const attempt = async (queryEmbedding: number[] | null): Promise<SearchRow[]> => {
+    const { data, error } = await caller.rpc('search_corpus', {
+      query_text: query,
+      query_embedding: queryEmbedding,
+      match_count: SEARCH_MATCH_COUNT,
+    });
+    if (error) throw error;
+    return (data ?? []) as SearchRow[];
+  };
+  const rows = embedding
+    ? await (async () => {
+        try {
+          return await attempt(embedding);
+        } catch (err) {
+          console.error('ask-alcan: search_corpus with embedding failed, retrying FTS-only', err);
+          return await attempt(null);
+        }
+      })()
+    : await attempt(null);
+  return filterToAlcanOrg(caller, rows);
+}
+
+/** QA fix (ASK-2): search_corpus's result rows carry no org_id, so filter
+ * them against corpus_documents (caller-scoped, RLS-governed) before they
+ * ever reach the model. See the comment on runSearchCorpus. */
+async function filterToAlcanOrg(caller: SupabaseClient, rows: SearchRow[]): Promise<SearchRow[]> {
+  if (rows.length === 0) return rows;
+  const { data, error } = await caller
+    .from('corpus_documents')
+    .select('id')
+    .eq('org_id', ALCAN_ORG_ID)
+    .in('id', rows.map((r) => r.document_id));
+  if (error) throw error;
+  const allowed = new Set((data ?? []).map((d: { id: string }) => d.id));
+  return rows.filter((r) => allowed.has(r.document_id));
+}
+
+async function runReadDocument(caller: SupabaseClient, documentId: string): Promise<CorpusDoc | null> {
+  const { data, error } = await caller
+    .from('corpus_documents')
+    .select('id, title, body, summary, status, source_url')
+    .eq('id', documentId)
+    // QA fix (ASK-2): v1 scopes its whole corpus load to ALCAN_ORG_ID; this
+    // tool-driven fetch had no equivalent org filter. See runSearchCorpus.
+    .eq('org_id', ALCAN_ORG_ID)
+    .in('status', ['kept', 'canon'])
+    .maybeSingle();
+  if (error) throw error;
+  return (data as CorpusDoc | null) ?? null;
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+  const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
   const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    // Auth per the pro-move-suggest template: Bearer + getClaims.
+    // Auth per the pro-move-suggest / ask-alcan-v1 template: Bearer + getClaims.
     const authHeader = req.headers.get('Authorization') ?? '';
     if (!authHeader.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401);
     const caller = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -113,9 +256,10 @@ Deno.serve(async (req) => {
     if (claimsErr || !claims?.claims?.sub) return json({ error: 'Unauthorized' }, 401);
     const callerUserId = claims.claims.sub as string;
 
-    // Gate: super admin only (the Ask Alcan gate — same semantics as
-    // src/lib/askAlcanAccess.ts). The Alcan scoping is applied to the data:
-    // the corpus is loaded from the Alcan org only.
+    // App-level gate: super admin only (same semantics as v1 and
+    // src/lib/askAlcanAccess.ts). This is a fast, friendly 403 in front of
+    // the real boundary — RLS on corpus_documents/corpus_chunks below, via
+    // the caller-scoped client, governs the actual data access.
     const { data: me } = await supabase
       .from('staff')
       .select('id, is_super_admin')
@@ -139,9 +283,6 @@ Deno.serve(async (req) => {
       return json({ error: `question exceeds ${MAX_QUESTION_CHARS} characters` }, 400);
     }
 
-    // The conversation must exist and belong to the asker. (RLS already
-    // prevents anyone else creating/reading it; this guards the service-role
-    // writes below.)
     const { data: convo } = await supabase
       .from('ask_conversations')
       .select('id, staff_id, title')
@@ -151,27 +292,16 @@ Deno.serve(async (req) => {
       return json({ error: 'Conversation not found' }, 404);
     }
 
-    // Prior turns of this conversation, oldest first, capped at the last 10
-    // messages (5 exchanges) — enough context for follow-ups without growing
-    // the request unboundedly. History rides AFTER the cache breakpoint, so
-    // it never disturbs the cached corpus prefix.
+    // Prior turns, oldest first, capped at the last 10 messages — same
+    // policy as v1. History rides after the cached system+tools prefix.
     const { data: priorMessages } = await supabase
       .from('ask_messages')
       .select('role, content')
       .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: false })
-      .limit(10);
+      .order('created_at', { ascending: true });
     const history = ((priorMessages ?? []) as { role: 'user' | 'assistant'; content: string }[])
-      .reverse()
-      .filter((m) => m.content.trim().length > 0);
-
-    // Load the eligible corpus (kept + canon, Alcan org).
-    const { data: docs, error: docsErr } = await supabase
-      .from('corpus_documents')
-      .select('id, title, body, summary, status, posted_at, source_url')
-      .eq('org_id', ALCAN_ORG_ID)
-      .in('status', ELIGIBLE_STATUSES);
-    if (docsErr) throw docsErr;
+      .filter((m) => m.content.trim().length > 0)
+      .slice(-10);
 
     const { data: areas } = await supabase
       .from('corpus_expert_areas')
@@ -179,101 +309,229 @@ Deno.serve(async (req) => {
       .eq('org_id', ALCAN_ORG_ID)
       .order('area_name');
 
-    // Pack deterministically up to the token cap.
-    const ordered = ((docs ?? []) as CorpusDoc[]).sort(packOrder);
-    const packed: { doc: CorpusDoc; text: string }[] = [];
-    let packedChars = 0;
-    const maxChars = MAX_PACKED_TOKENS * CHARS_PER_TOKEN;
-    for (const doc of ordered) {
-      const text = docText(doc);
-      if (packedChars + text.length > maxChars) break;
-      packed.push({ doc, text });
-      packedChars += text.length;
-    }
+    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
-    if (packed.length === 0) {
-      const answer =
-        'The corpus has no reviewed documents yet, so I can\'t answer from it. ' +
-        'Once documents are marked kept or canon, I\'ll answer from those.';
-      await persistExchange(supabase, convo, question, answer, []);
-      return json({ answer, citations: [] });
-    }
+    // Cache breakpoint on the system block: everything before it (tool
+    // definitions, then system) forms a stable, deterministic prefix that
+    // repeats on every question, unlike v1 where the corpus itself rode in
+    // the prompt. Conversation history and the new question come after.
+    const system: Anthropic.TextBlockParam[] = [
+      {
+        type: 'text',
+        text: buildSystemPrompt((areas ?? []).map((a: { area_name: string }) => a.area_name)),
+        cache_control: { type: 'ephemeral' },
+      },
+    ];
 
-    // Document blocks form a stable prefix; cache_control goes on the LAST
-    // document so system + all documents are cached. Everything volatile —
-    // conversation history, then the new question — comes after the cache
-    // breakpoint. (Consecutive same-role messages are allowed; the API
-    // combines them into one turn.)
-    const documentContent: Anthropic.ContentBlockParam[] = packed.map(({ doc, text }, i) => ({
-      type: 'document' as const,
-      source: { type: 'text' as const, media_type: 'text/plain' as const, data: text },
-      title: doc.title,
-      citations: { enabled: true },
-      ...(i === packed.length - 1 ? { cache_control: { type: 'ephemeral' as const } } : {}),
-    }));
     const messages: Anthropic.MessageParam[] = [
-      { role: 'user', content: documentContent },
       ...history.map((m) => ({ role: m.role, content: m.content })),
       { role: 'user', content: question.trim() },
     ];
 
-    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 4096,
-      system: buildSystemPrompt((areas ?? []).map((a: { area_name: string }) => a.area_name)),
-      messages,
-    });
+    let toolCallCount = 0;
+    let searchCallCount = 0;
+    let readDocumentCount = 0;
+    // Every document content block shown to the model, in the exact order
+    // it was pushed into `messages` -- Anthropic numbers document_index
+    // 0-based across the whole request in that same order, so this array's
+    // ordering must track the tool_result construction below exactly. A
+    // document can appear more than once (a search_corpus snippet, then a
+    // fuller read_document body); collectCitations() dedupes by document_id
+    // afterward, so pushing every occurrence here is intentional, not a bug.
+    const citableDocs: CitableDoc[] = [];
+    let finalResponse: Anthropic.Message | undefined;
 
-    // Packed-size + cache log: this line is how we learn when the spike
-    // stops scaling (the trigger for ASK-2).
-    console.log(JSON.stringify({
-      event: 'ask-alcan-packed',
-      packed_docs: packed.length,
-      eligible_docs: ordered.length,
-      packed_chars: packedChars,
-      est_packed_tokens: Math.round(packedChars / CHARS_PER_TOKEN),
-      input_tokens: response.usage.input_tokens,
-      cache_creation_input_tokens: response.usage.cache_creation_input_tokens,
-      cache_read_input_tokens: response.usage.cache_read_input_tokens,
-      output_tokens: response.usage.output_tokens,
-      stop_reason: response.stop_reason,
-    }));
+    for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+      const response = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: 4096,
+        system,
+        tools,
+        messages,
+      });
+      finalResponse = response;
+      if (response.stop_reason !== 'tool_use') break;
 
-    // Collapse text blocks into the answer; map citation document_index back
-    // to our packed docs, deduped in first-cited order.
-    let answer = '';
-    const citedIndexes: number[] = [];
-    for (const block of response.content) {
-      if (block.type !== 'text') continue;
-      answer += block.text;
-      for (const cite of block.citations ?? []) {
-        if ('document_index' in cite && !citedIndexes.includes(cite.document_index)) {
-          citedIndexes.push(cite.document_index);
+      messages.push({ role: 'assistant', content: response.content });
+      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+
+      for (const block of response.content) {
+        if (block.type !== 'tool_use') continue;
+
+        if (toolCallCount >= MAX_TOOL_CALLS) {
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: block.id,
+            is_error: true,
+            content:
+              'Tool call limit reached for this question. Answer with what you have so far, and say ' +
+              'plainly if that is not enough to fully answer.',
+          });
+          continue;
+        }
+        toolCallCount++;
+
+        if (block.name === 'search_corpus') {
+          searchCallCount++;
+          const query = typeof (block.input as { query?: unknown })?.query === 'string'
+            ? (block.input as { query: string }).query
+            : '';
+          try {
+            const embedding = OPENAI_API_KEY ? await embedQuery(query, OPENAI_API_KEY) : null;
+            const rows = await runSearchCorpus(caller, query, embedding);
+            if (rows.length === 0) {
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: 'No matching documents found. Try a different phrasing.',
+              });
+            } else {
+              // Citations fix: one citable `document` block per row, in
+              // result order, instead of one plain-text blob. The snippet
+              // itself is the citable source text; document_id/status ride
+              // in `context` (visible to the model, not citable) so
+              // read_document's document_id argument still works.
+              const documentBlocks: Anthropic.DocumentBlockParam[] = rows.map((r) => {
+                citableDocs.push({ document_id: r.document_id, title: r.title, source_url: r.source_url });
+                return {
+                  type: 'document',
+                  source: { type: 'text', media_type: 'text/plain', data: r.snippet },
+                  title: r.title,
+                  context: `document_id: ${r.document_id} (status: ${r.status})`,
+                  citations: { enabled: true },
+                };
+              });
+              toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: documentBlocks });
+            }
+          } catch (err) {
+            console.error('ask-alcan: search_corpus failed', err);
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: block.id,
+              is_error: true,
+              content: 'Search failed. Tell the person search is temporarily unavailable rather than guessing.',
+            });
+          }
+        } else if (block.name === 'read_document') {
+          const documentId = typeof (block.input as { document_id?: unknown })?.document_id === 'string'
+            ? (block.input as { document_id: string }).document_id
+            : '';
+          try {
+            const doc = documentId ? await runReadDocument(caller, documentId) : null;
+            if (!doc) {
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                is_error: true,
+                content: 'Document not found or not eligible to cite.',
+              });
+            } else {
+              readDocumentCount++;
+              citableDocs.push({ document_id: doc.id, title: doc.title, source_url: doc.source_url });
+              // Citations fix: the full body is the citable document block,
+              // same mechanism as search_corpus rows above -- a doc the
+              // model chooses to read in full is citable through the same
+              // native-citations path, not a separate "reading makes it
+              // citable" rule.
+              const bodyText = doc.body ?? '(No extracted text yet — title and link only.)';
+              const context = [
+                `document_id: ${doc.id}`,
+                doc.summary ? `Summary: ${doc.summary}` : null,
+                `Link: ${doc.source_url ?? '(none)'}`,
+              ]
+                .filter((line) => line !== null)
+                .join('\n');
+              const documentBlock: Anthropic.DocumentBlockParam = {
+                type: 'document',
+                source: { type: 'text', media_type: 'text/plain', data: bodyText },
+                title: doc.title,
+                context,
+                citations: { enabled: true },
+              };
+              toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: [documentBlock] });
+            }
+          } catch (err) {
+            console.error('ask-alcan: read_document failed', err);
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: block.id,
+              is_error: true,
+              content: 'Failed to read that document. Tell the person this is temporarily unavailable.',
+            });
+          }
+        } else {
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: block.id,
+            is_error: true,
+            content: `Unknown tool: ${block.name}`,
+          });
         }
       }
+      messages.push({ role: 'user', content: toolResults });
     }
-    const citations = citedIndexes
-      .filter((i) => i >= 0 && i < packed.length)
-      .map((i) => ({
-        document_id: packed[i].doc.id,
-        title: packed[i].doc.title,
-        source_url: packed[i].doc.source_url,
-      }));
 
-    // The answer is already paid for — a persistence failure must not discard
-    // it or trigger a retry that re-runs the whole exchange. Log loudly and
-    // return the answer anyway.
+    if (!finalResponse) {
+      // Should be unreachable (the loop always runs at least once), but
+      // never answer from nothing rather than guessing.
+      const answer = "Something went wrong answering that. Please try again.";
+      await persistExchange(supabase, convo, question, answer, []);
+      return json({ answer, citations: [] });
+    }
+
+    let answer = '';
+    for (const block of finalResponse.content) {
+      if (block.type === 'text') answer += block.text;
+    }
+    if (!answer.trim() && finalResponse.stop_reason === 'tool_use') {
+      // Hit MAX_ITERATIONS still mid tool-use — be honest about it rather
+      // than returning an empty answer.
+      answer =
+        "I wasn't able to finish researching that in time. Please try asking again, maybe with a " +
+        'more specific phrasing.';
+    }
+
+    // Citations fix: recover citations from Claude's native document_index
+    // citations on finalResponse's text blocks, mapped back through
+    // citableDocs -- mirrors v1's packed-doc mapping exactly. See
+    // supabase/functions/_shared/citationMapping.ts.
+    const citations = collectCitations(finalResponse.content, citableDocs);
+
+    // Tool-loop equivalent of v1's packed-size log: the signal for how the
+    // shadow deploy is actually behaving. citable_docs_surfaced and
+    // citations_returned are new with the citations fix -- they used to be
+    // identical to documents_read by construction (citations came only from
+    // documentsRead), so watching them diverge is the signal the fix is
+    // doing something: citations_returned should now be > 0 even on turns
+    // where documents_read is 0.
+    console.log(JSON.stringify({
+      event: 'ask-alcan-tool-loop',
+      search_calls: searchCallCount,
+      tool_calls: toolCallCount,
+      documents_read: readDocumentCount,
+      citable_docs_surfaced: citableDocs.length,
+      citations_returned: citations.length,
+      input_tokens: finalResponse.usage.input_tokens,
+      cache_creation_input_tokens: finalResponse.usage.cache_creation_input_tokens,
+      cache_read_input_tokens: finalResponse.usage.cache_read_input_tokens,
+      output_tokens: finalResponse.usage.output_tokens,
+      stop_reason: finalResponse.stop_reason,
+    }));
+
+    // QA fix (ASK-2): the answer is already paid for (an Anthropic call was
+    // made) — a persistence failure must not discard it, matching v1's
+    // explicit handling. Previously this awaited unguarded, so a transient
+    // ask_messages write failure would throw, get caught by the outer
+    // handler below, and return a generic 500 instead of the real answer.
     try {
       await persistExchange(supabase, convo, question, answer, citations.map((c) => c.document_id));
     } catch (persistErr) {
       console.error('ask-alcan persist failure (answer still returned):', persistErr);
     }
 
-    // FROZEN response contract (ASK-2 additivity guarantee): exactly this shape.
+    // FROZEN response contract (unchanged from v1): exactly this shape.
     return json({ answer, citations });
   } catch (err) {
-    // Detail stays server-side (function logs); the client gets a generic 500.
     console.error('ask-alcan error:', err);
     return json({ error: 'Something went wrong answering that. Please try again.' }, 500);
   }
@@ -281,7 +539,7 @@ Deno.serve(async (req) => {
 
 /** Log the exchange to ask_conversations/ask_messages (consent-scoped tables). */
 async function persistExchange(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   convo: { id: string; title: string | null },
   question: string,
   answer: string,
@@ -300,7 +558,6 @@ async function persistExchange(
     },
   ]);
   if (msgErr) throw msgErr;
-  // Touch the conversation (bumps updated_at); set a title on first use.
   const title = convo.title ?? question.trim().slice(0, 80);
   const { error: convoErr } = await supabase
     .from('ask_conversations')

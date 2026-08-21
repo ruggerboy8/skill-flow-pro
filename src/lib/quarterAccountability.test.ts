@@ -66,6 +66,16 @@ describe('tallyQuarterWindows', () => {
     expect(result.onTime).toBe(1);
   });
 
+  it('treats the due_at-vs-now boundary as inclusive: due exactly at "now" counts as past-due', () => {
+    // Regression pin: an earlier version of this check used `<` instead of
+    // `<=`, which every other test here couldn't distinguish because none
+    // used due_at === now exactly. Frozen `now` (not `new Date()`) is what
+    // makes this deterministic.
+    const windows = [win({ due_at: NOW.toISOString(), status: 'missing' })];
+    const result = tallyQuarterWindows(windows, '2026-06-30', NOW);
+    expect(result.expected).toBe(1);
+  });
+
   it('treats the quarter-end boundary as inclusive', () => {
     const windows = [win({ week_of: '2026-06-30', due_at: '2026-07-01T00:00:00Z', status: 'missing' })];
     const result = tallyQuarterWindows(windows, '2026-06-30', NOW);

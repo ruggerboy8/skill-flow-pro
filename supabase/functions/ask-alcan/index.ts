@@ -124,18 +124,41 @@ const tools: Anthropic.Tool[] = [
   },
 ];
 
-function buildSystemPrompt(areaNames: string[]): string {
+interface GlossaryEntry {
+  term: string;
+  aliases: string[];
+  category: string;
+  definition: string;
+}
+
+/** Renders the house-vocabulary block, or '' when the org has no glossary. */
+function renderGlossary(glossary: GlossaryEntry[]): string {
+  if (glossary.length === 0) return '';
+  const lines = glossary
+    .map((g) => {
+      const also = g.aliases.length > 0 ? ` (also called: ${g.aliases.join(', ')})` : '';
+      return `- ${g.term}${also} [${g.category}]: ${g.definition}`;
+    })
+    .join('\n');
+  return `
+
+House vocabulary. Staff say things the documents may not spell out the same way, so translate before you search. When a question uses one of the alias terms below, run search_corpus with the canonical term (the bolded name), not the alias, and you may include the person's own wording too. Example: a question about what a "DFI" does should be searched as "Front Desk". You may state a definition from this list directly, but still search for and cite the substantive answer to the actual question.
+
+${lines}`;
+}
+
+function buildSystemPrompt(areaNames: string[], glossary: GlossaryEntry[] = []): string {
   const areas = areaNames.length > 0 ? areaNames.join(', ') : 'RDA practice, clinical, operations';
   return `You are Ask Alcan, an internal assistant for Alcan dental practice staff. You have two tools: search_corpus(query) to find candidate documents, and read_document(document_id) to fetch one in full (or its title and link, for videos and files with no extracted text yet).
 
 Rules, in priority order:
-1. Search before answering. Start with search_corpus, and search again with different phrasing if the first pass comes up thin.
+1. Search before answering. Start with search_corpus, and search again with different phrasing if the first pass comes up thin. Translate house vocabulary (see the House vocabulary section below) into the corpus's canonical terms before searching.
 2. Every document search_corpus or read_document gives you is citable source content — use Claude's citation mechanism on the specific passage you drew a claim from, rather than paraphrasing without a citation. Call read_document when a snippet is too thin to answer from confidently, or to confirm a number, price, or policy before you state it; you do not have to read a document first just to cite it.
 3. Answer only from documents you have been given via these tools, and cite them. Never answer from general knowledge about dentistry or business, and NEVER fabricate or guess at a policy, price, number, or procedure.
 4. If the best source for a question is a video or a file whose text hasn't been extracted yet, say so plainly and still name and cite it, so the person can go watch or open it themselves.
 5. If the documents do not cover the question, say so plainly and point the person to the expert area that owns that territory (the areas are: ${areas}). One or two warm sentences; no apology theater.
 6. If documents contradict each other on the point being asked, say that plainly, cite both, and name the owning expert area as the place to resolve it. Do not pick a side.
-7. If someone is venting or looking for a sympathetic ear rather than an answer, respond kindly and briefly, and gently point them to a human — their manager or the owning expert area. Do not turn feelings into policy answers.
+7. If someone is venting or looking for a sympathetic ear rather than an answer, respond kindly and briefly, and gently point them to a human — their manager or the owning expert area. Do not turn feelings into policy answers.${renderGlossary(glossary)}
 
 Style: warm, plain, and concise, like a helpful colleague. No em dashes. Answer the actual question first; add context only when it helps.`;
 }
@@ -309,6 +332,16 @@ Deno.serve(async (req) => {
       .eq('org_id', ALCAN_ORG_ID)
       .order('area_name');
 
+    // House vocabulary: lets the model translate staff shorthand (DFI, RDA,
+    // OM, GA, ...) into the corpus's canonical terms before it searches.
+    const { data: glossaryRows } = await supabase
+      .from('corpus_glossary')
+      .select('term, aliases, category, definition')
+      .eq('org_id', ALCAN_ORG_ID)
+      .order('category')
+      .order('term');
+    const glossary = (glossaryRows ?? []) as GlossaryEntry[];
+
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
     // Cache breakpoint on the system block: everything before it (tool
@@ -318,7 +351,7 @@ Deno.serve(async (req) => {
     const system: Anthropic.TextBlockParam[] = [
       {
         type: 'text',
-        text: buildSystemPrompt((areas ?? []).map((a: { area_name: string }) => a.area_name)),
+        text: buildSystemPrompt((areas ?? []).map((a: { area_name: string }) => a.area_name), glossary),
         cache_control: { type: 'ephemeral' },
       },
     ];

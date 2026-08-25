@@ -1329,6 +1329,12 @@ serve(async (req: Request) => {
           return json({ error: "Forbidden: target user is not in your organization" }, 403);
         }
 
+        // Idempotent: re-enrolling an already-enrolled doctor is a no-op so
+        // the original enrollment timestamp is never silently rewritten.
+        if (enrolled && target.coaching_enrolled_at) {
+          return json({ ok: true, staff_id: target.id, enrolled: true, noop: true });
+        }
+
         const updateData = enrolled
           ? { coaching_enrolled_at: new Date().toISOString(), coaching_enrolled_by: me.id }
           : { coaching_enrolled_at: null, coaching_enrolled_by: null };

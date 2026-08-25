@@ -500,9 +500,10 @@ export default function DoctorManagement() {
                             </DropdownMenuItem>
                           )}
                           {/* Coaching enrollment is a CD/super-admin roster
-                              decision (DR-1); mentees-only coaches don't
-                              manage who is on the org's coaching roster. */}
-                          {!menteesOnly && (
+                              decision (DR-1); gate on the actual privilege,
+                              not on menteesOnly, so a coach whose mentee list
+                              is empty never sees roster-management actions. */}
+                          {(isClinicalDirector || isSuperAdmin) && (
                             doctor.coaching_enrolled_at == null ? (
                               <DropdownMenuItem onClick={(e) => {
                                 e.stopPropagation();

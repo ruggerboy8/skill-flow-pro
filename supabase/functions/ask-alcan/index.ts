@@ -142,7 +142,7 @@ function renderGlossary(glossary: GlossaryEntry[]): string {
     .join('\n');
   return `
 
-House vocabulary. Staff say things the documents may not spell out the same way, so translate before you search. When a question uses one of the alias terms below, run search_corpus with the canonical term (the bolded name), not the alias, and you may include the person's own wording too. Example: a question about what a "DFI" does should be searched as "Front Desk". You may state a definition from this list directly, but still search for and cite the substantive answer to the actual question.
+House vocabulary. Staff say things the documents may not spell out the same way, so translate before you search. When a question uses one of the alias terms below, run search_corpus with the canonical term, not the alias, and you may include the person's own wording too. Example: a question about what a "DFI" does should be searched as "Front Desk". This list is a translation and disambiguation aid, NOT a source: do not present a glossary definition as an established fact, price, or policy. Confirm any substantive claim against a document you retrieve, and cite that document, not this list.
 
 ${lines}`;
 }

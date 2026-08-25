@@ -80,13 +80,13 @@ values
  array['reach answering service','the answering service'],
  'tool',
  'The after-hours answering service that routes patient calls to the on-call doctor.',
- null, 'Confirm current after-hours vendor with operations before treating as canon.'),
+ null, 'No corpus source found; unverified. Confirm the current after-hours vendor with operations.'),
 
 ('a1ca0000-0000-0000-0000-000000000001', 'Thinkific',
  array['thinkific'],
  'tool',
- 'The online learning platform that hosts Alcan training courses.',
- null, 'Relationship to "Done Desk" course assignments unconfirmed; verify.'),
+ 'Formerly referenced as an online learning platform for Alcan training. RETIRED / no longer in use (per John, 2026-08-25).',
+ null, 'No corpus source found; RETIRED per John 2026-08-25. Candidate for deletion.'),
 
 -- ── Clinical procedures & acronyms ───────────────────────────────────────
 ('a1ca0000-0000-0000-0000-000000000001', 'General anesthesia',
@@ -133,3 +133,71 @@ values
  null, null)
 
 on conflict (org_id, term) do nothing;
+
+-- Provenance grounding (ASK-6 follow-up). Rows insert at the default
+-- provenance='assumption'; this block classifies each entry and links the
+-- corpus documents that back it. Portable: it matches by term / source_item_id
+-- and pulls representative (not exhaustive) doc ids via subselect, so it works
+-- in any environment without hardcoded uuids. Re-runnable.
+do $$
+declare org uuid := 'a1ca0000-0000-0000-0000-000000000001';
+begin
+  -- Culture-guide-grounded entries: cite the exact culture doc.
+  update corpus_glossary set provenance='corpus',
+    source_document_ids = array(select id from corpus_documents where org_id=org and source_item_id='culture-guide:history')
+    where org_id=org and term='Alcan Dental Cooperative';
+  update corpus_glossary set provenance='corpus',
+    source_document_ids = array(select id from corpus_documents where org_id=org and source_item_id='culture-guide:value-03-radical-candor')
+    where org_id=org and term='Radical Candor';
+  update corpus_glossary set provenance='corpus',
+    source_document_ids = array(select id from corpus_documents where org_id=org and source_item_id='culture-guide:value-09-extreme-ownership')
+    where org_id=org and term='Extreme Ownership';
+  update corpus_glossary set provenance='corpus',
+    source_document_ids = array(select id from corpus_documents where org_id=org and source_item_id='culture-guide:value-01-safety')
+    where org_id=org and term='Zero defect';
+
+  -- Corpus-term-grounded entries: representative doc ids (not exhaustive).
+  update corpus_glossary set provenance='corpus',
+    source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
+      and (d.body ilike '%DFI%' or d.body ilike '%first impression%' or d.title ilike 'Front Desk pro move%')
+      order by d.source_kind, d.title limit 3)
+    where org_id=org and term='Front Desk';
+  update corpus_glossary set provenance='corpus',
+    source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
+      and d.title ilike 'Dental Assistant pro move%' order by d.title limit 3)
+    where org_id=org and term='Dental Assistant';
+  update corpus_glossary set provenance='corpus',
+    source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
+      and (d.title ilike '%lead%' or d.body ilike '%lead dental assistant%' or d.body ilike '%lead da%')
+      order by d.title limit 3)
+    where org_id=org and term='Lead Dental Assistant';
+  update corpus_glossary set provenance='corpus',
+    source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
+      and d.body ilike '%office manager%' order by d.source_kind, d.title limit 3)
+    where org_id=org and term='Office Manager';
+  update corpus_glossary set provenance='corpus',
+    source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
+      and d.body ilike '%kids tooth%' order by d.title limit 3)
+    where org_id=org and term='Kids Tooth Team';
+  update corpus_glossary set provenance='corpus',
+    source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
+      and d.body ilike '%carestack%' order by d.source_kind, d.title limit 3)
+    where org_id=org and term='CareStack';
+  update corpus_glossary set provenance='corpus',
+    source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
+      and d.body ilike '%membership%' order by d.source_kind, d.title limit 3)
+    where org_id=org and term='Membership plan';
+  update corpus_glossary set provenance='corpus',
+    source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
+      and d.body ilike '%radiograph%'
+      order by (d.title ilike '%refusal%') desc, d.title limit 3)
+    where org_id=org and term='Radiographs';
+
+  -- Standard clinical / role definitions: general knowledge, no Alcan source.
+  update corpus_glossary set provenance='domain_knowledge', source_document_ids='{}'
+    where org_id=org and term in ('Doctor','General anesthesia','IV sedation','Nitrous oxide','Silver Diamine Fluoride','Frenectomy');
+
+  -- Unverified assumptions with NO corpus source (see notes on each row).
+  update corpus_glossary set provenance='assumption', source_document_ids='{}'
+    where org_id=org and term in ('Reach','Thinkific');
+end $$;

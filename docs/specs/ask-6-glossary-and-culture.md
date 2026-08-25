@@ -31,7 +31,28 @@ same gate and pattern as `corpus_expert_areas` (super-admin RLS, org-scoped):
 | `definition` | one to three plain sentences |
 | `maps_to` | optional: the expert area / canonical role a role-term belongs to (free text, portable) |
 | `notes` | optional org-specific caveat, or a "confirm this" flag |
+| `provenance` | where the entry's claim comes from: `corpus` (backed by docs), `domain_knowledge` (general, no Alcan source), `assumption` (unverified Alcan claim) — default `assumption` |
+| `source_document_ids` (uuid[]) | the corpus docs that back the entry (representative, not exhaustive); empty for domain_knowledge / assumption |
 | `unique (org_id, term)` | idempotent seeding |
+
+### Provenance (added 20260825180000)
+
+Every entry says where its claim came from, so a wrong entry is traceable and
+the unbacked ones are visible. This exists because the first seed asserted
+"Thinkific hosts Alcan training" from Claude's own inference; it is in fact
+retired. Audit the risky ones directly:
+
+```sql
+select term, provenance, source_document_ids, notes
+from corpus_glossary
+where provenance = 'assumption';   -- the entries with NO source; verify these first
+```
+
+The assistant treats the glossary as a translation/disambiguation aid, **not**
+a citable source: its prompt says never to present a glossary definition as an
+established fact and to confirm substantive claims against retrieved documents.
+So a stale glossary entry degrades search wording at worst, it does not put an
+un-sourced claim into an answer.
 
 **To onboard a new org:** seed `corpus_glossary` with that org's rows using the
 same columns. Nothing else changes. The Alcan content lives separately in

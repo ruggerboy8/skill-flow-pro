@@ -18,6 +18,13 @@ export interface Signal {
 
 interface SignalsBannerProps {
   signals: Signal[];
+  /** Moment-specific strip title, e.g. "Needs a nudge" or "Missed this week".
+   * Falls back to the original generic copy when omitted. */
+  title?: string;
+  /** Moment-specific empty-state line, e.g. "All locations submitted" for
+   * wrap-up or "No flags this week" for mid-week. Falls back to the
+   * original generic copy when omitted. */
+  emptyStateMessage?: string;
 }
 
 const SIGNAL_ICON = {
@@ -40,14 +47,14 @@ const TONE_TOKENS = {
   },
 } as const;
 
-export function SignalsBanner({ signals }: SignalsBannerProps) {
+export function SignalsBanner({ signals, title, emptyStateMessage }: SignalsBannerProps) {
   const [expanded, setExpanded] = useState(true);
 
   if (signals.length === 0) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground py-1">
         <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: 'hsl(var(--status-complete))' }} />
-        <span>No flags this week, all locations on track.</span>
+        <span>{emptyStateMessage ?? 'No flags this week, all locations on track.'}</span>
       </div>
     );
   }
@@ -65,7 +72,9 @@ export function SignalsBanner({ signals }: SignalsBannerProps) {
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 shrink-0" style={{ color: tone.text }} />
           <span className="text-sm font-semibold" style={{ color: tone.text }}>
-            {signals.length} signal{signals.length !== 1 ? 's' : ''} this week
+            {title
+              ? `${title} · ${signals.length} location${signals.length !== 1 ? 's' : ''}`
+              : `${signals.length} signal${signals.length !== 1 ? 's' : ''} this week`}
           </span>
           <Badge variant="secondary" className="text-xs" style={{ backgroundColor: tone.bg, color: tone.text }}>
             Needs attention

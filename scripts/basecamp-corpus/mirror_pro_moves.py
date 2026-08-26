@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """ASK-5: mirror active pro moves + resources into corpus_documents.
 
-Renders every active, platform-owned pro move (owner_org_id is null) as one
+Renders every active, platform-owned (owner_org_id is null) pro move for
+Alcan's practice type (practice_types contains 'pediatric_us') as one
 corpus document (Option A in the spec): the pro move's own prose
 (action_statement, description, intervention_text) plus its active
 pro_move_resources bodies (staff script, and for doctor moves the four
@@ -53,6 +54,13 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from corpus_lib import ALCAN_ORG_ID  # noqa: E402
+
+# Alcan is a US pediatric practice. The platform pro_moves table also holds
+# other frameworks (e.g. general_uk from the Avenue expansion), so scoping by
+# owner_org_id alone is NOT enough — it would mirror the whole library. Mirror
+# only this org's practice type. (Multi-tenant: map org -> practice type here
+# when a second org's corpus is built.)
+ALCAN_PRACTICE_TYPE = "pediatric_us"
 from db import get_client  # noqa: E402
 from mirror_lib import (  # noqa: E402
     expert_area_name_for_role,
@@ -100,15 +108,23 @@ def save_state(path: str, watermark: int, dry_run: bool) -> None:
 
 
 def fetch_active_pro_moves(client) -> list[dict]:
-    """Active, platform-owned pro moves (spec out-of-scope: org-owned pro
-    moves are filtered out; there are none live yet, but this is the
-    documented filter, not an assumption)."""
+    """Active, platform-owned pro moves for THIS org's practice type only.
+
+    Two filters, both required: owner_org_id is null (platform framework, not
+    an org's private pro moves) AND practice_types contains ALCAN_PRACTICE_TYPE.
+    The practice-type filter is not optional: the table mixes pediatric_us and
+    general_uk frameworks, and without it the mirror ingests the UK library
+    into Alcan's corpus (the 2026-08-25 leak: 125 general_uk docs)."""
     raw = client.select_all(
         "pro_moves",
         "action_id,action_statement,description,intervention_text,"
-        "competency_id,role_id,updated_at,owner_org_id",
+        "competency_id,role_id,updated_at,owner_org_id,practice_types",
         filters={"active": "true"}, page_size=1000, order="action_id.asc")
-    return [m for m in raw if m.get("owner_org_id") is None]
+    return [
+        m for m in raw
+        if m.get("owner_org_id") is None
+        and ALCAN_PRACTICE_TYPE in (m.get("practice_types") or [])
+    ]
 
 
 def fetch_resources_by_action(client) -> dict[int, list[dict]]:

@@ -101,3 +101,27 @@ export function blastBadgeLabel(state: BlastSlotState): string | undefined {
 export function shouldConfirmRegenerate(currentBody: string, lastGeneratedBody: string): boolean {
   return currentBody.trim() !== lastGeneratedBody.trim();
 }
+
+/**
+ * LRM-4: the subject a fresh draft proposes, and what a blank subject field
+ * displays as a placeholder before she has typed her own. Mirrors
+ * supabase/functions/lead-week-blast/index.ts's buildDefaultSubject -- keep
+ * the two in sync if this wording changes. weekStartDate is a YYYY-MM-DD
+ * Monday, read in the browser's local calendar the same way the rest of
+ * this tab's date labels are (see MeetingsAndFocusTab.tsx's `parse`).
+ */
+export function buildDefaultBlastSubject(weekStartDate: string): string {
+  const date = new Date(weekStartDate + 'T12:00:00');
+  const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `This week with your Lead RDAs: Week of ${formatted}`;
+}
+
+/**
+ * LRM-4: the "(X excluded)" suffix appended to the sent summary, omitted
+ * entirely when nothing was excluded (omit-absent-content rule -- a sent
+ * blast with no exclusions should read exactly as it did before this
+ * ticket).
+ */
+export function buildExcludedSuffix(excludedCount: number): string {
+  return excludedCount > 0 ? ` (${excludedCount} excluded)` : '';
+}

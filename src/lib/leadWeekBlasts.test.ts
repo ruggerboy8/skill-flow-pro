@@ -2,14 +2,16 @@ import { describe, it, expect } from 'vitest';
 import {
   canDraftBlast, deriveBlastSlotState, blastSlotBadgeStatus, blastBadgeLabel,
   buildSendConfirmBody, shouldConfirmRegenerate, canConfirmSend, formatSentSummary,
+  buildDefaultBlastSubject, buildExcludedSuffix,
 } from './leadWeekBlasts';
 import type { LeadWeekBlastRow } from '@/types/leadWeekBlasts';
 
 function blast(overrides: Partial<LeadWeekBlastRow> = {}): LeadWeekBlastRow {
   return {
     id: 'b1', organization_id: 'org1', created_by: 'staff1',
-    week_start_date: '2026-08-10', body: 'Hello doctors', status: 'draft',
+    week_start_date: '2026-08-10', body: 'Hello doctors', subject: '', status: 'draft',
     sent_at: null, sent_by: null, recipient_count: null, failed_count: null,
+    excluded_staff_ids: [],
     location_id: null,
     created_at: '2026-08-10T12:00:00Z', updated_at: '2026-08-10T12:00:00Z',
     ...overrides,
@@ -154,5 +156,33 @@ describe('formatSentSummary', () => {
 
   it('never reads negative even if the inputs are malformed', () => {
     expect(formatSentSummary(-1, -1)).toBe('0 doctors');
+  });
+});
+
+describe('buildDefaultBlastSubject', () => {
+  it('builds the standard default subject for a given week', () => {
+    expect(buildDefaultBlastSubject('2026-08-10')).toBe('This week with your Lead RDAs: Week of Aug 10');
+  });
+
+  it('has no em dash anywhere in the output', () => {
+    expect(buildDefaultBlastSubject('2026-12-28')).not.toMatch(/—/);
+  });
+});
+
+describe('buildExcludedSuffix', () => {
+  it('is empty when nothing was excluded (omit-absent-content)', () => {
+    expect(buildExcludedSuffix(0)).toBe('');
+  });
+
+  it('is empty for a negative or malformed count', () => {
+    expect(buildExcludedSuffix(-3)).toBe('');
+  });
+
+  it('appends a parenthetical count when something was excluded', () => {
+    expect(buildExcludedSuffix(2)).toBe(' (2 excluded)');
+  });
+
+  it('does not pluralize or otherwise special-case a single exclusion', () => {
+    expect(buildExcludedSuffix(1)).toBe(' (1 excluded)');
   });
 });

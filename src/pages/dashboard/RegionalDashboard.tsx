@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Users, AlertCircle, TrendingUp, CloudOff, Clock } from 'lucide-react';
+import { Users, TrendingUp, CloudOff, Clock } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
 import { format as formatDate } from 'date-fns';
 import { StaffWeekSummary } from '@/types/coachV2';
@@ -18,6 +18,8 @@ import { useLocationTimezone } from '@/hooks/useLocationTimezone';
 import { getLocationSubmissionGates, calculateLocationStats, calculateDistinctMissedCount, calculateDueSubmissionTotals, type SubmissionGates } from '@/lib/submissionStatus';
 import { getSubmissionPolicy, getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
 import { participationTier, tierColorTokens } from '@/lib/participationTier';
+import { getDashboardMoment } from '@/lib/dashboardMoment';
+import { wrapupComparator, midweekComparator } from '@/lib/dashboardGridSort';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LocationConfig {
@@ -174,7 +176,8 @@ export default function RegionalDashboard() {
       };
     });
 
-    stats.sort((a, b) => a.submissionRate - b.submissionRate);
+    // DASH-1b: no longer sorted here - the moment-aware comparator is
+    // applied later, once `moment` is known, via `sortedLocationStats`.
 
     const totalStaff = stats.reduce((sum, s) => sum + s.staffCount, 0);
     const totalMissingConf = stats.reduce((sum, s) => sum + s.missingConfCount, 0);
@@ -313,6 +316,11 @@ export default function RegionalDashboard() {
       confRate,
       perfRate,
       avgRate,
+      // Exposed for the merged participation row (DASH-1b): the same
+      // pooled due-conf + due-perf figures already used to compute
+      // avgRate above, not a new aggregate.
+      dueSubmitted,
+      dueExpected,
       confTier: participationTier({
         rate: confRate,
         missedCount: totals.totalMissingConf,
@@ -336,6 +344,54 @@ export default function RegionalDashboard() {
       }),
     };
   }, [totals]);
+
+  // DASH-1b: which of the page's two moments we're in - mid-week (nudge
+  // toward a deadline) or wrap-up (review what was missed). Drives strip
+  // titling, section order, and grid sort below. See dashboardMoment.ts.
+  const moment = useMemo(() => getDashboardMoment(locationGatesMap), [locationGatesMap]);
+
+  // DASH-1b: per-location deadline metadata for the grid's mid-week sort,
+  // computed once alongside the same policy calls the display label
+  // already needed, so the sort and the label can never disagree.
+  const locationDeadlineMeta = useMemo(() => {
+    const map = new Map<string, { label: string | null; nextDeadlineAt: Date | null; pendingCount: number }>();
+    locationStats.forEach(stats => {
+      const locConfig = locationConfigs.get(stats.id);
+      let label: string | null = null;
+      let nextDeadlineAt: Date | null = null;
+      let pendingCount = 0;
+      if (locConfig) {
+        const offsets = getPolicyOffsetsForLocation(locConfig);
+        const policy = getSubmissionPolicy(now, locConfig.timezone, offsets);
+        if (!policy.isConfidenceLate(now)) {
+          label = `Conf due ${formatInTimeZone(policy.confidence_due, locConfig.timezone, 'EEE h:mm a')}`;
+          nextDeadlineAt = policy.confidence_due;
+          pendingCount = stats.pendingConfCount ?? 0;
+        } else if (!policy.isPerformanceLate(now)) {
+          label = `Perf due ${formatInTimeZone(policy.performance_due, locConfig.timezone, 'EEE h:mm a')}`;
+          nextDeadlineAt = policy.performance_due;
+          pendingCount = Math.max((stats.perfExpected ?? 0) - (stats.perfSubmitted ?? 0), 0);
+        }
+      }
+      map.set(stats.id, { label, nextDeadlineAt, pendingCount });
+    });
+    return map;
+  }, [locationStats, locationConfigs, now]);
+
+  // DASH-1b: the grid's actual display order, per moment. Wrap-up keeps the
+  // original worst-rate-first order (wrapupComparator, extracted unchanged
+  // from what this page always did). Mid-week orders by soonest deadline,
+  // then by pending count (midweekComparator) - "who needs a nudge first."
+  const sortedLocationStats = useMemo(() => {
+    if (moment === 'wrapup') {
+      return [...locationStats].sort(wrapupComparator);
+    }
+    return [...locationStats].sort((a, b) => {
+      const metaA = locationDeadlineMeta.get(a.id) ?? { nextDeadlineAt: null, pendingCount: 0 };
+      const metaB = locationDeadlineMeta.get(b.id) ?? { nextDeadlineAt: null, pendingCount: 0 };
+      return midweekComparator(metaA, metaB);
+    });
+  }, [locationStats, locationDeadlineMeta, moment]);
 
   if (loading) {
     return (
@@ -371,6 +427,47 @@ export default function RegionalDashboard() {
     );
   }
 
+  // DASH-1b: build the heatmap and grid sections once, then order them by
+  // moment below, rather than writing two parallel JSX trees.
+  const heatmapSection = locationIdList.length > 0 ? (
+    <DomainConfidenceHeatmap
+      key="heatmap"
+      locationIds={locationIdList}
+      locationNames={locationNamesMap}
+    />
+  ) : null;
+
+  const gridSection = (
+    <div key="grid">
+      {locationStats.length === 0 ? (
+        <Card>
+          <CardContent className="p-6 text-center text-muted-foreground">
+            No location data available for this week.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {sortedLocationStats.map(stats => (
+            <LocationHealthCard
+              key={stats.id}
+              stats={stats}
+              excuseStatus={getExcuseStatus(stats.id)}
+              submissionGates={getCardSubmissionGates(stats.id)}
+              nextDeadlineLabel={locationDeadlineMeta.get(stats.id)?.label ?? null}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // Mid-week: grid first (nudge targets), heatmap demoted to the bottom
+  // (it's 6-week lookback data, irrelevant to nudging). Wrap-up: heatmap
+  // promoted as the coaching lens, grid as the calm archive.
+  const orderedSections = moment === 'wrapup'
+    ? [heatmapSection, gridSection]
+    : [gridSection, heatmapSection];
+
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -383,12 +480,16 @@ export default function RegionalDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+              <Users className="h-4 w-4" />
+              {totals.totalStaff} staff
+            </span>
             <Badge variant="outline" className="text-sm">
               {totals.locationCount} Location{totals.locationCount !== 1 ? 's' : ''}
             </Badge>
             {canManageExcuses && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => setExcuseDialogOpen(true)}
                 className="gap-2"
@@ -400,160 +501,96 @@ export default function RegionalDashboard() {
           </div>
         </div>
 
-        {/* Signals Banner */}
-        <SignalsBanner signals={signals} />
+        {/* Signals Banner, retitled per moment (DASH-1b) */}
+        <SignalsBanner
+          signals={signals}
+          title={moment === 'wrapup' ? 'Missed this week' : 'Needs a nudge'}
+          emptyStateMessage={
+            moment === 'wrapup'
+              ? 'All locations submitted.'
+              : 'No flags this week, all locations on track.'
+          }
+        />
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Total Staff
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{totals.totalStaff}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" />
-                Submissions Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {totals.totalMissingConf === 0 && totals.totalPendingConf === 0 && totals.totalMissingPerf === 0 ? (
-                <div>
-                  <div className="text-sm text-muted-foreground">All on track!</div>
-                  {nextDeadlineLabel && (
-                    <p className="text-xs text-muted-foreground/70 mt-1">Next: {nextDeadlineLabel}</p>
-                  )}
-                </div>
-              ) : (
-                <div className="flex gap-4">
-                  {totals.totalConfExpected > 0 && (
-                    <div>
-                      <div
-                        className="text-2xl font-bold"
-                        style={{ color: tierColorTokens(summaryTiers.confTier)?.text ?? 'hsl(var(--foreground))' }}
-                      >
-                        {summaryTiers.confRate}%
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {totals.totalDueConfSubmitted}/{totals.totalDueConfExpected} conf submitted
-                      </p>
-                      {totals.totalMissingConf > 0 && (
-                        <span
-                          className="inline-flex items-center mt-1 rounded-full px-1.5 py-0.5 text-2xs font-medium"
-                          style={{ backgroundColor: 'hsl(var(--status-late-bg))', color: 'hsl(var(--status-late))' }}
-                        >
-                          {totals.totalMissingConf} late
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {totals.totalPendingConf > 0 && (
-                    <div>
-                      <div className="text-2xl font-bold text-foreground">{totals.totalPendingConf}</div>
-                      <p className="text-xs text-muted-foreground">Pending Conf</p>
-                    </div>
+        {/* Weekly Participation - merged from the three former summary
+            cards (Total Staff moved to the header above) into one
+            proportion+meter row (DASH-1b). */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Weekly Participation
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {totals.anyLocationPastDeadline ? (
+              <div className="space-y-2">
+                <div className="flex items-baseline gap-3 flex-wrap">
+                  <span
+                    className="text-3xl font-bold"
+                    style={{ color: tierColorTokens(summaryTiers.avgTier)?.text ?? 'hsl(var(--foreground))' }}
+                  >
+                    {summaryTiers.avgRate}%
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {summaryTiers.dueSubmitted} of {summaryTiers.dueExpected} due submitted
+                  </span>
+                  {totals.totalMissingConf > 0 && (
+                    <span
+                      className="inline-flex items-center rounded-full px-1.5 py-0.5 text-2xs font-medium"
+                      style={{ backgroundColor: 'hsl(var(--status-late-bg))', color: 'hsl(var(--status-late))' }}
+                    >
+                      {totals.totalMissingConf} conf late
+                    </span>
                   )}
                   {totals.totalMissingPerf > 0 && (
-                    <div>
-                      <div
-                        className="text-2xl font-bold"
-                        style={{ color: tierColorTokens(summaryTiers.perfTier)?.text ?? 'hsl(var(--foreground))' }}
-                      >
-                        {summaryTiers.perfRate}%
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {totals.totalDuePerfSubmitted}/{totals.totalDuePerfExpected} perf submitted
-                      </p>
-                      <span
-                        className="inline-flex items-center mt-1 rounded-full px-1.5 py-0.5 text-2xs font-medium"
-                        style={{ backgroundColor: 'hsl(var(--status-late-bg))', color: 'hsl(var(--status-late))' }}
-                      >
-                        {totals.totalMissingPerf} late
-                      </span>
-                    </div>
+                    <span
+                      className="inline-flex items-center rounded-full px-1.5 py-0.5 text-2xs font-medium"
+                      style={{ backgroundColor: 'hsl(var(--status-late-bg))', color: 'hsl(var(--status-late))' }}
+                    >
+                      {totals.totalMissingPerf} perf late
+                    </span>
                   )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                Avg Completion
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {totals.anyLocationPastDeadline ? (
-                <div
-                  className="text-3xl font-bold"
-                  style={{ color: tierColorTokens(summaryTiers.avgTier)?.text ?? 'hsl(var(--foreground))' }}
-                >
-                  {summaryTiers.avgRate}%
+                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${Math.min(summaryTiers.avgRate, 100)}%`,
+                      backgroundColor: tierColorTokens(summaryTiers.avgTier)?.text ?? 'hsl(var(--status-complete))',
+                    }}
+                  />
                 </div>
-              ) : (
-                <div>
-                  <div className="text-2xl font-bold text-foreground">
-                    {totals.totalConfSubmitted}/{totals.totalConfExpected}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-baseline gap-3">
+                  <span className="text-2xl font-bold text-foreground">
+                    {totals.totalConfSubmitted} of {totals.totalConfExpected}
+                  </span>
+                  <span className="text-sm text-muted-foreground">confidence in</span>
+                </div>
+                {totals.totalConfExpected > 0 && (
+                  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.min((totals.totalConfSubmitted / totals.totalConfExpected) * 100, 100)}%`,
+                        backgroundColor: 'hsl(var(--muted-foreground) / 0.4)',
+                      }}
+                    />
                   </div>
-                  <p className="text-xs text-muted-foreground">Conf submitted</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                )}
+                {nextDeadlineLabel && (
+                  <p className="text-xs text-muted-foreground/70">Next: {nextDeadlineLabel}</p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* Domain Confidence Heatmap */}
-        {locationIdList.length > 0 && (
-          <DomainConfidenceHeatmap
-            locationIds={locationIdList}
-            locationNames={locationNamesMap}
-          />
-        )}
-
-        {/* Location Grid */}
-        {locationStats.length === 0 ? (
-          <Card>
-            <CardContent className="p-6 text-center text-muted-foreground">
-              No location data available for this week.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {locationStats.map(stats => {
-              // Compute per-location next deadline label
-              const locConfig = locationConfigs.get(stats.id);
-              let locDeadlineLabel: string | null = null;
-              if (locConfig) {
-                const offsets = getPolicyOffsetsForLocation(locConfig);
-                const policy = getSubmissionPolicy(now, locConfig.timezone, offsets);
-                if (!policy.isConfidenceLate(now)) {
-                  locDeadlineLabel = `Conf due ${formatInTimeZone(policy.confidence_due, locConfig.timezone, 'EEE h:mm a')}`;
-                } else if (!policy.isPerformanceLate(now)) {
-                  locDeadlineLabel = `Perf due ${formatInTimeZone(policy.performance_due, locConfig.timezone, 'EEE h:mm a')}`;
-                }
-              }
-              return (
-                <LocationHealthCard
-                  key={stats.id}
-                  stats={stats}
-                  excuseStatus={getExcuseStatus(stats.id)}
-                  submissionGates={getCardSubmissionGates(stats.id)}
-                  nextDeadlineLabel={locDeadlineLabel}
-                />
-              );
-            })}
-          </div>
-        )}
+        {/* Moment-aware section order (DASH-1b): see orderedSections above. */}
+        {orderedSections}
       </div>
       
       {/* Excuse Submissions Dialog */}

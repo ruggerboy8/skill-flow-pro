@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  canDraftBlast, deriveBlastSlotState, blastSlotBadgeStatus,
+  canDraftBlast, deriveBlastSlotState, blastSlotBadgeStatus, blastBadgeLabel,
   buildSendConfirmBody, shouldConfirmRegenerate, canConfirmSend, formatSentSummary,
 } from './leadWeekBlasts';
 import type { LeadWeekBlastRow } from '@/types/leadWeekBlasts';
@@ -75,6 +75,18 @@ describe('blastSlotBadgeStatus', () => {
 
   it('maps sent to completed', () => {
     expect(blastSlotBadgeStatus('sent')).toBe('completed');
+  });
+});
+
+describe('blastBadgeLabel', () => {
+  it('softens the none state to "Waiting"', () => {
+    expect(blastBadgeLabel('none')).toBe('Waiting');
+  });
+
+  it('has no override for draftable, draft, or sent', () => {
+    expect(blastBadgeLabel('draftable')).toBeUndefined();
+    expect(blastBadgeLabel('draft')).toBeUndefined();
+    expect(blastBadgeLabel('sent')).toBeUndefined();
   });
 });
 

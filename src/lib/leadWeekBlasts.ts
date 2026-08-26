@@ -81,6 +81,17 @@ export function formatSentSummary(recipientCount: number, failedCount: number): 
 }
 
 /**
+ * LRM-3 B4: UI wording override for the 'none' blast state's badge. The
+ * status token stays 'locked' so the color/icon still match every other
+ * locked state, but the label softens from "Locked" to "Waiting" per the
+ * show-do-not-lock principle -- an empty week isn't locked, it's just
+ * waiting on a focus or meeting to draft from.
+ */
+export function blastBadgeLabel(state: BlastSlotState): string | undefined {
+  return state === 'none' ? 'Waiting' : undefined;
+}
+
+/**
  * Whether clicking "regenerate" while a draft exists should interrupt with
  * a "Replace the current draft? Your edits will be lost." confirm, versus
  * regenerating straight away. Only interrupts if the draft body currently

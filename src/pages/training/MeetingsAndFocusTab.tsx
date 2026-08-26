@@ -8,13 +8,18 @@ import { useWorkspaceLocations } from '@/hooks/useWorkspaceLocations';
 import { SOURCE_META, type SourceType, type CoachingIssue } from '@/types/coachingWorkspace';
 import { OUTCOME_META, type HydratedFocusWeek } from '@/types/leadFocus';
 import type { LeadMeetingRow } from '@/types/leadMeetings';
-import type { LeadWeekBlastRow } from '@/types/leadWeekBlasts';
+import type { LeadWeekBlastRow, LeadWeekBlastRecipient } from '@/types/leadWeekBlasts';
 import { deriveFocusSlotState, deriveMeetingSlotState, meetingsInWeek } from '@/lib/leadMeetingsAndFocus';
 import {
-  deriveBlastSlotState, blastSlotBadgeStatus, blastBadgeLabel, buildSendConfirmBody, shouldConfirmRegenerate,
-  canConfirmSend, formatSentSummary,
+  deriveBlastSlotState, blastSlotBadgeStatus, blastBadgeLabel, shouldConfirmRegenerate,
+  canConfirmSend, formatSentSummary, buildDefaultBlastSubject, buildExcludedSuffix,
   type BlastSlotState,
 } from '@/lib/leadWeekBlasts';
+import {
+  groupRecipientsByLocation, isGroupFullyIncluded, isEveryoneIncluded,
+  toggleDoctorExclusion, toggleGroupExclusion, toggleAllExclusion,
+  deriveExclusionIds, buildSendingSummary,
+} from '@/lib/leadWeekBlastRecipients';
 import {
   buildPipelineChips, deriveWeekGlyphStates, shouldHideEmptyBadge, isBuilderDirty,
   type WeekWhen, type PipelineChip, type PipelineChipStatus, type WeekGlyphStates,
@@ -30,10 +35,16 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
 import {
   ChevronLeft, ChevronRight, LayoutList, CalendarDays, Sparkles, Loader2, Plus, X, Shield,
-  Users, Mail,
+  Users, Mail, Send,
 } from 'lucide-react';
 import { CT_TZ } from '@/lib/centralTime';
 import { addDaysToDateString, mondaysInMonth as mondaysInMonthTz } from '@/lib/dateUtils';
@@ -403,11 +414,13 @@ function BlastSlot({
   blastsHook: ReturnType<typeof useLeadWeekBlasts>;
 }) {
   const [editedBody, setEditedBody] = useState(weekBlast?.body ?? '');
+  const [editedSubject, setEditedSubject] = useState(weekBlast?.subject || buildDefaultBlastSubject(weekStartDate));
   const [drafting, setDrafting] = useState(false);
   const [regenConfirmOpen, setRegenConfirmOpen] = useState(false);
-  const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
-  const [recipientCount, setRecipientCount] = useState<number | null>(null);
-  const [countLoading, setCountLoading] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [recipients, setRecipients] = useState<LeadWeekBlastRecipient[]>([]);
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
+  const [recipientsLoading, setRecipientsLoading] = useState(false);
   const lastGeneratedRef = useRef('');
 
   // Re-sync local edit state when a different week's draft loads. Keyed on
@@ -415,19 +428,23 @@ function BlastSlot({
   // silently refetches the same row.
   useEffect(() => {
     setEditedBody(weekBlast?.body ?? '');
+    setEditedSubject(weekBlast?.subject || buildDefaultBlastSubject(weekStartDate));
     lastGeneratedRef.current = weekBlast?.body ?? '';
   }, [weekBlast?.id, weekStartDate]);
 
   const runDraft = async () => {
     setDrafting(true);
     try {
-      const body = await blastsHook.generateDraft.mutateAsync(weekStartDate);
+      const { body, subject } = await blastsHook.generateDraft.mutateAsync(weekStartDate);
       lastGeneratedRef.current = body;
       setEditedBody(body);
       if (weekBlast) {
-        blastsHook.updateBlastBody.mutate({ id: weekBlast.id, body });
+        // Regenerating an existing draft only replaces the body -- her
+        // subject line (default or hand-edited) is untouched.
+        blastsHook.updateBlastBody.mutate({ id: weekBlast.id, body, subject: weekBlast.subject });
       } else {
-        blastsHook.createBlast.mutate({ weekStartDate, body });
+        setEditedSubject(subject);
+        blastsHook.createBlast.mutate({ weekStartDate, body, subject });
       }
     } catch {
       // Failure toast already shown by the hook's onError.
@@ -444,44 +461,58 @@ function BlastSlot({
     }
   };
 
+  const onTestSendClick = () => {
+    if (!weekBlast) return;
+    blastsHook.testSendBlast.mutate(weekBlast.id, {
+      onSuccess: (data) => toast({ title: 'Test sent', description: `Sent to ${data.email}.` }),
+    });
+  };
+
   const onSendClick = async () => {
-    setCountLoading(true);
+    setRecipientsLoading(true);
     try {
-      const count = await blastsHook.fetchRecipientCount.mutateAsync();
-      setRecipientCount(count);
-      // QA fix: zero eligible doctors means there's nothing to confirm --
-      // show a plain message instead of opening a confirm dialog for a send
-      // the edge function would reject anyway.
-      if (canConfirmSend(count)) {
-        setSendConfirmOpen(true);
+      const list = await blastsHook.fetchRecipients.mutateAsync();
+      // Fresh every open: nothing carries over from a previous review.
+      setRecipients(list);
+      setExcludedIds(new Set());
+      // QA fix carried from LRM-2: zero eligible doctors means there's
+      // nothing to review -- show a plain message instead of opening the
+      // review step for a send the edge function would reject anyway.
+      if (canConfirmSend(list.length)) {
+        setReviewOpen(true);
       } else {
         toast({ title: 'No doctors to send to', description: 'There are no doctors to send this to yet.' });
       }
     } catch {
       // Failure toast already shown by the hook's onError.
     } finally {
-      setCountLoading(false);
+      setRecipientsLoading(false);
     }
   };
 
+  const includedCount = recipients.length - excludedIds.size;
+
   const confirmSend = () => {
     if (!weekBlast) return;
-    blastsHook.sendBlast.mutate(weekBlast.id, {
-      onSuccess: (data) => {
-        setSendConfirmOpen(false);
-        // QA fix: a partial failure must be visible, not swallowed into a
-        // clean "sent" toast.
-        if (data.failed > 0) {
-          toast({
-            title: 'Sent with some failures',
-            description: `${data.sent} sent, ${data.failed} failed. Check the recipient list and try again if needed.`,
-            variant: 'destructive',
-          });
-        } else {
-          toast({ title: 'Sent to doctors' });
-        }
+    blastsHook.sendBlast.mutate(
+      { blastId: weekBlast.id, excludedStaffIds: deriveExclusionIds(excludedIds) },
+      {
+        onSuccess: (data) => {
+          setReviewOpen(false);
+          // QA fix: a partial failure must be visible, not swallowed into a
+          // clean "sent" toast.
+          if (data.failed > 0) {
+            toast({
+              title: 'Sent with some failures',
+              description: `${data.sent} sent, ${data.failed} failed. Check the recipient list and try again if needed.`,
+              variant: 'destructive',
+            });
+          } else {
+            toast({ title: 'Sent to doctors' });
+          }
+        },
       },
-    });
+    );
   };
 
   if (state === 'none' || state === 'draftable') {
@@ -505,11 +536,12 @@ function BlastSlot({
 
   if (state === 'sent' && weekBlast) {
     const summary = formatSentSummary(weekBlast.recipient_count ?? 0, weekBlast.failed_count ?? 0);
+    const excludedSuffix = buildExcludedSuffix(weekBlast.excluded_staff_ids?.length ?? 0);
     return (
       <div className="space-y-2.5">
         <div className="whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">{weekBlast.body}</div>
         <div className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Sent {weekBlast.sent_at && fmtSentAt(weekBlast.sent_at)} · {summary}
+          Sent {weekBlast.sent_at && fmtSentAt(weekBlast.sent_at)} · {summary}{excludedSuffix}
         </div>
       </div>
     );
@@ -518,13 +550,17 @@ function BlastSlot({
   // state === 'draft'
   return (
     <div className="space-y-3">
+      <div>
+        <Label htmlFor="blast-subject" className="mb-1.5 block text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Subject</Label>
+        <Input id="blast-subject" value={editedSubject} onChange={(e) => setEditedSubject(e.target.value)} />
+      </div>
       <Textarea value={editedBody} onChange={(e) => setEditedBody(e.target.value)} rows={10} />
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
           variant="outline"
           disabled={!editedBody.trim() || !weekBlast || blastsHook.updateBlastBody.isPending}
-          onClick={() => weekBlast && blastsHook.updateBlastBody.mutate({ id: weekBlast.id, body: editedBody })}
+          onClick={() => weekBlast && blastsHook.updateBlastBody.mutate({ id: weekBlast.id, body: editedBody, subject: editedSubject })}
         >
           {blastsHook.updateBlastBody.isPending ? (
             <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</>
@@ -537,8 +573,20 @@ function BlastSlot({
             <><Sparkles className="mr-1.5 h-4 w-4" />Regenerate</>
           )}
         </Button>
-        <Button size="sm" className="ml-auto" disabled={!editedBody.trim() || !weekBlast || countLoading} onClick={onSendClick}>
-          {countLoading ? (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!editedBody.trim() || !weekBlast || blastsHook.testSendBlast.isPending}
+          onClick={onTestSendClick}
+        >
+          {blastsHook.testSendBlast.isPending ? (
+            <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Sending test…</>
+          ) : (
+            <><Send className="mr-1.5 h-4 w-4" />Send a test to me</>
+          )}
+        </Button>
+        <Button size="sm" className="ml-auto" disabled={!editedBody.trim() || !weekBlast || recipientsLoading} onClick={onSendClick}>
+          {recipientsLoading ? (
             <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Checking…</>
           ) : (
             <><Mail className="mr-1.5 h-4 w-4" />Send to doctors</>
@@ -559,26 +607,118 @@ function BlastSlot({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={sendConfirmOpen} onOpenChange={setSendConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Send this to all doctors?</AlertDialogTitle>
-            <AlertDialogDescription>{buildSendConfirmBody(recipientCount ?? 0)}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={blastsHook.sendBlast.isPending || !canConfirmSend(recipientCount ?? 0)}
-              onClick={confirmSend}
-            >
-              {blastsHook.sendBlast.isPending ? (
-                <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Sending…</>
-              ) : 'Send'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <RecipientReviewDialog
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        subject={editedSubject}
+        recipients={recipients}
+        excludedIds={excludedIds}
+        onExcludedIdsChange={setExcludedIds}
+        includedCount={includedCount}
+        sending={blastsHook.sendBlast.isPending}
+        onConfirm={confirmSend}
+      />
     </div>
+  );
+}
+
+/**
+ * LRM-4: the "Send to doctors" review step. Groups the resolved cohort by
+ * location (Roaming for doctors with no home location), lets her narrow the
+ * send with per-doctor, per-location, and top-level toggles, and shows a
+ * live "Sending to N of M doctors" line. Everyone starts checked and
+ * nothing carries over between opens -- the parent resets excludedIds each
+ * time it fetches a fresh recipient list.
+ */
+function RecipientReviewDialog({
+  open, onOpenChange, subject, recipients, excludedIds, onExcludedIdsChange, includedCount, sending, onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  subject: string;
+  recipients: LeadWeekBlastRecipient[];
+  excludedIds: Set<string>;
+  onExcludedIdsChange: (next: Set<string>) => void;
+  includedCount: number;
+  sending: boolean;
+  onConfirm: () => void;
+}) {
+  const groups = groupRecipientsByLocation(recipients);
+  const everyoneIncluded = isEveryoneIncluded(excludedIds, recipients);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Send to doctors</DialogTitle>
+          <DialogDescription>Review who this goes to before sending. It cannot be sent twice.</DialogDescription>
+        </DialogHeader>
+
+        <div className="rounded-lg border bg-muted/30 p-2.5">
+          <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Subject</span>
+          <p className="text-sm font-semibold">{subject}</p>
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="blast-everyone"
+              checked={everyoneIncluded}
+              onCheckedChange={() => onExcludedIdsChange(toggleAllExclusion(excludedIds, recipients))}
+            />
+            <Label htmlFor="blast-everyone" className="text-sm font-semibold">Everyone</Label>
+          </div>
+          <span className="text-xs font-semibold text-muted-foreground">{buildSendingSummary(recipients.length, excludedIds.size)}</span>
+        </div>
+
+        <ScrollArea className="-mx-1 max-h-[45vh] px-1">
+          <div className="space-y-3">
+            {groups.map((group) => {
+              const groupChecked = isGroupFullyIncluded(excludedIds, group);
+              return (
+                <div key={group.key} className="rounded-lg border p-2.5">
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <Checkbox
+                      id={`blast-group-${group.key}`}
+                      checked={groupChecked}
+                      onCheckedChange={() => onExcludedIdsChange(toggleGroupExclusion(excludedIds, group))}
+                    />
+                    <Label htmlFor={`blast-group-${group.key}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      {group.label}
+                    </Label>
+                  </div>
+                  <div className="space-y-1.5 pl-6">
+                    {group.doctors.map((doctor) => (
+                      <div key={doctor.staff_id} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`blast-doctor-${doctor.staff_id}`}
+                          checked={!excludedIds.has(doctor.staff_id)}
+                          onCheckedChange={() => onExcludedIdsChange(toggleDoctorExclusion(excludedIds, doctor.staff_id))}
+                        />
+                        <Label htmlFor={`blast-doctor-${doctor.staff_id}`} className="text-sm">{doctor.name}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </ScrollArea>
+
+        {includedCount === 0 && (
+          <p className="text-xs text-muted-foreground">Everyone is excluded. Check at least one doctor to send.</p>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button disabled={sending || includedCount === 0} onClick={onConfirm}>
+            {sending ? (
+              <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Sending…</>
+            ) : 'Send'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -29,8 +29,9 @@ function meeting(overrides: Partial<LeadMeetingRow> = {}): LeadMeetingRow {
 function blast(overrides: Partial<LeadWeekBlastRow> = {}): LeadWeekBlastRow {
   return {
     id: 'b1', organization_id: 'org1', created_by: 'staff1',
-    week_start_date: '2026-08-10', body: 'Hello doctors', status: 'draft',
+    week_start_date: '2026-08-10', body: 'Hello doctors', subject: '', status: 'draft',
     sent_at: null, sent_by: null, recipient_count: null, failed_count: null,
+    excluded_staff_ids: [],
     location_id: null,
     created_at: '2026-08-10T12:00:00Z', updated_at: '2026-08-10T12:00:00Z',
     ...overrides,

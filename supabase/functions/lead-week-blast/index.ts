@@ -64,11 +64,19 @@ function formatWeekLabel(weekStartDate: string): string {
   return `Week of ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`;
 }
 
+// LRM-4: the subject a fresh draft proposes, and what `send` falls back to
+// if the stored subject is blank. Mirrors src/lib/leadWeekBlasts.ts's
+// buildDefaultBlastSubject -- keep the two in sync if this wording changes.
+function buildDefaultSubject(weekStartDate: string): string {
+  return `This week with your Lead RDAs: ${formatWeekLabel(weekStartDate)}`;
+}
+
 interface DoctorRecipient {
   id: string;
   user_id: string;
   name: string;
   email: string;
+  primary_location_id: string | null;
 }
 
 /**
@@ -99,7 +107,7 @@ async function resolveDoctorCohort(admin: ReturnType<typeof createClient>, orgId
 
   const { data: doctors, error } = await admin
     .from('staff')
-    .select('id, user_id, name, email')
+    .select('id, user_id, name, email, primary_location_id')
     .eq('is_doctor', true)
     .not('email', 'is', null)
     .neq('email', '')
@@ -119,6 +127,27 @@ async function resolveOrgBranding(admin: ReturnType<typeof createClient>, orgId:
   const { data } = await admin
     .from('organizations').select('app_display_name, reply_to_email').eq('id', orgId).maybeSingle();
   return data ?? {};
+}
+
+/**
+ * LRM-4: pulls the Resend API key and per-org branded from/reply-to out of
+ * handleSend so handleTestSend can reuse the exact same config instead of
+ * duplicating it. resendApiKey is empty when RESEND_API_KEY is unset -- the
+ * caller is responsible for the "not configured" 500.
+ */
+async function resolveSendConfig(admin: ReturnType<typeof createClient>, orgId: string) {
+  const resendApiKey = Deno.env.get('RESEND_API_KEY') ?? '';
+  const defaultFromEmail = Deno.env.get('RESEND_FROM') || 'Pro-Moves <no-reply@mypromoves.com>';
+  const defaultReplyTo = Deno.env.get('RESEND_REPLY_TO') || 'johno@alcandentalcooperative.com';
+
+  const branding = await resolveOrgBranding(admin, orgId);
+  const fromDisplayName = branding.app_display_name || 'Pro-Moves';
+  const fromEmail = defaultFromEmail.includes('<')
+    ? defaultFromEmail.replace(/^[^<]*</, `${fromDisplayName} <`)
+    : `${fromDisplayName} <${defaultFromEmail}>`;
+  const replyTo = branding.reply_to_email || defaultReplyTo;
+
+  return { resendApiKey, fromEmail, replyTo };
 }
 
 async function handleDraft(admin: ReturnType<typeof createClient>, callerStaff: { id: string }, payload: any) {
@@ -230,12 +259,38 @@ not a bulleted memo. Written to be read by a busy doctor in under a minute.`;
     return jsonResponse({ error: 'No draft produced' }, 502);
   }
 
-  return jsonResponse({ body });
+  // LRM-4: alongside the AI-drafted body, propose the default subject line.
+  // The client stores this on the row when it creates a NEW draft; it does
+  // not overwrite a subject she has already customized on an existing one.
+  return jsonResponse({ body, subject: buildDefaultSubject(weekStartDate) });
 }
 
-async function handleRecipientCount(admin: ReturnType<typeof createClient>, callerStaff: { id: string; organization_id: string }) {
+/**
+ * LRM-4: the review list's source of truth. Same cohort derivation and
+ * authority gate as send (the gate is applied once, before dispatch, in
+ * serve() below). Names and location names only -- no email addresses go
+ * to the client.
+ */
+async function handleRecipients(admin: ReturnType<typeof createClient>, callerStaff: { id: string; organization_id: string }) {
   const doctors = await resolveDoctorCohort(admin, callerStaff.organization_id, callerStaff.id);
-  return jsonResponse({ count: doctors.length });
+
+  const locationIds = Array.from(new Set(
+    doctors.map((d) => d.primary_location_id).filter((id): id is string => !!id),
+  ));
+  let locationNameById: Record<string, string> = {};
+  if (locationIds.length > 0) {
+    const { data: locations, error } = await admin
+      .from('locations').select('id, name').in('id', locationIds);
+    if (error) throw error;
+    locationNameById = Object.fromEntries((locations ?? []).map((l: any) => [l.id, l.name]));
+  }
+
+  const recipients = doctors.map((d) => ({
+    staff_id: d.id,
+    name: d.name,
+    location_name: d.primary_location_id ? (locationNameById[d.primary_location_id] ?? null) : null,
+  }));
+  return jsonResponse({ recipients });
 }
 
 async function handleSend(admin: ReturnType<typeof createClient>, callerStaff: { id: string; organization_id: string; user_id: string }, payload: any) {
@@ -246,7 +301,7 @@ async function handleSend(admin: ReturnType<typeof createClient>, callerStaff: {
 
   const { data: blastRow, error: blastError } = await admin
     .from('lead_week_blasts')
-    .select('id, created_by, status, body, week_start_date')
+    .select('id, created_by, status, body, subject, week_start_date')
     .eq('id', blastId)
     .maybeSingle();
   if (blastError) throw blastError;
@@ -271,36 +326,54 @@ async function handleSend(admin: ReturnType<typeof createClient>, callerStaff: {
     return jsonResponse({ error: 'There are no doctors to send this to yet.' }, 400);
   }
 
-  const resendApiKey = Deno.env.get('RESEND_API_KEY');
-  const defaultFromEmail = Deno.env.get('RESEND_FROM') || 'Pro-Moves <no-reply@mypromoves.com>';
-  const defaultReplyTo = Deno.env.get('RESEND_REPLY_TO') || 'johno@alcandentalcooperative.com';
+  // LRM-4: narrow-only exclusions. The client can only ever trim the
+  // server-derived cohort, never add to it -- any id that is not part of
+  // this cohort is silently dropped rather than trusted. The sanitized
+  // list (not the raw payload) is what gets persisted below, so the stored
+  // record always reflects who was actually excluded.
+  const rawExcluded = payload?.excluded_staff_ids;
+  const requestedExclusions: string[] = Array.isArray(rawExcluded)
+    ? rawExcluded.filter((id: unknown): id is string => typeof id === 'string')
+    : [];
+  const cohortIds = new Set(doctors.map((d) => d.id));
+  // Narrow-only AND deduped: unknown ids are dropped, duplicates collapse,
+  // so the persisted record of who was excluded stays clean.
+  const excludedSet = new Set(requestedExclusions.filter((id) => cohortIds.has(id)));
+  const excludedIds = [...excludedSet];
+  const effectiveDoctors = doctors.filter((d) => !excludedSet.has(d.id));
+
+  // The zero-recipient block now also covers "she excluded everyone" --
+  // this runs BEFORE the atomic claim below, same as the org-wide-empty
+  // check above, so an all-excluded send never flips status or locks the
+  // week.
+  if (effectiveDoctors.length === 0) {
+    return jsonResponse({ error: 'Every doctor on this list is excluded. At least one needs to stay in to send.' }, 400);
+  }
+
+  const { resendApiKey, fromEmail, replyTo } = await resolveSendConfig(admin, callerStaff.organization_id);
   if (!resendApiKey) {
     return jsonResponse({ error: 'Email service not configured' }, 500);
   }
 
-  // Org branding, mirroring coach-remind's per-recipient lookup -- but this
-  // blast has exactly one org (the caller's), so it's resolved once instead
-  // of once per recipient.
-  const branding = await resolveOrgBranding(admin, callerStaff.organization_id);
-  const fromDisplayName = branding.app_display_name || 'Pro-Moves';
-  const fromEmail = defaultFromEmail.includes('<')
-    ? defaultFromEmail.replace(/^[^<]*</, `${fromDisplayName} <`)
-    : `${fromDisplayName} <${defaultFromEmail}>`;
-  const replyTo = branding.reply_to_email || defaultReplyTo;
-
-  const subject = `This week with your Lead RDAs · ${formatWeekLabel(blastRow.week_start_date)}`;
+  // Empty subject falls back to the default rather than sending blank.
+  const subject = (blastRow.subject && blastRow.subject.trim()) || buildDefaultSubject(blastRow.week_start_date);
 
   // Atomic claim: only proceeds past here if this call is the one that
   // flips status from draft to sent. A concurrent second call (double-click,
   // retry) sees zero rows come back and 409s WITHOUT sending a single email
   // -- this is what actually closes the double-send race, not the earlier
   // status check above (which is just a fast path for the common case).
+  // Subject and excluded_staff_ids are persisted as part of this same claim
+  // update so the record of what was sent lands atomically with the status
+  // flip -- nothing sends before this succeeds.
   const { data: claimedRows, error: claimError } = await admin
     .from('lead_week_blasts')
     .update({
       status: 'sent',
       sent_at: new Date().toISOString(),
       sent_by: callerStaff.id,
+      subject,
+      excluded_staff_ids: excludedIds,
       updated_at: new Date().toISOString(),
     })
     .eq('id', blastId)
@@ -314,7 +387,7 @@ async function handleSend(admin: ReturnType<typeof createClient>, callerStaff: {
   let successCount = 0;
   let failedCount = 0;
 
-  for (const doctor of doctors) {
+  for (const doctor of effectiveDoctors) {
     try {
       const resendResponse = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -361,7 +434,78 @@ async function handleSend(admin: ReturnType<typeof createClient>, callerStaff: {
     })
     .eq('id', blastId);
 
-  return jsonResponse({ sent: successCount, failed: failedCount, recipient_count: doctors.length });
+  return jsonResponse({ sent: successCount, failed: failedCount, recipient_count: effectiveDoctors.length });
+}
+
+/**
+ * LRM-4: sends ONE copy of the current draft to the caller's own staff
+ * email, subject prefixed "[Test] ". Does not flip status, does not touch
+ * recipient_count/failed_count/excluded_staff_ids, and logs to a distinct
+ * reminder_log template key so it never gets confused with a real send in
+ * the send history. Safe to click repeatedly.
+ */
+async function handleTestSend(admin: ReturnType<typeof createClient>, callerStaff: { id: string; user_id: string; organization_id: string; email: string | null }, payload: any) {
+  const blastId = payload?.blast_id;
+  if (!blastId || typeof blastId !== 'string') {
+    return jsonResponse({ error: 'blast_id is required' }, 400);
+  }
+  if (!callerStaff.email) {
+    return jsonResponse({ error: 'There is no email on file for your account.' }, 400);
+  }
+
+  const { data: blastRow, error: blastError } = await admin
+    .from('lead_week_blasts')
+    .select('id, created_by, status, body, subject, week_start_date')
+    .eq('id', blastId)
+    .maybeSingle();
+  if (blastError) throw blastError;
+  if (!blastRow) {
+    return jsonResponse({ error: 'That blast could not be found.' }, 404);
+  }
+  if (blastRow.created_by !== callerStaff.id) {
+    return jsonResponse({ error: 'Unauthorized' }, 403);
+  }
+  if (blastRow.status !== 'draft') {
+    return jsonResponse({ error: 'Only a draft blast can be test sent.' }, 400);
+  }
+  if (!blastRow.body || !blastRow.body.trim()) {
+    return jsonResponse({ error: 'The blast body is empty. Add some content before sending a test.' }, 400);
+  }
+
+  const { resendApiKey, fromEmail, replyTo } = await resolveSendConfig(admin, callerStaff.organization_id);
+  if (!resendApiKey) {
+    return jsonResponse({ error: 'Email service not configured' }, 500);
+  }
+
+  const baseSubject = (blastRow.subject && blastRow.subject.trim()) || buildDefaultSubject(blastRow.week_start_date);
+  const subject = `[Test] ${baseSubject}`;
+
+  const resendResponse = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: fromEmail,
+      to: [callerStaff.email],
+      reply_to: replyTo,
+      subject,
+      text: blastRow.body,
+    }),
+  });
+  if (!resendResponse.ok) {
+    const errorData = await resendResponse.json();
+    console.error('[lead-week-blast] test send failed:', errorData);
+    return jsonResponse({ error: 'The test email could not be sent. Try again.' }, 502);
+  }
+
+  await admin.from('reminder_log').insert({
+    sender_user_id: callerStaff.user_id,
+    target_user_id: callerStaff.user_id,
+    type: 'lead_week_blast_test',
+    subject,
+    body: blastRow.body,
+  });
+
+  return jsonResponse({ sent: true, email: callerStaff.email });
 }
 
 serve(async (req) => {
@@ -391,7 +535,7 @@ serve(async (req) => {
 
     const { data: staffRow, error: staffError } = await admin
       .from('staff')
-      .select('id, organization_id, primary_location_id, user_id')
+      .select('id, organization_id, primary_location_id, user_id, email')
       .eq('user_id', authUserId)
       .maybeSingle();
     if (staffError || !staffRow?.id) {
@@ -402,7 +546,12 @@ serve(async (req) => {
     if (!orgId) {
       return jsonResponse({ error: 'Unauthorized' }, 401);
     }
-    const callerStaff = { id: staffRow.id, user_id: staffRow.user_id, organization_id: orgId };
+    const callerStaff = {
+      id: staffRow.id,
+      user_id: staffRow.user_id,
+      organization_id: orgId,
+      email: (staffRow as any).email ?? null,
+    };
 
     // Training-workspace authority gate, same for every action below. Being
     // the row's owner is a separate check inside handleSend -- this is
@@ -415,8 +564,9 @@ serve(async (req) => {
     const action = payload?.action;
 
     if (action === 'draft') return await handleDraft(admin, callerStaff, payload);
-    if (action === 'recipient_count') return await handleRecipientCount(admin, callerStaff);
+    if (action === 'recipients') return await handleRecipients(admin, callerStaff);
     if (action === 'send') return await handleSend(admin, callerStaff, payload);
+    if (action === 'test_send') return await handleTestSend(admin, callerStaff, payload);
 
     return jsonResponse({ error: 'Unknown action' }, 400);
   } catch (err) {

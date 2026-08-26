@@ -76,17 +76,10 @@ values
  'Alcan''s practice-management software: scheduling, charting, patient records, and referral letters.',
  null, null),
 
-('a1ca0000-0000-0000-0000-000000000001', 'Reach',
- array['reach answering service','the answering service'],
- 'tool',
- 'The after-hours answering service that routes patient calls to the on-call doctor.',
- null, 'No corpus source found; unverified. Confirm the current after-hours vendor with operations.'),
-
-('a1ca0000-0000-0000-0000-000000000001', 'Thinkific',
- array['thinkific'],
- 'tool',
- 'Formerly referenced as an online learning platform for Alcan training. RETIRED / no longer in use (per John, 2026-08-25).',
- null, 'No corpus source found; RETIRED per John 2026-08-25. Candidate for deletion.'),
+-- NOTE: 'Reach' (after-hours vendor) and 'Thinkific' (LMS) were removed
+-- 2026-08-26 per John: both were unverified assumptions with no corpus source.
+-- Thinkific is retired; the on-call/after-hours system is TBD, to be confirmed
+-- with Dr. Alex and re-added with provenance if it exists.
 
 -- ── Clinical procedures & acronyms ───────────────────────────────────────
 ('a1ca0000-0000-0000-0000-000000000001', 'General anesthesia',
@@ -208,7 +201,7 @@ begin
   update corpus_glossary set provenance='domain_knowledge', source_document_ids='{}'
     where org_id=org and term in ('Doctor','General anesthesia','IV sedation','Nitrous oxide','Silver Diamine Fluoride','Frenectomy');
 
-  -- Unverified assumptions with NO corpus source (see notes on each row).
-  update corpus_glossary set provenance='assumption', source_document_ids='{}'
-    where org_id=org and term in ('Reach','Thinkific');
+  -- (No 'assumption' entries remain in the seed as of 2026-08-26; Reach and
+  -- Thinkific were removed. The default provenance is still 'assumption', so
+  -- any future unbacked entry stays flagged until classified.)
 end $$;

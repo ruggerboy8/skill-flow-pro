@@ -86,7 +86,6 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
           group_id: groupId || null,
           organization_id: organizationId ?? null,
           location_id: locationId === '__roaming__' ? null : locationId,
-          release_baseline: true,
         },
       });
 
@@ -212,11 +211,8 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
           <div className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground">
             <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
             <p>
-              Sending this invitation opens{' '}
-              <span className="font-medium text-foreground">
-                {name.trim() ? drName(normalizeDoctorName(name)) : 'the doctor'}
-              </span>
-              's baseline self-assessment so they can begin right away.
+              This creates {name.trim() ? drName(normalizeDoctorName(name)) : "the doctor"}'s login and
+              they'll appear in All doctors. Coaching and the baseline come later, once they're enrolled.
             </p>
           </div>
 

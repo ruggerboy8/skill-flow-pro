@@ -61,6 +61,11 @@ export function RecordMeetingDialog({
   }, [open, mode, meeting, weekStart]);
 
   const parsedDate = parseTypedDate(dateDisplay);
+  // QA fix: a typed date can legitimately fall in a different week than the
+  // one the dialog was opened from (backfilling an old meeting, or a typo).
+  // Show where it will land instead of blocking the save.
+  const parsedWeekStart = parsedDate ? deriveMeetingWeekStart(parsedDate) : null;
+  const landsInOtherWeek = parsedWeekStart != null && parsedWeekStart !== weekStart;
   const transcriptReady = isTranscriptLongEnough(transcript);
 
   const generate = async () => {
@@ -123,6 +128,11 @@ export function RecordMeetingDialog({
             )}
             {mode === 'create' && dateDisplay.length === 10 && !parsedDate && (
               <p className="mt-1 text-xs text-destructive">That date doesn't look right.</p>
+            )}
+            {mode === 'create' && landsInOtherWeek && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                This date is in the week of {formatDateForDisplay(parsedWeekStart)}, so the meeting will be recorded there.
+              </p>
             )}
           </div>
 

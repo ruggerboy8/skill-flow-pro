@@ -2,12 +2,15 @@ import type { ParticipationTier } from '@/lib/participationTier';
 
 /**
  * DASH-2: one quiet, dot-separated fact per LocationHealthCard status line.
- * `icon` is only ever 'check' - the single quiet accent icon the spec
- * allows (never a filled pill) for a clean post-deadline "all in" week.
+ * `icon` marks the two accent treatments the spec allows (never a filled
+ * pill): 'check' for a clean post-deadline "all in" week, and 'late' for
+ * the late-straggler amendment (John, 2026-08-26) - a light --status-late
+ * accent (icon + colored text) on an otherwise calm card so a straggler
+ * catches the eye on a scan without reading as an alarm.
  */
 export interface StatusPhrase {
   text: string;
-  icon?: 'check';
+  icon?: 'check' | 'late';
 }
 
 export interface LocationStatusLineInput {
@@ -59,6 +62,13 @@ function formatDeadlinePhrase(label: string | null): string | null {
  * quiet "N late (metric)" prose facts (rule 3: facts are prose, not pills).
  * At red, they collapse into one "N people missing" sentence built from the
  * distinct count, per the spec's simplification note.
+ *
+ * Late-straggler amendment (John, 2026-08-26): on a good/neutral card - one
+ * with no chip already carrying the alarm - a late count gets a light
+ * `--status-late` accent (icon: 'late') instead of staying fully muted, so
+ * it catches the eye on a scan without reading as an alarm. Watch and red
+ * tiers already carry that alarm via their chip and wash, so their late
+ * phrases stay plain/muted here.
  */
 function missingOrLatePhrases(
   tier: ParticipationTier,
@@ -79,9 +89,22 @@ function missingOrLatePhrases(
     return [{ text: `${distinctMissedCount} people missing (${metric})` }];
   }
 
+  const accent = tier === 'good' || tier === 'neutral';
   const phrases: StatusPhrase[] = [];
-  if (missingConfCount > 0) phrases.push({ text: `${missingConfCount} late (conf)` });
-  if (missingPerfCount > 0) phrases.push({ text: `${missingPerfCount} late (perf)` });
+  if (missingConfCount > 0) {
+    phrases.push(
+      accent
+        ? { text: `${missingConfCount} late (conf)`, icon: 'late' }
+        : { text: `${missingConfCount} late (conf)` },
+    );
+  }
+  if (missingPerfCount > 0) {
+    phrases.push(
+      accent
+        ? { text: `${missingPerfCount} late (perf)`, icon: 'late' }
+        : { text: `${missingPerfCount} late (perf)` },
+    );
+  }
   return phrases;
 }
 

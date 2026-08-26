@@ -68,7 +68,15 @@ Rule 1 tells the model to translate house vocabulary into canonical terms
 before it searches. Verified: searching the canonical "Front Desk ..." phrasing
 returns all the right pro moves, where "DFI ..." returned none.
 
-### Alcan seed (20 entries, authored 2026-08-25)
+### Alcan seed (19 entries, authored 2026-08-25)
+
+> Correction 2026-08-26: "Membership plan" was removed (a `general_uk`
+> concept; Alcan has none), dropping the seed from 20 to 19 entries. The
+> provenance grounding block now restricts pro-move citations to
+> `practice_types @> ['pediatric_us']`, so a UK doc can never back a
+> glossary entry. See the ASK-5 spec's practice-type correction for the
+> matching mirror fix.
+
 
 Roles (Front Desk/DFI, Dental Assistant/RDA, Lead DA, Office Manager/OM,
 Doctor), org/brands (Alcan Dental Cooperative, Kids Tooth Team), core values

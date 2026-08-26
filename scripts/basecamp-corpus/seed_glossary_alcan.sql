@@ -123,14 +123,10 @@ values
  array['frenectomy','tongue tie','tongue-tie','lip tie','lip-tie','frenulum'],
  'procedure',
  'A procedure to release a restrictive tongue-tie or lip-tie (frenulum).',
- 'clinical', null),
+ 'clinical', null)
 
--- ── Programs ─────────────────────────────────────────────────────────────
-('a1ca0000-0000-0000-0000-000000000001', 'Membership plan',
- array['membership','in-house membership','dental membership','savings plan'],
- 'program',
- 'Alcan''s in-house membership / savings plan for families, often introduced at check-in.',
- null, null)
+-- NOTE: 'Membership plan' was intentionally removed 2026-08-26 — it is a
+-- general_uk concept; Alcan (pediatric_us) has no membership plan.
 
 on conflict (org_id, term) do nothing;
 
@@ -157,23 +153,37 @@ begin
     where org_id=org and term='Zero defect';
 
   -- Corpus-term-grounded entries: representative doc ids (not exhaustive).
+  -- Pro-move matches are restricted to Alcan's practice type (pediatric_us);
+  -- basecamp + culture docs are Alcan-origin already. This guard is why the
+  -- 2026-08-26 UK leak cannot re-enter a citation. Reused below via the
+  -- `d.source_kind <> 'authored' OR pediatric_us OR culture-guide` clause.
   update corpus_glossary set provenance='corpus',
     source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
+      and (d.source_kind <> 'authored'
+           or d.source_item_id like 'culture-guide:%'
+           or exists (select 1 from pro_moves pm where ('promove:'||pm.action_id)=d.source_item_id and pm.practice_types @> array['pediatric_us']))
       and (d.body ilike '%DFI%' or d.body ilike '%first impression%' or d.title ilike 'Front Desk pro move%')
       order by d.source_kind, d.title limit 3)
     where org_id=org and term='Front Desk';
   update corpus_glossary set provenance='corpus',
     source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
-      and d.title ilike 'Dental Assistant pro move%' order by d.title limit 3)
+      and d.title ilike 'Dental Assistant pro move%'
+      and exists (select 1 from pro_moves pm where ('promove:'||pm.action_id)=d.source_item_id and pm.practice_types @> array['pediatric_us'])
+      order by d.title limit 3)
     where org_id=org and term='Dental Assistant';
   update corpus_glossary set provenance='corpus',
     source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
-      and (d.title ilike '%lead%' or d.body ilike '%lead dental assistant%' or d.body ilike '%lead da%')
+      and (d.title ilike '%lead%' or d.body ilike '%lead rda%' or d.body ilike '%lead dental assistant%')
+      and (d.source_kind <> 'authored'
+           or exists (select 1 from pro_moves pm where ('promove:'||pm.action_id)=d.source_item_id and pm.practice_types @> array['pediatric_us']))
       order by d.title limit 3)
     where org_id=org and term='Lead Dental Assistant';
   update corpus_glossary set provenance='corpus',
     source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
-      and d.body ilike '%office manager%' order by d.source_kind, d.title limit 3)
+      and d.body ilike '%office manager%'
+      and (d.source_kind <> 'authored'
+           or exists (select 1 from pro_moves pm where ('promove:'||pm.action_id)=d.source_item_id and pm.practice_types @> array['pediatric_us']))
+      order by d.source_kind, d.title limit 3)
     where org_id=org and term='Office Manager';
   update corpus_glossary set provenance='corpus',
     source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
@@ -181,15 +191,16 @@ begin
     where org_id=org and term='Kids Tooth Team';
   update corpus_glossary set provenance='corpus',
     source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
-      and d.body ilike '%carestack%' order by d.source_kind, d.title limit 3)
+      and d.body ilike '%carestack%'
+      and (d.source_kind <> 'authored'
+           or exists (select 1 from pro_moves pm where ('promove:'||pm.action_id)=d.source_item_id and pm.practice_types @> array['pediatric_us']))
+      order by d.source_kind, d.title limit 3)
     where org_id=org and term='CareStack';
   update corpus_glossary set provenance='corpus',
     source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
-      and d.body ilike '%membership%' order by d.source_kind, d.title limit 3)
-    where org_id=org and term='Membership plan';
-  update corpus_glossary set provenance='corpus',
-    source_document_ids = array(select d.id from corpus_documents d where d.org_id=org and d.status in ('kept','canon')
       and d.body ilike '%radiograph%'
+      and (d.source_kind <> 'authored'
+           or exists (select 1 from pro_moves pm where ('promove:'||pm.action_id)=d.source_item_id and pm.practice_types @> array['pediatric_us']))
       order by (d.title ilike '%refusal%') desc, d.title limit 3)
     where org_id=org and term='Radiographs';
 

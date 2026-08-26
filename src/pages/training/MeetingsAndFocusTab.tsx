@@ -2,15 +2,25 @@ import { useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLeadFocus } from '@/hooks/useLeadFocus';
 import { useCoachingWorkspace } from '@/hooks/useCoachingWorkspace';
+import { useLeadMeetings } from '@/hooks/useLeadMeetings';
+import { useWorkspaceLocations } from '@/hooks/useWorkspaceLocations';
 import { SOURCE_META, type SourceType, type CoachingIssue } from '@/types/coachingWorkspace';
 import { OUTCOME_META, type HydratedFocusWeek } from '@/types/leadFocus';
+import type { LeadMeetingRow } from '@/types/leadMeetings';
+import { deriveFocusSlotState, deriveMeetingSlotState, meetingsInWeek } from '@/lib/leadMeetingsAndFocus';
+import { formatDateForDisplay } from '@/lib/dateInputMask';
+import { RecordMeetingDialog } from '@/components/training/RecordMeetingDialog';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { toast } from '@/hooks/use-toast';
-import { ChevronLeft, ChevronRight, LayoutList, CalendarDays, Sparkles, Loader2, Plus, X, Shield } from 'lucide-react';
+import {
+  ChevronLeft, ChevronRight, LayoutList, CalendarDays, Sparkles, Loader2, Plus, X, Shield,
+  Users, Mail,
+} from 'lucide-react';
 import { CT_TZ } from '@/lib/centralTime';
 import { addDaysToDateString, mondaysInMonth as mondaysInMonthTz } from '@/lib/dateUtils';
 
@@ -31,22 +41,27 @@ const mondaysInMonth = (anchor: string): string[] => mondaysInMonthTz(anchor, CT
 
 interface BuilderItem { key: string; text: string; sourceId: string | null; sourceTitle: string | null; polishing?: boolean; aiPolished?: boolean }
 
-export function LeadFocusTab() {
+export function MeetingsAndFocusTab() {
   const { weeks, currentMonday, publishWeek, isLoading } = useLeadFocus();
   const ws = useCoachingWorkspace();
+  const meetingsHook = useLeadMeetings();
+  const { data: locations = [] } = useWorkspaceLocations(ws.orgId);
   const weeksByDate = useMemo(() => new Map(weeks.map((w) => [w.week_start_date, w])), [weeks]);
 
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
   const [selectedMonday, setSelectedMonday] = useState(currentMonday);
   const [monthAnchor, setMonthAnchor] = useState(firstOfMonth(currentMonday));
 
-  // builder
+  // builder (focus slot)
   const [builderOpen, setBuilderOpen] = useState(false);
   const [items, setItems] = useState<BuilderItem[]>([]);
   const [framing, setFraming] = useState('');
   const [own, setOwn] = useState('');
   const keyRef = useRef(1);
   const nextKey = () => 'k' + (keyRef.current++);
+
+  // meeting dialog
+  const [meetingDialog, setMeetingDialog] = useState<{ mode: 'create' | 'view'; meeting: LeadMeetingRow | null } | null>(null);
 
   const selected = weeksByDate.get(selectedMonday) ?? null;
   const when: 'past' | 'current' | 'future' =
@@ -107,12 +122,16 @@ export function LeadFocusTab() {
     );
   };
 
+  const weekMeetings = meetingsInWeek(meetingsHook.meetings, selectedMonday);
+  const focusState = deriveFocusSlotState(selected);
+  const meetingState = deriveMeetingSlotState(weekMeetings);
+
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-bold tracking-tight">Lead focus schedule</h1>
+        <h1 className="text-xl font-bold tracking-tight">Meetings and Focus</h1>
         <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Shield className="h-4 w-4" /> One or two behaviors you want the leads driving at their locations each week. Move across weeks like the builder; past weeks are your record.
+          <Shield className="h-4 w-4" /> Set the week's focus, run the Lead RDA meeting, and (soon) send doctors a weekly recap. Past weeks are your record.
         </p>
       </div>
 
@@ -158,25 +177,115 @@ export function LeadFocusTab() {
             );
           })}
         </div>
-      ) : builderOpen ? (
-        <Builder weekLabel={fmtWeek(selectedMonday)} when={when} items={items} framing={framing} own={own}
-          availIssues={availIssues} publishing={publishWeek.isPending}
-          onOwn={setOwn} onAddOwn={addOwn} onAddIssue={addIssue} onEdit={editItem} onRemove={removeItem}
-          onPolish={polishItem} onFraming={setFraming} onSchedule={schedule} onCancel={closeBuilder} />
       ) : (
-        <SelectedWeek week={selected} when={when} monday={selectedMonday} onBuild={() => openBuilder(selectedMonday)} />
+        <div className="space-y-4">
+          <SlotSection num={1} title="Focus" state={focusState}>
+            {builderOpen ? (
+              <Builder weekLabel={fmtWeek(selectedMonday)} when={when} items={items} framing={framing} own={own}
+                availIssues={availIssues} publishing={publishWeek.isPending}
+                onOwn={setOwn} onAddOwn={addOwn} onAddIssue={addIssue} onEdit={editItem} onRemove={removeItem}
+                onPolish={polishItem} onFraming={setFraming} onSchedule={schedule} onCancel={closeBuilder} />
+            ) : (
+              <SelectedWeek week={selected} when={when} monday={selectedMonday} onBuild={() => openBuilder(selectedMonday)} />
+            )}
+          </SlotSection>
+
+          <SlotSection num={2} title="Meeting" state={meetingState}>
+            <MeetingSlot
+              meetings={weekMeetings}
+              onRecord={() => setMeetingDialog({ mode: 'create', meeting: null })}
+              onOpen={(m) => setMeetingDialog({ mode: 'view', meeting: m })}
+            />
+          </SlotSection>
+
+          <SlotSection num={3} title="Doctor blast" state="locked">
+            <BlastSlot />
+          </SlotSection>
+        </div>
       )}
 
       <RecordAccordion weeks={weeks.filter((w) => w.week_start_date < currentMonday)} />
+
+      {meetingDialog && (
+        <RecordMeetingDialog
+          open={!!meetingDialog}
+          onOpenChange={(o) => { if (!o) setMeetingDialog(null); }}
+          mode={meetingDialog.mode}
+          meeting={meetingDialog.meeting}
+          weekStart={selectedMonday}
+          locations={locations}
+          creating={meetingsHook.createMeeting.isPending}
+          updating={meetingsHook.updateMeeting.isPending}
+          onCreate={(input) => meetingsHook.createMeeting.mutate(input, {
+            onSuccess: () => toast({ title: 'Meeting saved' }),
+          })}
+          onUpdateSummary={(input) => meetingsHook.updateMeeting.mutate(input, {
+            onSuccess: () => toast({ title: 'Summary saved' }),
+          })}
+          onAddIssue={(input) => ws.createIssue.mutate(input)}
+        />
+      )}
     </div>
   );
 }
+
+// ── slot chrome ───────────────────────────────────────────────────────────
+
+function SlotSection({ num, title, state, children }: { num: number; title: string; state: 'not_started' | 'completed' | 'locked'; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-muted text-xs font-bold text-muted-foreground">{num}</span>
+        <h2 className="text-sm font-bold">{title}</h2>
+        <StatusBadge status={state} className="ml-auto" />
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function MeetingSlot({ meetings, onRecord, onOpen }: { meetings: LeadMeetingRow[]; onRecord: () => void; onOpen: (m: LeadMeetingRow) => void }) {
+  if (meetings.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
+        <div><Button onClick={onRecord}><Plus className="mr-1.5 h-4 w-4" />Record meeting</Button></div>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {meetings.map((m) => (
+        <button key={m.id} onClick={() => onOpen(m)}
+          className="flex w-full items-start gap-3 rounded-lg border p-3 text-left hover:bg-muted/40">
+          <Users className="mt-0.5 h-4 w-4 flex-none text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold">{formatDateForDisplay(m.meeting_date)}</div>
+            {m.internal_summary && <div className="mt-0.5 truncate text-xs text-muted-foreground">{m.internal_summary}</div>}
+          </div>
+        </button>
+      ))}
+      <Button variant="outline" size="sm" onClick={onRecord}><Plus className="mr-1.5 h-4 w-4" />Record another</Button>
+    </div>
+  );
+}
+
+function BlastSlot() {
+  return (
+    <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
+      <Mail className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+      <div>Coming soon</div>
+      <div className="mt-3"><Button disabled variant="outline">Draft blast</Button></div>
+    </div>
+  );
+}
+
+// ── existing focus slot pieces (unchanged behavior) ─────────────────────────
 
 function SelectedWeek({ week, when, monday, onBuild }: { week: HydratedFocusWeek | null; when: 'past' | 'current' | 'future'; monday: string; onBuild: () => void }) {
   const live = when === 'current';
   if (week && week.items.length > 0) {
     return (
-      <div className="rounded-xl border p-4">
+      <div>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">{when === 'past' ? 'What you covered' : 'Scheduled'}</span>
           {live && <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-[color:var(--domain-clinical,#0E7C86)]">● live on lead homes</span>}
@@ -188,7 +297,7 @@ function SelectedWeek({ week, when, monday, onBuild }: { week: HydratedFocusWeek
     );
   }
   return (
-    <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
+    <div className="rounded-lg border border-dashed py-12 text-center text-sm text-muted-foreground">
       Nothing set for {fmtShort(monday)} yet.
       <div className="mt-3"><Button onClick={onBuild}><Plus className="mr-1.5 h-4 w-4" />{when === 'current' ? "Set this week's focus" : 'Plan this week'}</Button></div>
     </div>
@@ -215,7 +324,7 @@ function Builder(props: {
   const { items, availIssues, when } = props;
   const live = when === 'current';
   return (
-    <div className="rounded-xl border p-4">
+    <div>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-bold">Set focus · {props.weekLabel}</h3>
         <Button variant="ghost" size="sm" onClick={props.onCancel}>Cancel</Button>
@@ -254,7 +363,7 @@ function Builder(props: {
             );
           })}
           <div className="my-4 h-px bg-border" />
-          <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Framing note <span className="font-normal normal-case tracking-normal">— optional</span></div>
+          <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Framing note <span className="font-normal normal-case tracking-normal">(optional)</span></div>
           <Textarea value={props.framing} onChange={(e) => props.onFraming(e.target.value)} rows={2} placeholder="e.g. Two small things this week, both about starting strong with the family." />
           <Button className="mt-3.5" disabled={props.publishing || !items.length} onClick={props.onSchedule}>
             {props.publishing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Scheduling…</> : 'Schedule this week →'}
@@ -303,7 +412,7 @@ function RecordAccordion({ weeks }: { weeks: HydratedFocusWeek[] }) {
   return (
     <div className="pt-4">
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Record — what you have covered</span>
+        <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Record: what you have covered</span>
         <span className="text-xs text-muted-foreground">outcomes fill in as you assess the issues</span>
       </div>
       {groups.length === 0 ? (

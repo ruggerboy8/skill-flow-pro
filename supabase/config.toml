@@ -86,6 +86,9 @@ verify_jwt = true
 [functions.invite-to-schedule]
 verify_jwt = true
 
+[functions.lead-meeting-summary]
+verify_jwt = true
+
 [functions.lead-request-meeting]
 verify_jwt = true
 

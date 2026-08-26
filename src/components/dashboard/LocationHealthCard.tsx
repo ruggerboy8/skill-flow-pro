@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Users, AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { participationTier, tierColorTokens } from "@/lib/participationTier";
@@ -254,7 +254,12 @@ export function LocationHealthCard({
                 {phrase.icon === 'check' && (
                   <CheckCircle2 className="h-4 w-4" style={{ color: 'hsl(var(--status-complete))' }} />
                 )}
-                {phrase.text}
+                {phrase.icon === 'late' && (
+                  <Clock className="h-4 w-4" style={{ color: 'hsl(var(--status-late))' }} />
+                )}
+                <span style={phrase.icon === 'late' ? { color: 'hsl(var(--status-late))' } : undefined}>
+                  {phrase.text}
+                </span>
               </span>
             ))}
           </div>

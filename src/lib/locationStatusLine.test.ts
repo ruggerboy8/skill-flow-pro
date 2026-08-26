@@ -46,9 +46,13 @@ describe('buildLocationStatusLine', () => {
       ]);
     });
 
-    it('leads with the late-conf fact when there are stragglers', () => {
+    // Late-straggler amendment (John, 2026-08-26): a late count on a good
+    // tier card gets the --status-late accent (icon: 'late'), not a fully
+    // muted phrase - the rest of the line (the perf window fact) stays
+    // muted.
+    it('leads with a late-toned late-conf fact when there are stragglers', () => {
       expect(buildLocationStatusLine({ ...state, missingConfCount: 1 })).toEqual([
-        { text: '1 late (conf)' },
+        { text: '1 late (conf)', icon: 'late' },
         { text: 'perf window open until Fri 5:00 PM' },
       ]);
     });
@@ -100,16 +104,22 @@ describe('buildLocationStatusLine', () => {
       expect(buildLocationStatusLine(state)).toEqual([{ text: 'all in', icon: 'check' }]);
     });
 
-    it('shows a muted late fact for a single straggler', () => {
+    // Late-straggler amendment (John, 2026-08-26): stays a status-line
+    // phrase (no pill, no fill), but takes the --status-late icon + text
+    // accent instead of full muting.
+    it('shows a late-toned late fact for a single straggler', () => {
       expect(buildLocationStatusLine({ ...state, missingConfCount: 1 })).toEqual([
-        { text: '1 late (conf)' },
+        { text: '1 late (conf)', icon: 'late' },
       ]);
     });
 
-    it('shows both metrics when both have stragglers', () => {
+    it('shows both metrics, both late-toned, when both have stragglers', () => {
       expect(
         buildLocationStatusLine({ ...state, missingConfCount: 1, missingPerfCount: 2 }),
-      ).toEqual([{ text: '1 late (conf)' }, { text: '2 late (perf)' }]);
+      ).toEqual([
+        { text: '1 late (conf)', icon: 'late' },
+        { text: '2 late (perf)', icon: 'late' },
+      ]);
     });
   });
 

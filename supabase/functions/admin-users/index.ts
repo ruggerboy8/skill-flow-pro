@@ -1236,7 +1236,7 @@ serve(async (req: Request) => {
         }
 
         // 3) Create staff row with is_doctor = true
-        // If release_baseline is truthy, set baseline_released_at now
+        // Legacy flag: pre-DR-2 clients could request baseline release at invite.
         const staffInsert: Record<string, any> = { 
           name, 
           email, 
@@ -1249,9 +1249,12 @@ serve(async (req: Request) => {
           home_route: '/doctor',
         };
 
+        // QA fix: the flag is accepted for old clients but never honored.
+        // Release now requires enrollment first (the release_baseline action
+        // enforces it), and a just-invited doctor cannot be enrolled yet, so
+        // stamping here would always bypass that invariant.
         if (release_baseline) {
-          staffInsert.baseline_released_at = new Date().toISOString();
-          staffInsert.baseline_released_by = authUser.user.id;
+          console.warn("invite_doctor: ignoring legacy release_baseline flag; use the release_baseline action after enrollment");
         }
 
         const { data: staff, error: staffErr } = await admin
@@ -1294,8 +1297,8 @@ serve(async (req: Request) => {
           user_metadata: { staff_id: staff.id, user_type: 'doctor' }
         });
 
-        console.log(`✅ Invited doctor ${name} (${email}) - staff_id: ${staff.id}, baseline_released: ${!!release_baseline}`);
-        return json({ ok: true, staff_id: staff.id, user_id: invite.user.id, email_sent: true, baseline_released: !!release_baseline });
+        console.log(`✅ Invited doctor ${name} (${email}) - staff_id: ${staff.id}`);
+        return json({ ok: true, staff_id: staff.id, user_id: invite.user.id, email_sent: true, baseline_released: false });
       }
 
       case "set_coaching_enrollment": {

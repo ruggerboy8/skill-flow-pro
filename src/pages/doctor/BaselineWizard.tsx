@@ -43,7 +43,12 @@ export default function BaselineWizard() {
   // have their name we always sign with it; the fallback below only fires
   // for baselines with no recorded releaser at all, where we can't assume
   // "Your Clinical Director" anymore now that regional coaches release
-  // baselines too — "Your Coach" is the safe default either way.
+  // baselines too, so "Your Coach" is the safe default either way.
+  //
+  // DR-2 fix: baseline_released_by stores an auth uid (it references
+  // auth.users(id)), not a staff id, so the releasing staff row has to be
+  // looked up by user_id. Looking it up by id (the old bug) never matched,
+  // which is why the releaser's name never resolved before this fix.
   const { data: releaser } = useQuery({
     queryKey: ['baseline-releaser', staff?.id],
     queryFn: async () => {
@@ -51,7 +56,7 @@ export default function BaselineWizard() {
       const { data } = await supabase
         .from('staff')
         .select('name, is_clinical_director')
-        .eq('id', staff.baseline_released_by)
+        .eq('user_id', staff.baseline_released_by)
         .maybeSingle();
       return data;
     },

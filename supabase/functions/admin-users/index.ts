@@ -1184,7 +1184,10 @@ serve(async (req: Request) => {
           return json({ error: "Only Clinical Directors can invite doctors" }, 403);
         }
         
-        const { email, name, location_id, group_id, organization_id, release_baseline } = payload ?? {};
+        // DR-2: release_baseline is kept for compatibility but defaults to
+        // false. Baseline release is now its own action (release_baseline
+        // below), separate from invite.
+        const { email, name, location_id, group_id, organization_id, release_baseline = false } = payload ?? {};
         const resolvedGroupId = group_id || null;
         if (!email || !name || (!resolvedGroupId && !organization_id)) {
           return json({ error: "Missing required fields: email, name, and a group or organization are required" }, 400);
@@ -1361,6 +1364,80 @@ serve(async (req: Request) => {
 
         console.log(`✅ ${enrolled ? "Enrolled" : "Un-enrolled"} doctor ${target.name} (staff_id: ${target.id}) in coaching`);
         return json({ ok: true, staff_id: target.id, enrolled });
+      }
+
+      case "release_baseline": {
+        // DR-2: baseline release is now its own explicit action, separate
+        // from invite_doctor. Only clinical directors or super admins can
+        // release a baseline (mirrors set_coaching_enrollment's gate), and
+        // only for a doctor who is already enrolled in coaching.
+        if (!me.is_clinical_director && !me.is_super_admin) {
+          return json({ error: "Only Clinical Directors can release a baseline" }, 403);
+        }
+
+        const { staff_id } = payload ?? {};
+        if (!staff_id) {
+          return json({ error: "staff_id is required" }, 400);
+        }
+
+        const { data: target, error: targetErr } = await admin
+          .from("staff")
+          .select("id, user_id, name, is_doctor, coaching_enrolled_at, baseline_released_at")
+          .eq("id", staff_id)
+          .maybeSingle();
+
+        if (targetErr) throw targetErr;
+        if (!target) return json({ error: "Staff not found" }, 404);
+        if (!target.is_doctor) return json({ error: "Baseline release only applies to doctors" }, 400);
+        if (!target.coaching_enrolled_at) {
+          return json({ error: "This doctor must be enrolled in coaching before their baseline can be released" }, 400);
+        }
+
+        // Org scope: a clinical director (not a super admin) may only
+        // release a baseline for a doctor in their own org.
+        if (target.user_id) {
+          const orgErr = await assertSameOrgTarget(target.user_id);
+          if (orgErr) return orgErr;
+        } else if (!me.is_super_admin) {
+          return json({ error: "Forbidden: target user is not in your organization" }, 403);
+        }
+
+        // Idempotent: releasing an already-released baseline is a no-op so
+        // the original release timestamp is never silently rewritten.
+        if (target.baseline_released_at) {
+          return json({ ok: true, staff_id: target.id, noop: true });
+        }
+
+        // baseline_released_by is declared referencing auth.users(id) (see
+        // the DR-1 migration note), so this stores the caller's auth uid,
+        // not their staff id, to match the declared FK.
+        const updateData = {
+          baseline_released_at: new Date().toISOString(),
+          baseline_released_by: authUser.user.id,
+        };
+
+        const { error: updateErr } = await admin
+          .from("staff")
+          .update(updateData)
+          .eq("id", staff_id);
+
+        if (updateErr) throw updateErr;
+
+        // Audit log
+        try {
+          await admin.from("admin_audit").insert({
+            staff_id: target.id,
+            changed_by: me.id,
+            action: "release_baseline",
+            old_values: { baseline_released_at: target.baseline_released_at },
+            new_values: updateData,
+          });
+        } catch (auditErr) {
+          console.warn("Failed to write audit log:", auditErr);
+        }
+
+        console.log(`✅ Released baseline for doctor ${target.name} (staff_id: ${target.id})`);
+        return json({ ok: true, staff_id: target.id, noop: false });
       }
 
       case "delete_user": {

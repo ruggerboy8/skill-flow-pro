@@ -18,8 +18,44 @@ const corsHeaders = {
 // already established for this function family) rather than juggling a
 // forwarded-auth client for author-scoped reads and a service-role client for
 // the org-wide recipient lookup.
+//
+// QA fix (fresh-eyes pass on PR #91): being the row's owner was not enough
+// authorization -- RLS only checked created_by=self, so any authenticated
+// staff row could insert its own draft-blast row and send it to the whole
+// org's doctors. Every action below now also requires the same
+// training-workspace authority the /training route itself requires (see
+// allowTraining in src/components/RequireAccess.tsx): platform admin, or
+// can_manage_library within the Alcan org. The migration's RLS policy now
+// enforces the same thing for INSERT/UPDATE independently, so this is
+// defense in depth, not the only gate.
+const ALCAN_ORG_ID = 'a1ca0000-0000-0000-0000-000000000001';
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
+
+/**
+ * Resolves the caller's org the same way public.current_user_org_id() does:
+ * staff.organization_id, falling back to primary_location_id's practice
+ * group's organization_id.
+ */
+async function resolveOrgId(admin: ReturnType<typeof createClient>, staffRow: { organization_id: string | null; primary_location_id: string | null }): Promise<string | null> {
+  if (staffRow.organization_id) return staffRow.organization_id;
+  if (!staffRow.primary_location_id) return null;
+  const { data: location } = await admin
+    .from('locations').select('group_id').eq('id', staffRow.primary_location_id).maybeSingle();
+  if (!location?.group_id) return null;
+  const { data: group } = await admin
+    .from('practice_groups').select('organization_id').eq('id', location.group_id).maybeSingle();
+  return group?.organization_id ?? null;
+}
+
+/** Server-side equivalent of allowTraining (src/components/RequireAccess.tsx). */
+async function hasTrainingAuthority(admin: ReturnType<typeof createClient>, staffId: string, resolvedOrgId: string | null): Promise<boolean> {
+  const { data: caps } = await admin
+    .from('user_capabilities').select('is_platform_admin, can_manage_library').eq('staff_id', staffId).maybeSingle();
+  if (caps?.is_platform_admin) return true;
+  return !!caps?.can_manage_library && resolvedOrgId === ALCAN_ORG_ID;
 }
 
 function formatWeekLabel(weekStartDate: string): string {
@@ -39,9 +75,11 @@ interface DoctorRecipient {
  * Server-side equivalent of src/lib/clinicalDoctorScope.ts's
  * buildOrganizationStaffScopeFilter: staff.organization_id = org OR
  * staff.primary_location_id in (locations under that org's practice_groups),
- * filtered to doctors with an email on file.
+ * filtered to doctors with a real email on file. Excludes the caller's own
+ * staff row -- the blast is addressed to doctors on the team, not back to
+ * whoever is sending it, even if that person happens to also be a doctor.
  */
-async function resolveDoctorCohort(admin: ReturnType<typeof createClient>, orgId: string): Promise<DoctorRecipient[]> {
+async function resolveDoctorCohort(admin: ReturnType<typeof createClient>, orgId: string, excludeStaffId: string): Promise<DoctorRecipient[]> {
   const { data: groups, error: groupsError } = await admin
     .from('practice_groups').select('id').eq('organization_id', orgId);
   if (groupsError) throw groupsError;
@@ -64,9 +102,23 @@ async function resolveDoctorCohort(admin: ReturnType<typeof createClient>, orgId
     .select('id, user_id, name, email')
     .eq('is_doctor', true)
     .not('email', 'is', null)
+    .neq('email', '')
+    .neq('id', excludeStaffId)
     .or(orFilter);
   if (error) throw error;
   return (doctors ?? []) as DoctorRecipient[];
+}
+
+interface OrgBranding {
+  app_display_name?: string | null;
+  reply_to_email?: string | null;
+}
+
+/** Per-org branding lookup, mirroring coach-remind's organizations.app_display_name / reply_to_email fallback shape. */
+async function resolveOrgBranding(admin: ReturnType<typeof createClient>, orgId: string): Promise<OrgBranding> {
+  const { data } = await admin
+    .from('organizations').select('app_display_name, reply_to_email').eq('id', orgId).maybeSingle();
+  return data ?? {};
 }
 
 async function handleDraft(admin: ReturnType<typeof createClient>, callerStaff: { id: string }, payload: any) {
@@ -181,8 +233,8 @@ not a bulleted memo. Written to be read by a busy doctor in under a minute.`;
   return jsonResponse({ body });
 }
 
-async function handleRecipientCount(admin: ReturnType<typeof createClient>, callerStaff: { organization_id: string }) {
-  const doctors = await resolveDoctorCohort(admin, callerStaff.organization_id);
+async function handleRecipientCount(admin: ReturnType<typeof createClient>, callerStaff: { id: string; organization_id: string }) {
+  const doctors = await resolveDoctorCohort(admin, callerStaff.organization_id, callerStaff.id);
   return jsonResponse({ count: doctors.length });
 }
 
@@ -204,8 +256,9 @@ async function handleSend(admin: ReturnType<typeof createClient>, callerStaff: {
   if (blastRow.created_by !== callerStaff.id) {
     return jsonResponse({ error: 'Unauthorized' }, 403);
   }
-  // Server-side re-check against the DB row, not client state -- makes a
-  // double-click or retry safe even if the client thinks it's still a draft.
+  // Belt-and-braces re-check before we even try to claim the row -- the
+  // atomic claim below is what actually closes the race, this is just an
+  // early, cheap rejection for the common "already sent" case.
   if (blastRow.status === 'sent') {
     return jsonResponse({ error: 'This blast has already been sent.' }, 409);
   }
@@ -213,7 +266,10 @@ async function handleSend(admin: ReturnType<typeof createClient>, callerStaff: {
     return jsonResponse({ error: 'The blast body is empty. Add some content before sending.' }, 400);
   }
 
-  const doctors = await resolveDoctorCohort(admin, callerStaff.organization_id);
+  const doctors = await resolveDoctorCohort(admin, callerStaff.organization_id, callerStaff.id);
+  if (doctors.length === 0) {
+    return jsonResponse({ error: 'There are no doctors to send this to yet.' }, 400);
+  }
 
   const resendApiKey = Deno.env.get('RESEND_API_KEY');
   const defaultFromEmail = Deno.env.get('RESEND_FROM') || 'Pro-Moves <no-reply@mypromoves.com>';
@@ -222,7 +278,38 @@ async function handleSend(admin: ReturnType<typeof createClient>, callerStaff: {
     return jsonResponse({ error: 'Email service not configured' }, 500);
   }
 
+  // Org branding, mirroring coach-remind's per-recipient lookup -- but this
+  // blast has exactly one org (the caller's), so it's resolved once instead
+  // of once per recipient.
+  const branding = await resolveOrgBranding(admin, callerStaff.organization_id);
+  const fromDisplayName = branding.app_display_name || 'Pro-Moves';
+  const fromEmail = defaultFromEmail.includes('<')
+    ? defaultFromEmail.replace(/^[^<]*</, `${fromDisplayName} <`)
+    : `${fromDisplayName} <${defaultFromEmail}>`;
+  const replyTo = branding.reply_to_email || defaultReplyTo;
+
   const subject = `This week with your Lead RDAs · ${formatWeekLabel(blastRow.week_start_date)}`;
+
+  // Atomic claim: only proceeds past here if this call is the one that
+  // flips status from draft to sent. A concurrent second call (double-click,
+  // retry) sees zero rows come back and 409s WITHOUT sending a single email
+  // -- this is what actually closes the double-send race, not the earlier
+  // status check above (which is just a fast path for the common case).
+  const { data: claimedRows, error: claimError } = await admin
+    .from('lead_week_blasts')
+    .update({
+      status: 'sent',
+      sent_at: new Date().toISOString(),
+      sent_by: callerStaff.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', blastId)
+    .eq('status', 'draft')
+    .select('id');
+  if (claimError) throw claimError;
+  if (!claimedRows || claimedRows.length === 0) {
+    return jsonResponse({ error: 'This blast has already been sent.' }, 409);
+  }
 
   let successCount = 0;
   let failedCount = 0;
@@ -233,9 +320,9 @@ async function handleSend(admin: ReturnType<typeof createClient>, callerStaff: {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          from: defaultFromEmail,
+          from: fromEmail,
           to: [doctor.email],
-          reply_to: defaultReplyTo,
+          reply_to: replyTo,
           subject,
           text: blastRow.body,
         }),
@@ -262,13 +349,14 @@ async function handleSend(admin: ReturnType<typeof createClient>, callerStaff: {
     }
   }
 
+  // The row is already claimed as 'sent'; this second update just fills in
+  // the honest counts once the fan-out is done (partial failures included,
+  // never silently rounded up).
   await admin
     .from('lead_week_blasts')
     .update({
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-      sent_by: callerStaff.id,
       recipient_count: successCount,
+      failed_count: failedCount,
       updated_at: new Date().toISOString(),
     })
     .eq('id', blastId);
@@ -301,13 +389,26 @@ serve(async (req) => {
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    const { data: callerStaff, error: staffError } = await admin
+    const { data: staffRow, error: staffError } = await admin
       .from('staff')
-      .select('id, organization_id, user_id')
+      .select('id, organization_id, primary_location_id, user_id')
       .eq('user_id', authUserId)
       .maybeSingle();
-    if (staffError || !callerStaff?.id || !callerStaff.organization_id) {
+    if (staffError || !staffRow?.id) {
       return jsonResponse({ error: 'Unauthorized' }, 401);
+    }
+
+    const orgId = await resolveOrgId(admin, staffRow);
+    if (!orgId) {
+      return jsonResponse({ error: 'Unauthorized' }, 401);
+    }
+    const callerStaff = { id: staffRow.id, user_id: staffRow.user_id, organization_id: orgId };
+
+    // Training-workspace authority gate, same for every action below. Being
+    // the row's owner is a separate check inside handleSend -- this is
+    // "can this person touch the blast pipeline at all".
+    if (!(await hasTrainingAuthority(admin, callerStaff.id, orgId))) {
+      return jsonResponse({ error: "You don't have access to the doctor blast tool." }, 403);
     }
 
     const payload = await req.json().catch(() => ({}));

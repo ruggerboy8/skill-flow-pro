@@ -92,6 +92,9 @@ verify_jwt = true
 [functions.lead-request-meeting]
 verify_jwt = true
 
+[functions.lead-week-blast]
+verify_jwt = true
+
 [functions.manager-priorities-save]
 verify_jwt = true
 

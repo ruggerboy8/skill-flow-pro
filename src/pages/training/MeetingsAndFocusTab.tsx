@@ -1,21 +1,32 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLeadFocus } from '@/hooks/useLeadFocus';
 import { useCoachingWorkspace } from '@/hooks/useCoachingWorkspace';
 import { useLeadMeetings } from '@/hooks/useLeadMeetings';
+import { useLeadWeekBlasts } from '@/hooks/useLeadWeekBlasts';
 import { useWorkspaceLocations } from '@/hooks/useWorkspaceLocations';
 import { SOURCE_META, type SourceType, type CoachingIssue } from '@/types/coachingWorkspace';
 import { OUTCOME_META, type HydratedFocusWeek } from '@/types/leadFocus';
 import type { LeadMeetingRow } from '@/types/leadMeetings';
+import type { LeadWeekBlastRow } from '@/types/leadWeekBlasts';
 import { deriveFocusSlotState, deriveMeetingSlotState, meetingsInWeek } from '@/lib/leadMeetingsAndFocus';
+import {
+  deriveBlastSlotState, blastSlotBadgeStatus, buildSendConfirmBody, shouldConfirmRegenerate,
+  canConfirmSend, formatSentSummary,
+  type BlastSlotState,
+} from '@/lib/leadWeekBlasts';
 import { formatDateForDisplay } from '@/lib/dateInputMask';
 import { RecordMeetingDialog } from '@/components/training/RecordMeetingDialog';
-import { StatusBadge } from '@/components/ui/StatusBadge';
+import { StatusBadge, type BadgeStatus } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
 import {
   ChevronLeft, ChevronRight, LayoutList, CalendarDays, Sparkles, Loader2, Plus, X, Shield,
@@ -45,6 +56,7 @@ export function MeetingsAndFocusTab() {
   const { weeks, currentMonday, publishWeek, isLoading } = useLeadFocus();
   const ws = useCoachingWorkspace();
   const meetingsHook = useLeadMeetings();
+  const blastsHook = useLeadWeekBlasts();
   const { data: locations = [] } = useWorkspaceLocations(ws.orgId);
   const weeksByDate = useMemo(() => new Map(weeks.map((w) => [w.week_start_date, w])), [weeks]);
 
@@ -126,6 +138,9 @@ export function MeetingsAndFocusTab() {
   const focusState = deriveFocusSlotState(selected);
   const meetingState = deriveMeetingSlotState(weekMeetings);
 
+  const weekBlast = blastsHook.blasts.find((b) => b.week_start_date === selectedMonday) ?? null;
+  const blastState = deriveBlastSlotState(focusState === 'completed', weekMeetings.length, weekBlast);
+
   return (
     <div className="space-y-5">
       <div>
@@ -198,8 +213,13 @@ export function MeetingsAndFocusTab() {
             />
           </SlotSection>
 
-          <SlotSection num={3} title="Doctor blast" state="locked">
-            <BlastSlot />
+          <SlotSection num={3} title="Doctor blast" state={blastSlotBadgeStatus(blastState)}>
+            <BlastSlot
+              state={blastState}
+              weekBlast={weekBlast}
+              weekStartDate={selectedMonday}
+              blastsHook={blastsHook}
+            />
           </SlotSection>
         </div>
       )}
@@ -231,7 +251,7 @@ export function MeetingsAndFocusTab() {
 
 // ── slot chrome ───────────────────────────────────────────────────────────
 
-function SlotSection({ num, title, state, children }: { num: number; title: string; state: 'not_started' | 'completed' | 'locked'; children: React.ReactNode }) {
+function SlotSection({ num, title, state, children }: { num: number; title: string; state: BadgeStatus; children: React.ReactNode }) {
   return (
     <div className="rounded-xl border p-4">
       <div className="mb-3 flex items-center gap-2">
@@ -269,12 +289,190 @@ function MeetingSlot({ meetings, onRecord, onOpen }: { meetings: LeadMeetingRow[
   );
 }
 
-function BlastSlot() {
+const fmtSentAt = (iso: string) =>
+  new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+function BlastSlot({
+  state, weekBlast, weekStartDate, blastsHook,
+}: {
+  state: BlastSlotState;
+  weekBlast: LeadWeekBlastRow | null;
+  weekStartDate: string;
+  blastsHook: ReturnType<typeof useLeadWeekBlasts>;
+}) {
+  const [editedBody, setEditedBody] = useState(weekBlast?.body ?? '');
+  const [drafting, setDrafting] = useState(false);
+  const [regenConfirmOpen, setRegenConfirmOpen] = useState(false);
+  const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
+  const [recipientCount, setRecipientCount] = useState<number | null>(null);
+  const [countLoading, setCountLoading] = useState(false);
+  const lastGeneratedRef = useRef('');
+
+  // Re-sync local edit state when a different week's draft loads. Keyed on
+  // id + week so it doesn't stomp on in-progress typing when the query
+  // silently refetches the same row.
+  useEffect(() => {
+    setEditedBody(weekBlast?.body ?? '');
+    lastGeneratedRef.current = weekBlast?.body ?? '';
+  }, [weekBlast?.id, weekStartDate]);
+
+  const runDraft = async () => {
+    setDrafting(true);
+    try {
+      const body = await blastsHook.generateDraft.mutateAsync(weekStartDate);
+      lastGeneratedRef.current = body;
+      setEditedBody(body);
+      if (weekBlast) {
+        blastsHook.updateBlastBody.mutate({ id: weekBlast.id, body });
+      } else {
+        blastsHook.createBlast.mutate({ weekStartDate, body });
+      }
+    } catch {
+      // Failure toast already shown by the hook's onError.
+    } finally {
+      setDrafting(false);
+    }
+  };
+
+  const onRegenerateClick = () => {
+    if (shouldConfirmRegenerate(editedBody, lastGeneratedRef.current)) {
+      setRegenConfirmOpen(true);
+    } else {
+      runDraft();
+    }
+  };
+
+  const onSendClick = async () => {
+    setCountLoading(true);
+    try {
+      const count = await blastsHook.fetchRecipientCount.mutateAsync();
+      setRecipientCount(count);
+      // QA fix: zero eligible doctors means there's nothing to confirm --
+      // show a plain message instead of opening a confirm dialog for a send
+      // the edge function would reject anyway.
+      if (canConfirmSend(count)) {
+        setSendConfirmOpen(true);
+      } else {
+        toast({ title: 'No doctors to send to', description: 'There are no doctors to send this to yet.' });
+      }
+    } catch {
+      // Failure toast already shown by the hook's onError.
+    } finally {
+      setCountLoading(false);
+    }
+  };
+
+  const confirmSend = () => {
+    if (!weekBlast) return;
+    blastsHook.sendBlast.mutate(weekBlast.id, {
+      onSuccess: (data) => {
+        setSendConfirmOpen(false);
+        // QA fix: a partial failure must be visible, not swallowed into a
+        // clean "sent" toast.
+        if (data.failed > 0) {
+          toast({
+            title: 'Sent with some failures',
+            description: `${data.sent} sent, ${data.failed} failed. Check the recipient list and try again if needed.`,
+            variant: 'destructive',
+          });
+        } else {
+          toast({ title: 'Sent to doctors' });
+        }
+      },
+    });
+  };
+
+  if (state === 'none' || state === 'draftable') {
+    return (
+      <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
+        <Mail className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+        <div className="mt-3">
+          <Button disabled={state === 'none' || drafting} onClick={runDraft}>
+            {drafting ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Drafting…</>
+            ) : (
+              <><Sparkles className="mr-1.5 h-4 w-4" />Draft blast</>
+            )}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === 'sent' && weekBlast) {
+    const summary = formatSentSummary(weekBlast.recipient_count ?? 0, weekBlast.failed_count ?? 0);
+    return (
+      <div className="space-y-2.5">
+        <div className="whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">{weekBlast.body}</div>
+        <div className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Sent {weekBlast.sent_at && fmtSentAt(weekBlast.sent_at)} · {summary}
+        </div>
+      </div>
+    );
+  }
+
+  // state === 'draft'
   return (
-    <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
-      <Mail className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
-      <div>Coming soon</div>
-      <div className="mt-3"><Button disabled variant="outline">Draft blast</Button></div>
+    <div className="space-y-3">
+      <Textarea value={editedBody} onChange={(e) => setEditedBody(e.target.value)} rows={10} />
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          disabled={!editedBody.trim() || !weekBlast || blastsHook.updateBlastBody.isPending}
+          onClick={() => weekBlast && blastsHook.updateBlastBody.mutate({ id: weekBlast.id, body: editedBody })}
+        >
+          {blastsHook.updateBlastBody.isPending ? (
+            <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</>
+          ) : 'Save draft'}
+        </Button>
+        <Button size="sm" variant="outline" disabled={drafting} onClick={onRegenerateClick}>
+          {drafting ? (
+            <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Regenerating…</>
+          ) : (
+            <><Sparkles className="mr-1.5 h-4 w-4" />Regenerate</>
+          )}
+        </Button>
+        <Button size="sm" className="ml-auto" disabled={!editedBody.trim() || !weekBlast || countLoading} onClick={onSendClick}>
+          {countLoading ? (
+            <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Checking…</>
+          ) : (
+            <><Mail className="mr-1.5 h-4 w-4" />Send to doctors</>
+          )}
+        </Button>
+      </div>
+
+      <AlertDialog open={regenConfirmOpen} onOpenChange={setRegenConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace the current draft?</AlertDialogTitle>
+            <AlertDialogDescription>Your edits will be lost.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setRegenConfirmOpen(false); runDraft(); }}>Replace</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={sendConfirmOpen} onOpenChange={setSendConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send this to all doctors?</AlertDialogTitle>
+            <AlertDialogDescription>{buildSendConfirmBody(recipientCount ?? 0)}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={blastsHook.sendBlast.isPending || !canConfirmSend(recipientCount ?? 0)}
+              onClick={confirmSend}
+            >
+              {blastsHook.sendBlast.isPending ? (
+                <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Sending…</>
+              ) : 'Send'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

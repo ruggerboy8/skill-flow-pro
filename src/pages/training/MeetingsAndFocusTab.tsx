@@ -180,7 +180,7 @@ export function MeetingsAndFocusTab() {
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" className="h-8 w-8"
               onClick={() => viewMode === 'week'
-                ? guardedNavigate(() => { setSelectedMonday((s) => addDays(s, -7)); setBuilderOpen(false); })
+                ? guardedNavigate(() => { setSelectedMonday((s) => addDays(s, -7)); closeBuilder(); })
                 : setMonthAnchor((a) => firstOfMonth(addDays(a, -15)))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -189,12 +189,12 @@ export function MeetingsAndFocusTab() {
             </h1>
             <Button variant="ghost" size="icon" className="h-8 w-8"
               onClick={() => viewMode === 'week'
-                ? guardedNavigate(() => { setSelectedMonday((s) => addDays(s, 7)); setBuilderOpen(false); })
+                ? guardedNavigate(() => { setSelectedMonday((s) => addDays(s, 7)); closeBuilder(); })
                 : setMonthAnchor((a) => firstOfMonth(addDays(a, 40)))}>
               <ChevronRight className="h-4 w-4" />
             </Button>
             {viewMode === 'week' && selectedMonday !== currentMonday && (
-              <Button variant="ghost" size="sm" onClick={() => setSelectedMonday(currentMonday)}>This week</Button>
+              <Button variant="ghost" size="sm" onClick={() => guardedNavigate(() => { setSelectedMonday(currentMonday); closeBuilder(); })}>This week</Button>
             )}
           </div>
           <div className="inline-flex gap-1 rounded-lg border bg-muted/50 p-1">
@@ -224,7 +224,7 @@ export function MeetingsAndFocusTab() {
             const glyphStates = deriveWeekGlyphStates(w, monthRowMeetings, monthRowBlast);
             return (
               <button key={m}
-                onClick={() => guardedNavigate(() => { setSelectedMonday(m); setViewMode('week'); setBuilderOpen(false); })}
+                onClick={() => guardedNavigate(() => { setSelectedMonday(m); setViewMode('week'); closeBuilder(); })}
                 className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors hover:bg-muted ${set ? 'bg-background' : 'bg-muted/40'} ${pastEmpty ? 'opacity-50' : ''}`}>
                 <span className="text-sm font-semibold">{fmtWeek(m)}{isCurrent && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-2xs font-semibold text-primary">this week</span>}</span>
                 <span className="flex items-center gap-3">

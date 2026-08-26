@@ -336,8 +336,10 @@ async function handleSend(admin: ReturnType<typeof createClient>, callerStaff: {
     ? rawExcluded.filter((id: unknown): id is string => typeof id === 'string')
     : [];
   const cohortIds = new Set(doctors.map((d) => d.id));
-  const excludedIds = requestedExclusions.filter((id) => cohortIds.has(id));
-  const excludedSet = new Set(excludedIds);
+  // Narrow-only AND deduped: unknown ids are dropped, duplicates collapse,
+  // so the persisted record of who was excluded stays clean.
+  const excludedSet = new Set(requestedExclusions.filter((id) => cohortIds.has(id)));
+  const excludedIds = [...excludedSet];
   const effectiveDoctors = doctors.filter((d) => !excludedSet.has(d.id));
 
   // The zero-recipient block now also covers "she excluded everyone" --

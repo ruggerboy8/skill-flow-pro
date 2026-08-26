@@ -59,11 +59,16 @@ export function useLeadWeekBlasts() {
 
   const updateBlastBody = useMutation({
     mutationFn: async ({ id, body, subject }: UpdateLeadWeekBlastInput) => {
-      const { error } = await sb
+      // Seatbelt: only a draft may be edited. A stale tab that lost a send
+      // race matches zero rows here instead of rewriting the sent record.
+      const { data, error } = await sb
         .from('lead_week_blasts')
         .update({ body, subject, updated_at: new Date().toISOString() })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('status', 'draft')
+        .select('id');
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('This blast was already sent, so the draft can no longer be edited.');
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
     onError: (e: any) =>

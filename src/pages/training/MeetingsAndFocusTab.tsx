@@ -363,7 +363,7 @@ function Builder(props: {
             );
           })}
           <div className="my-4 h-px bg-border" />
-          <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Framing note <span className="font-normal normal-case tracking-normal">— optional</span></div>
+          <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Framing note <span className="font-normal normal-case tracking-normal">(optional)</span></div>
           <Textarea value={props.framing} onChange={(e) => props.onFraming(e.target.value)} rows={2} placeholder="e.g. Two small things this week, both about starting strong with the family." />
           <Button className="mt-3.5" disabled={props.publishing || !items.length} onClick={props.onSchedule}>
             {props.publishing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Scheduling…</> : 'Schedule this week →'}
@@ -412,7 +412,7 @@ function RecordAccordion({ weeks }: { weeks: HydratedFocusWeek[] }) {
   return (
     <div className="pt-4">
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Record — what you have covered</span>
+        <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Record: what you have covered</span>
         <span className="text-xs text-muted-foreground">outcomes fill in as you assess the issues</span>
       </div>
       {groups.length === 0 ? (

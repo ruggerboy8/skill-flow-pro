@@ -150,7 +150,7 @@ export function RecordMeetingDialog({
 
           <div>
             <label className="mb-1.5 block text-[12.5px] font-semibold text-foreground/80">
-              Internal summary <span className="font-normal normal-case tracking-normal text-muted-foreground">— private to you</span>
+              Internal summary <span className="font-normal normal-case tracking-normal text-muted-foreground">(private to you)</span>
             </label>
             <Textarea
               value={summary}

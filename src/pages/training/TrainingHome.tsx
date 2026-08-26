@@ -6,7 +6,7 @@ import { MeetingsAndFocusTab } from './MeetingsAndFocusTab';
 import { SchedulingTab } from './SchedulingTab';
 
 // Tabbed home for the training director surface. Meetings and Focus +
-// Scheduling are RDA-line machinery (Ariyana's lead cascade) — interim gate:
+// Scheduling are RDA-line machinery (Ariyana's lead cascade); interim gate:
 // super admins only, so directors without a lead tier (Lauren / DFI line)
 // get just the Workspace. Revisit when the Functional Director archetype
 // lands (Phase C D7).

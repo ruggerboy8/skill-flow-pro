@@ -11,10 +11,14 @@ import type { LeadMeetingRow } from '@/types/leadMeetings';
 import type { LeadWeekBlastRow } from '@/types/leadWeekBlasts';
 import { deriveFocusSlotState, deriveMeetingSlotState, meetingsInWeek } from '@/lib/leadMeetingsAndFocus';
 import {
-  deriveBlastSlotState, blastSlotBadgeStatus, buildSendConfirmBody, shouldConfirmRegenerate,
+  deriveBlastSlotState, blastSlotBadgeStatus, blastBadgeLabel, buildSendConfirmBody, shouldConfirmRegenerate,
   canConfirmSend, formatSentSummary,
   type BlastSlotState,
 } from '@/lib/leadWeekBlasts';
+import {
+  buildPipelineChips, deriveWeekGlyphStates, shouldHideEmptyBadge, isBuilderDirty,
+  type WeekWhen, type PipelineChip, type PipelineChipStatus, type WeekGlyphStates,
+} from '@/lib/meetingsAndFocusView';
 import { formatDateForDisplay } from '@/lib/dateInputMask';
 import { RecordMeetingDialog } from '@/components/training/RecordMeetingDialog';
 import { StatusBadge, type BadgeStatus } from '@/components/ui/StatusBadge';
@@ -22,7 +26,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -69,6 +72,11 @@ export function MeetingsAndFocusTab() {
   const [items, setItems] = useState<BuilderItem[]>([]);
   const [framing, setFraming] = useState('');
   const [own, setOwn] = useState('');
+  // Snapshot of what the Builder loaded with, so navigation can tell whether
+  // there are unsaved edits worth confirming before discarding (B3).
+  const [builderSnapshot, setBuilderSnapshot] = useState<{ items: { text: string; sourceId: string | null }[]; framing: string } | null>(null);
+  // A navigation action deferred behind the unsaved-edits confirm (B3).
+  const [pendingNav, setPendingNav] = useState<(() => void) | null>(null);
   const keyRef = useRef(1);
   const nextKey = () => 'k' + (keyRef.current++);
 
@@ -76,7 +84,7 @@ export function MeetingsAndFocusTab() {
   const [meetingDialog, setMeetingDialog] = useState<{ mode: 'create' | 'view'; meeting: LeadMeetingRow | null } | null>(null);
 
   const selected = weeksByDate.get(selectedMonday) ?? null;
-  const when: 'past' | 'current' | 'future' =
+  const when: WeekWhen =
     selectedMonday < currentMonday ? 'past' : selectedMonday === currentMonday ? 'current' : 'future';
 
   const usedIds = new Set(items.map((i) => i.sourceId).filter(Boolean) as string[]);
@@ -84,13 +92,31 @@ export function MeetingsAndFocusTab() {
 
   const openBuilder = (monday: string) => {
     const w = weeksByDate.get(monday);
-    setItems((w?.items ?? []).map((it) => ({
+    const initialItems = (w?.items ?? []).map((it) => ({
       key: nextKey(), text: it.text, sourceId: it.source_issue_id, sourceTitle: it.sourceIssueTitle ?? null, aiPolished: true,
-    })));
+    }));
+    setItems(initialItems);
     setFraming(w?.framing ?? '');
+    setBuilderSnapshot({ items: initialItems.map((it) => ({ text: it.text, sourceId: it.sourceId })), framing: w?.framing ?? '' });
     setBuilderOpen(true);
   };
-  const closeBuilder = () => { setBuilderOpen(false); setItems([]); setFraming(''); setOwn(''); };
+  const closeBuilder = () => { setBuilderOpen(false); setItems([]); setFraming(''); setOwn(''); setBuilderSnapshot(null); };
+
+  const isBuilderEditDirty = builderOpen && !!builderSnapshot && isBuilderDirty(
+    { items: items.map((it) => ({ text: it.text, sourceId: it.sourceId })), framing, ownDraft: own },
+    builderSnapshot,
+  );
+
+  // B3: the week arrows and the Month view's "jump to this week" both close
+  // an open Builder as a side effect. If it has unsaved edits, defer the
+  // action behind a plain confirm instead of discarding them silently.
+  const guardedNavigate = (action: () => void) => {
+    if (isBuilderEditDirty) {
+      setPendingNav(() => action);
+    } else {
+      action();
+    }
+  };
 
   const addIssue = (issue: CoachingIssue) => {
     if (items.length >= 2) return;
@@ -141,39 +167,49 @@ export function MeetingsAndFocusTab() {
   const weekBlast = blastsHook.blasts.find((b) => b.week_start_date === selectedMonday) ?? null;
   const blastState = deriveBlastSlotState(focusState === 'completed', weekMeetings.length, weekBlast);
 
+  const pipelineChips = buildPipelineChips(focusState, meetingState, blastState);
+  const scrollToSlot = (key: PipelineChip['key']) => {
+    document.getElementById(`slot-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight">Meetings and Focus</h1>
-        <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Shield className="h-4 w-4" /> Set the week's focus, run the Lead RDA meeting, and (soon) send doctors a weekly recap. Past weeks are your record.
-        </p>
-      </div>
-
-      {/* toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex gap-1 rounded-lg border bg-muted/50 p-1">
-          {([['week', 'Week', LayoutList], ['month', 'Month', CalendarDays]] as const).map(([m, label, Icon]) => (
-            <button key={m} onClick={() => setViewMode(m)}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-semibold ${viewMode === m ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}>
-              <Icon className="h-4 w-4" />{label}
-            </button>
-          ))}
+      <div className="space-y-2.5">
+        {/* W1: the week (or month) is the page's dominant heading, not the static tab title. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8"
+              onClick={() => viewMode === 'week'
+                ? guardedNavigate(() => { setSelectedMonday((s) => addDays(s, -7)); setBuilderOpen(false); })
+                : setMonthAnchor((a) => firstOfMonth(addDays(a, -15)))}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+              {viewMode === 'week' ? fmtWeek(selectedMonday) : fmtMonth(monthAnchor)}
+            </h1>
+            <Button variant="ghost" size="icon" className="h-8 w-8"
+              onClick={() => viewMode === 'week'
+                ? guardedNavigate(() => { setSelectedMonday((s) => addDays(s, 7)); setBuilderOpen(false); })
+                : setMonthAnchor((a) => firstOfMonth(addDays(a, 40)))}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            {viewMode === 'week' && selectedMonday !== currentMonday && (
+              <Button variant="ghost" size="sm" onClick={() => setSelectedMonday(currentMonday)}>This week</Button>
+            )}
+          </div>
+          <div className="inline-flex gap-1 rounded-lg border bg-muted/50 p-1">
+            {([['week', 'Week', LayoutList], ['month', 'Month', CalendarDays]] as const).map(([m, label, Icon]) => (
+              <button key={m} onClick={() => setViewMode(m)}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold ${viewMode === m ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}>
+                <Icon className="h-4 w-4" />{label}
+              </button>
+            ))}
+          </div>
         </div>
-        {viewMode === 'week' ? (
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedMonday((s) => addDays(s, -7)); setBuilderOpen(false); }}><ChevronLeft className="h-4 w-4" /></Button>
-            <span className="min-w-[120px] text-center text-sm font-bold">{fmtWeek(selectedMonday)}</span>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedMonday((s) => addDays(s, 7)); setBuilderOpen(false); }}><ChevronRight className="h-4 w-4" /></Button>
-            {selectedMonday !== currentMonday && <Button variant="ghost" size="sm" onClick={() => setSelectedMonday(currentMonday)}>This week</Button>}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMonthAnchor((a) => firstOfMonth(addDays(a, -15)))}><ChevronLeft className="h-4 w-4" /></Button>
-            <span className="text-sm font-bold">{fmtMonth(monthAnchor)}</span>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMonthAnchor((a) => firstOfMonth(addDays(a, 40)))}><ChevronRight className="h-4 w-4" /></Button>
-          </div>
-        )}
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Shield className="h-4 w-4" /> Set the week's focus, run the Lead RDA meeting, and send doctors a weekly recap. Past weeks are your record.
+        </p>
+        {viewMode === 'week' && <PipelineChipRow chips={pipelineChips} onSelect={scrollToSlot} />}
       </div>
 
       {isLoading ? (
@@ -183,18 +219,26 @@ export function MeetingsAndFocusTab() {
           {mondaysInMonth(monthAnchor).map((m) => {
             const w = weeksByDate.get(m); const set = !!w && w.items.length > 0;
             const isCurrent = m === currentMonday; const pastEmpty = m < currentMonday && !set;
+            const monthRowMeetings = meetingsInWeek(meetingsHook.meetings, m);
+            const monthRowBlast = blastsHook.blasts.find((b) => b.week_start_date === m) ?? null;
+            const glyphStates = deriveWeekGlyphStates(w, monthRowMeetings, monthRowBlast);
             return (
-              <button key={m} onClick={() => { setSelectedMonday(m); setViewMode('week'); setBuilderOpen(false); }}
+              <button key={m}
+                onClick={() => guardedNavigate(() => { setSelectedMonday(m); setViewMode('week'); setBuilderOpen(false); })}
                 className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors hover:bg-muted ${set ? 'bg-background' : 'bg-muted/40'} ${pastEmpty ? 'opacity-50' : ''}`}>
-                <span className="text-sm font-semibold">{fmtWeek(m)}{isCurrent && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">this week</span>}</span>
-                <span className="text-xs font-semibold text-muted-foreground">{set ? (m < currentMonday ? '✓ covered' : '✓ scheduled') : '◦ not set'}</span>
+                <span className="text-sm font-semibold">{fmtWeek(m)}{isCurrent && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-2xs font-semibold text-primary">this week</span>}</span>
+                <span className="flex items-center gap-3">
+                  <WeekGlyphs states={glyphStates} />
+                  <span className="text-xs font-semibold text-muted-foreground">{set ? (m < currentMonday ? '✓ covered' : '✓ scheduled') : '◦ not set'}</span>
+                </span>
               </button>
             );
           })}
         </div>
       ) : (
         <div className="space-y-4">
-          <SlotSection num={1} title="Focus" state={focusState}>
+          <SlotSection num={1} title="Focus" state={focusState} id="slot-focus"
+            hideBadge={shouldHideEmptyBadge(when, focusState === 'not_started')}>
             {builderOpen ? (
               <Builder weekLabel={fmtWeek(selectedMonday)} when={when} items={items} framing={framing} own={own}
                 availIssues={availIssues} publishing={publishWeek.isPending}
@@ -205,7 +249,8 @@ export function MeetingsAndFocusTab() {
             )}
           </SlotSection>
 
-          <SlotSection num={2} title="Meeting" state={meetingState}>
+          <SlotSection num={2} title="Meeting" state={meetingState} id="slot-meeting"
+            hideBadge={shouldHideEmptyBadge(when, meetingState === 'not_started')}>
             <MeetingSlot
               meetings={weekMeetings}
               onRecord={() => setMeetingDialog({ mode: 'create', meeting: null })}
@@ -213,7 +258,8 @@ export function MeetingsAndFocusTab() {
             />
           </SlotSection>
 
-          <SlotSection num={3} title="Doctor blast" state={blastSlotBadgeStatus(blastState)}>
+          <SlotSection num={3} title="Doctor blast" state={blastSlotBadgeStatus(blastState)} id="slot-blast"
+            badgeLabel={blastBadgeLabel(blastState)} hideBadge={shouldHideEmptyBadge(when, blastState === 'none')}>
             <BlastSlot
               state={blastState}
               weekBlast={weekBlast}
@@ -224,7 +270,18 @@ export function MeetingsAndFocusTab() {
         </div>
       )}
 
-      <RecordAccordion weeks={weeks.filter((w) => w.week_start_date < currentMonday)} />
+      <AlertDialog open={!!pendingNav} onOpenChange={(o) => { if (!o) setPendingNav(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
+            <AlertDialogDescription>This week's focus has unsaved edits. Leaving now will lose them.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { const action = pendingNav; setPendingNav(null); action?.(); }}>Leave</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {meetingDialog && (
         <RecordMeetingDialog
@@ -251,16 +308,61 @@ export function MeetingsAndFocusTab() {
 
 // ── slot chrome ───────────────────────────────────────────────────────────
 
-function SlotSection({ num, title, state, children }: { num: number; title: string; state: BadgeStatus; children: React.ReactNode }) {
+function SlotSection({ num, title, state, id, badgeLabel, hideBadge, children }: {
+  num: number; title: string; state: BadgeStatus; id?: string; badgeLabel?: string; hideBadge?: boolean; children: React.ReactNode;
+}) {
   return (
-    <div className="rounded-xl border p-4">
+    <div id={id} className="rounded-xl border p-4">
       <div className="mb-3 flex items-center gap-2">
         <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-muted text-xs font-bold text-muted-foreground">{num}</span>
         <h2 className="text-sm font-bold">{title}</h2>
-        <StatusBadge status={state} className="ml-auto" />
+        {!hideBadge && <StatusBadge status={state} label={badgeLabel} className="ml-auto" />}
       </div>
       {children}
     </div>
+  );
+}
+
+// W2: the quiet three-chip pipeline summary under the week headline. Each
+// chip names its step and state (design tokens only, via StatusBadge) and
+// scrolls to that slot's card on click -- information, not nagging.
+function PipelineChipRow({ chips, onSelect }: { chips: PipelineChip[]; onSelect: (key: PipelineChip['key']) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {chips.map((chip) => (
+        <button key={chip.key} onClick={() => onSelect(chip.key)}
+          className="inline-flex items-center gap-1.5 rounded-full border bg-muted/30 px-2 py-1 text-2xs font-semibold text-muted-foreground transition-colors hover:bg-muted">
+          {chip.label}
+          <StatusBadge status={chip.status} label={chip.badgeLabel} className="h-5 px-1.5 py-0 text-2xs" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// W4: the three tiny per-week state glyphs on a Month view row.
+const GLYPH_COLOR: Record<PipelineChipStatus, string> = {
+  completed: 'hsl(var(--status-complete))',
+  draft: 'hsl(var(--status-late))',
+  not_started: 'hsl(var(--muted-foreground) / 0.35)',
+  locked: 'hsl(var(--muted-foreground) / 0.35)',
+};
+
+function WeekGlyphs({ states }: { states: WeekGlyphStates }) {
+  // See buildPipelineChips's comment: the switch only ever returns the four
+  // values PipelineChipStatus covers, narrower than the declared BadgeStatus.
+  const blastStatus = blastSlotBadgeStatus(states.blast) as PipelineChipStatus;
+  const dots: { label: string; status: PipelineChipStatus }[] = [
+    { label: 'Focus', status: states.focus },
+    { label: 'Meeting', status: states.meeting },
+    { label: 'Blast', status: blastStatus },
+  ];
+  return (
+    <span className="inline-flex items-center gap-1" title={dots.map((d) => `${d.label}: ${d.status.replace('_', ' ')}`).join(', ')}>
+      {dots.map((d) => (
+        <span key={d.label} className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: GLYPH_COLOR[d.status] }} />
+      ))}
+    </span>
   );
 }
 
@@ -386,6 +488,8 @@ function BlastSlot({
     return (
       <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
         <Mail className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+        {/* W3: explain what a draft draws from instead of a bare disabled button. */}
+        <p className="text-xs text-muted-foreground">Drafts from this week's focus and meeting.</p>
         <div className="mt-3">
           <Button disabled={state === 'none' || drafting} onClick={runDraft}>
             {drafting ? (
@@ -418,6 +522,7 @@ function BlastSlot({
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
+          variant="outline"
           disabled={!editedBody.trim() || !weekBlast || blastsHook.updateBlastBody.isPending}
           onClick={() => weekBlast && blastsHook.updateBlastBody.mutate({ id: weekBlast.id, body: editedBody })}
         >
@@ -479,20 +584,26 @@ function BlastSlot({
 
 // ── existing focus slot pieces (unchanged behavior) ─────────────────────────
 
-function SelectedWeek({ week, when, monday, onBuild }: { week: HydratedFocusWeek | null; when: 'past' | 'current' | 'future'; monday: string; onBuild: () => void }) {
+function SelectedWeek({ week, when, monday, onBuild }: { week: HydratedFocusWeek | null; when: WeekWhen; monday: string; onBuild: () => void }) {
   const live = when === 'current';
   if (week && week.items.length > 0) {
     return (
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">{when === 'past' ? 'What you covered' : 'Scheduled'}</span>
-          {live && <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-[color:var(--domain-clinical,#0E7C86)]">● live on lead homes</span>}
+          <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{when === 'past' ? 'What you covered' : 'Scheduled'}</span>
+          {live && <span className="inline-flex items-center gap-1.5 text-2xs font-bold text-[color:var(--domain-clinical,#0E7C86)]">● live on lead homes</span>}
         </div>
         {week.items.map((it, i) => <FocusRow key={it.id} idx={i} text={it.text} outcome={when === 'past' ? it.outcome : undefined} />)}
         {week.framing && <p className="mt-2.5 text-sm italic text-muted-foreground">“{week.framing}”</p>}
         {when !== 'past' && <Button variant="outline" size="sm" className="mt-3" onClick={onBuild}>Edit</Button>}
       </div>
     );
+  }
+  // B2: a past empty week is legitimately finished, not a chore left undone --
+  // no CTA that would publish a focus into a finished week, and no "...yet"
+  // wording (omit-absent-content rule; there is no "yet" about the past).
+  if (when === 'past') {
+    return <div className="rounded-lg border border-dashed py-12" />;
   }
   return (
     <div className="rounded-lg border border-dashed py-12 text-center text-sm text-muted-foreground">
@@ -508,14 +619,14 @@ function FocusRow({ idx, text, outcome }: { idx: number; text: string; outcome?:
       <span className="mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{idx + 1}</span>
       <div className="flex-1">
         <div className="text-sm font-semibold">{text}</div>
-        {outcome && <span className="mt-1 inline-block rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">{OUTCOME_META[outcome as keyof typeof OUTCOME_META]?.label ?? outcome}</span>}
+        {outcome && <span className="mt-1 inline-block rounded-full bg-muted px-2 py-0.5 text-2xs font-bold text-muted-foreground">{OUTCOME_META[outcome as keyof typeof OUTCOME_META]?.label ?? outcome}</span>}
       </div>
     </div>
   );
 }
 
 function Builder(props: {
-  weekLabel: string; when: 'past' | 'current' | 'future'; items: BuilderItem[]; framing: string; own: string; availIssues: CoachingIssue[]; publishing: boolean;
+  weekLabel: string; when: WeekWhen; items: BuilderItem[]; framing: string; own: string; availIssues: CoachingIssue[]; publishing: boolean;
   onOwn: (v: string) => void; onAddOwn: () => void; onAddIssue: (i: CoachingIssue) => void; onEdit: (k: string, v: string) => void; onRemove: (k: string) => void;
   onPolish: (k: string) => void; onFraming: (v: string) => void; onSchedule: () => void; onCancel: () => void;
 }) {
@@ -531,12 +642,12 @@ function Builder(props: {
         {/* left: slots */}
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">This week (1–2)</span>
-            {items.length >= 2 && <span className="text-[10.5px] font-bold text-muted-foreground">Two is the cap</span>}
+            <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">This week (1–2)</span>
+            {items.length >= 2 && <span className="text-2xs font-bold text-muted-foreground">Two is the cap</span>}
           </div>
           {[0, 1].map((n) => {
             const it = items[n];
-            if (!it) return <div key={n} className="mb-3 rounded-xl border border-dashed p-3.5 text-[12.5px] text-muted-foreground">Add an issue from the right, or write your own.</div>;
+            if (!it) return <div key={n} className="mb-3 rounded-xl border border-dashed p-3.5 text-xs text-muted-foreground">Add an issue from the right, or write your own.</div>;
             return (
               <div key={it.key} className="mb-3 rounded-xl border p-3">
                 <div className="flex items-start gap-2.5">
@@ -545,14 +656,14 @@ function Builder(props: {
                     <Textarea value={it.text} onChange={(e) => props.onEdit(it.key, e.target.value)} rows={2} className="font-semibold" />
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="rounded-full border bg-background px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{it.sourceTitle ? `from: ${it.sourceTitle.slice(0, 24)}${it.sourceTitle.length > 24 ? '…' : ''}` : 'written by you'}</span>
-                        {it.aiPolished && <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-[color:var(--domain-clinical,#0E7C86)]"><Sparkles className="h-4 w-4" />AI-polished</span>}
+                        <span className="rounded-full border bg-background px-2 py-0.5 text-2xs font-semibold text-muted-foreground">{it.sourceTitle ? `from: ${it.sourceTitle.slice(0, 24)}${it.sourceTitle.length > 24 ? '…' : ''}` : 'written by you'}</span>
+                        {it.aiPolished && <span className="inline-flex items-center gap-1 text-2xs font-bold text-[color:var(--domain-clinical,#0E7C86)]"><Sparkles className="h-4 w-4" />AI-polished</span>}
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Button variant="outline" size="sm" disabled={it.polishing} onClick={() => props.onPolish(it.key)}>
                           {it.polishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Sparkles className="mr-1 h-4 w-4" />Polish</>}
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => props.onRemove(it.key)}><X className="h-5 w-5" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => props.onRemove(it.key)}><X className="h-4 w-4" /></Button>
                       </div>
                     </div>
                   </div>
@@ -561,7 +672,7 @@ function Builder(props: {
             );
           })}
           <div className="my-4 h-px bg-border" />
-          <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Framing note <span className="font-normal normal-case tracking-normal">(optional)</span></div>
+          <div className="mb-1.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Framing note <span className="font-normal normal-case tracking-normal">(optional)</span></div>
           <Textarea value={props.framing} onChange={(e) => props.onFraming(e.target.value)} rows={2} placeholder="e.g. Two small things this week, both about starting strong with the family." />
           <Button className="mt-3.5" disabled={props.publishing || !items.length} onClick={props.onSchedule}>
             {props.publishing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Scheduling…</> : 'Schedule this week →'}
@@ -583,56 +694,18 @@ function Builder(props: {
           ) : availIssues.map((iss) => (
             <div key={iss.id} className="mb-2.5 rounded-lg border p-2.5">
               <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 text-[13.5px] font-semibold">{iss.title}</div>
+                <div className="flex-1 text-xs font-semibold">{iss.title}</div>
                 <Button size="sm" disabled={items.length >= 2} onClick={() => props.onAddIssue(iss)}><Plus className="mr-1 h-4 w-4" />Focus</Button>
               </div>
               <div className="mt-2 flex flex-wrap gap-1">
-                {iss.is_global && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">Global</span>}
-                {iss.sources.map((s: SourceType) => <span key={s} className="rounded-full border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground">{SOURCE_META[s].label}</span>)}
+                {iss.is_global && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-2xs font-semibold text-primary">Global</span>}
+                {iss.sources.map((s: SourceType) => <span key={s} className="rounded-full border bg-background px-1.5 py-0.5 text-2xs text-muted-foreground">{SOURCE_META[s].label}</span>)}
                 {iss.sources.length >= 2 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-2xs font-bold text-primary">×{iss.sources.length}</span>}
               </div>
             </div>
           ))}
         </div>
       </div>
-    </div>
-  );
-}
-
-function RecordAccordion({ weeks }: { weeks: HydratedFocusWeek[] }) {
-  const groups = useMemo(() => {
-    const sorted = weeks.slice().sort((a, b) => b.week_start_date.localeCompare(a.week_start_date));
-    const g: { month: string; weeks: HydratedFocusWeek[] }[] = [];
-    sorted.forEach((w) => { const m = fmtMonth(w.week_start_date); let e = g.find((x) => x.month === m); if (!e) { e = { month: m, weeks: [] }; g.push(e); } e.weeks.push(w); });
-    return g;
-  }, [weeks]);
-
-  return (
-    <div className="pt-4">
-      <div className="mb-1 flex items-center justify-between">
-        <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Record: what you have covered</span>
-        <span className="text-xs text-muted-foreground">outcomes fill in as you assess the issues</span>
-      </div>
-      {groups.length === 0 ? (
-        <div className="rounded-xl border border-dashed py-8 text-center text-sm text-muted-foreground">No past weeks yet.</div>
-      ) : groups.map((g) => (
-        <div key={g.month} className="mt-2">
-          <div className="px-1 py-2 text-xs font-bold text-muted-foreground">{g.month}</div>
-          <Accordion type="multiple" className="border-t">
-            {g.weeks.map((w) => (
-              <AccordionItem key={w.id} value={w.id}>
-                <AccordionTrigger className="text-[13.5px]">
-                  <span className="flex items-center gap-2">{fmtWeek(w.week_start_date)}<span className="text-xs font-normal text-muted-foreground">· {w.items.length} focus{w.items.length !== 1 ? 'es' : ''}</span></span>
-                </AccordionTrigger>
-                <AccordionContent>
-                  {w.items.map((it, i) => <FocusRow key={it.id} idx={i} text={it.text} outcome={it.outcome} />)}
-                  {w.framing && <p className="mt-2 text-sm italic text-muted-foreground">“{w.framing}”</p>}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </div>
-      ))}
     </div>
   );
 }

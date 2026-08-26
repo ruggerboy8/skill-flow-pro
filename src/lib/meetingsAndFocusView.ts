@@ -37,7 +37,10 @@ export function buildPipelineChips(
   meetingState: SlotState,
   blastState: BlastSlotState,
 ): PipelineChip[] {
-  const blastStatus = blastSlotBadgeStatus(blastState);
+  // blastSlotBadgeStatus's declared return type is StatusBadge's full
+  // BadgeStatus union (shared across the whole design system); its switch
+  // only ever actually returns the four values PipelineChipStatus covers.
+  const blastStatus = blastSlotBadgeStatus(blastState) as PipelineChipStatus;
   return [
     { key: 'focus', label: 'Focus', status: focusState },
     { key: 'meeting', label: 'Meeting', status: meetingState },

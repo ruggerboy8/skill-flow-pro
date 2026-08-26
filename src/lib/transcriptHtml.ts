@@ -20,7 +20,11 @@ export function plainTextTranscriptToHtml(value: string | null | undefined): str
   if (!value || !value.trim()) return '';
   if (isLikelyHtml(value)) return value;
 
-  const escaped = value
+  // Normalize CRLF / lone CR to `\n` so Windows-origin line endings split into
+  // paragraphs and <br> the same as Unix newlines (no literal `\r` survives).
+  const normalized = value.replace(/\r\n?/g, '\n');
+
+  const escaped = normalized
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');

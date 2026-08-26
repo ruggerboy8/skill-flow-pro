@@ -73,6 +73,17 @@ describe('plainTextTranscriptToHtml', () => {
     const result = plainTextTranscriptToHtml('\n\nOnly paragraph.\n\n');
     expect(result).toBe('<p>Only paragraph.</p>');
   });
+
+  it('normalizes a lone CRLF within a paragraph to <br> with no literal carriage return', () => {
+    const result = plainTextTranscriptToHtml('Line one\r\nLine two');
+    expect(result).toBe('<p>Line one<br>Line two</p>');
+    expect(result).not.toContain('\r');
+  });
+
+  it('normalizes CRLF blank-line paragraph boundaries the same as \\n\\n', () => {
+    const result = plainTextTranscriptToHtml('First paragraph.\r\n\r\nSecond paragraph.');
+    expect(result).toBe('<p>First paragraph.</p><p>Second paragraph.</p>');
+  });
 });
 
 describe('isLikelyHtml', () => {
@@ -90,5 +101,14 @@ describe('isLikelyHtml', () => {
 
   it('returns false for plain text that merely mentions angle brackets as prose', () => {
     expect(isLikelyHtml('the patient said "less than 5 minutes"')).toBe(false);
+  });
+
+  it('returns false for a bare angle bracket not forming a real tag', () => {
+    expect(isLikelyHtml('score < 3 & rising')).toBe(false);
+    expect(isLikelyHtml('compared a<b in the notes')).toBe(false);
+  });
+
+  it('escapes (not passes through) plain text containing a bare < and &', () => {
+    expect(plainTextTranscriptToHtml('score < 3 & rising')).toBe('<p>score &lt; 3 &amp; rising</p>');
   });
 });

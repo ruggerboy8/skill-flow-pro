@@ -57,6 +57,7 @@ import { useAudioRecording, type AudioSegment } from '@/hooks/useAudioRecording'
 import { transcribeWithChunking, type ChunkProgress, CHUNK_SIZE_BYTES } from '@/lib/audioChunking';
 import { useSidebar } from '@/components/ui/sidebar';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
+import { plainTextTranscriptToHtml } from '@/lib/transcriptHtml';
 
 // DSN-3: migrated off hardcoded red/orange/blue/green classes onto the
 // --score-1..4 tokens — the same 1-4 confidence scale used everywhere else
@@ -1843,7 +1844,7 @@ export function EvaluationHub() {
                 <CardContent className="pt-0">
                   <div className="space-y-4">
                     <RichTextEditor
-                      value={summaryRawTranscript}
+                      value={plainTextTranscriptToHtml(summaryRawTranscript)}
                       onChange={handleSummaryTranscriptChange}
                       readOnly={isReadOnly}
                       className="bg-background [&_.ql-editor]:min-h-[100px]"

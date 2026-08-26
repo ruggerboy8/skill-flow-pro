@@ -12,6 +12,7 @@ import type { LeadWeekBlastRow } from '@/types/leadWeekBlasts';
 import { deriveFocusSlotState, deriveMeetingSlotState, meetingsInWeek } from '@/lib/leadMeetingsAndFocus';
 import {
   deriveBlastSlotState, blastSlotBadgeStatus, buildSendConfirmBody, shouldConfirmRegenerate,
+  canConfirmSend, formatSentSummary,
   type BlastSlotState,
 } from '@/lib/leadWeekBlasts';
 import { formatDateForDisplay } from '@/lib/dateInputMask';
@@ -346,7 +347,14 @@ function BlastSlot({
     try {
       const count = await blastsHook.fetchRecipientCount.mutateAsync();
       setRecipientCount(count);
-      setSendConfirmOpen(true);
+      // QA fix: zero eligible doctors means there's nothing to confirm --
+      // show a plain message instead of opening a confirm dialog for a send
+      // the edge function would reject anyway.
+      if (canConfirmSend(count)) {
+        setSendConfirmOpen(true);
+      } else {
+        toast({ title: 'No doctors to send to', description: 'There are no doctors to send this to yet.' });
+      }
     } catch {
       // Failure toast already shown by the hook's onError.
     } finally {
@@ -357,9 +365,19 @@ function BlastSlot({
   const confirmSend = () => {
     if (!weekBlast) return;
     blastsHook.sendBlast.mutate(weekBlast.id, {
-      onSuccess: () => {
+      onSuccess: (data) => {
         setSendConfirmOpen(false);
-        toast({ title: 'Sent to doctors' });
+        // QA fix: a partial failure must be visible, not swallowed into a
+        // clean "sent" toast.
+        if (data.failed > 0) {
+          toast({
+            title: 'Sent with some failures',
+            description: `${data.sent} sent, ${data.failed} failed. Check the recipient list and try again if needed.`,
+            variant: 'destructive',
+          });
+        } else {
+          toast({ title: 'Sent to doctors' });
+        }
       },
     });
   };
@@ -382,12 +400,12 @@ function BlastSlot({
   }
 
   if (state === 'sent' && weekBlast) {
-    const count = weekBlast.recipient_count ?? 0;
+    const summary = formatSentSummary(weekBlast.recipient_count ?? 0, weekBlast.failed_count ?? 0);
     return (
       <div className="space-y-2.5">
         <div className="whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">{weekBlast.body}</div>
         <div className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Sent {weekBlast.sent_at && fmtSentAt(weekBlast.sent_at)} · {count} doctor{count === 1 ? '' : 's'}
+          Sent {weekBlast.sent_at && fmtSentAt(weekBlast.sent_at)} · {summary}
         </div>
       </div>
     );
@@ -444,7 +462,10 @@ function BlastSlot({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction disabled={blastsHook.sendBlast.isPending} onClick={confirmSend}>
+            <AlertDialogAction
+              disabled={blastsHook.sendBlast.isPending || !canConfirmSend(recipientCount ?? 0)}
+              onClick={confirmSend}
+            >
               {blastsHook.sendBlast.isPending ? (
                 <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Sending…</>
               ) : 'Send'}

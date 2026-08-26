@@ -1295,6 +1295,74 @@ serve(async (req: Request) => {
         return json({ ok: true, staff_id: staff.id, user_id: invite.user.id, email_sent: true, baseline_released: !!release_baseline });
       }
 
+      case "set_coaching_enrollment": {
+        // DR-1: an explicit "is this doctor being coached" designation on
+        // the doctor roster, separate from "does this doctor have a login."
+        // Only clinical directors or super admins can change it (mirrors
+        // invite_doctor's gate).
+        if (!me.is_clinical_director && !me.is_super_admin) {
+          return json({ error: "Only Clinical Directors can change coaching enrollment" }, 403);
+        }
+
+        const { staff_id, enrolled } = payload ?? {};
+        if (!staff_id || typeof enrolled !== "boolean") {
+          return json({ error: "staff_id and a boolean enrolled flag are required" }, 400);
+        }
+
+        const { data: target, error: targetErr } = await admin
+          .from("staff")
+          .select("id, user_id, name, is_doctor, coaching_enrolled_at")
+          .eq("id", staff_id)
+          .maybeSingle();
+
+        if (targetErr) throw targetErr;
+        if (!target) return json({ error: "Staff not found" }, 404);
+        if (!target.is_doctor) return json({ error: "Coaching enrollment only applies to doctors" }, 400);
+
+        // Org scope: a clinical director (not a super admin) may only
+        // change enrollment for a doctor in their own org. Mirrors the
+        // assertSameOrgTarget guard other doctor-roster actions use.
+        if (target.user_id) {
+          const orgErr = await assertSameOrgTarget(target.user_id);
+          if (orgErr) return orgErr;
+        } else if (!me.is_super_admin) {
+          return json({ error: "Forbidden: target user is not in your organization" }, 403);
+        }
+
+        // Idempotent: re-enrolling an already-enrolled doctor is a no-op so
+        // the original enrollment timestamp is never silently rewritten.
+        if (enrolled && target.coaching_enrolled_at) {
+          return json({ ok: true, staff_id: target.id, enrolled: true, noop: true });
+        }
+
+        const updateData = enrolled
+          ? { coaching_enrolled_at: new Date().toISOString(), coaching_enrolled_by: me.id }
+          : { coaching_enrolled_at: null, coaching_enrolled_by: null };
+
+        const { error: updateErr } = await admin
+          .from("staff")
+          .update(updateData)
+          .eq("id", staff_id);
+
+        if (updateErr) throw updateErr;
+
+        // Audit log
+        try {
+          await admin.from("admin_audit").insert({
+            staff_id: target.id,
+            changed_by: me.id,
+            action: "set_coaching_enrollment",
+            old_values: { coaching_enrolled_at: target.coaching_enrolled_at },
+            new_values: updateData,
+          });
+        } catch (auditErr) {
+          console.warn("Failed to write audit log:", auditErr);
+        }
+
+        console.log(`✅ ${enrolled ? "Enrolled" : "Un-enrolled"} doctor ${target.name} (staff_id: ${target.id}) in coaching`);
+        return json({ ok: true, staff_id: target.id, enrolled });
+      }
+
       case "delete_user": {
         const { user_id } = payload ?? {};
         if (!user_id) return json({ error: "user_id required" }, 400);

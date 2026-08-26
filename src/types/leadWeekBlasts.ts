@@ -15,6 +15,7 @@ export interface LeadWeekBlastRow {
   sent_at: string | null;
   sent_by: string | null;
   recipient_count: number | null;
+  failed_count: number | null;
   location_id: string | null; // always null in v1, see column comment in the migration
   created_at: string;
   updated_at: string;

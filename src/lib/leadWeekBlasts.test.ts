@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   canDraftBlast, deriveBlastSlotState, blastSlotBadgeStatus,
-  buildSendConfirmBody, shouldConfirmRegenerate,
+  buildSendConfirmBody, shouldConfirmRegenerate, canConfirmSend, formatSentSummary,
 } from './leadWeekBlasts';
 import type { LeadWeekBlastRow } from '@/types/leadWeekBlasts';
 
@@ -9,7 +9,8 @@ function blast(overrides: Partial<LeadWeekBlastRow> = {}): LeadWeekBlastRow {
   return {
     id: 'b1', organization_id: 'org1', created_by: 'staff1',
     week_start_date: '2026-08-10', body: 'Hello doctors', status: 'draft',
-    sent_at: null, sent_by: null, recipient_count: null, location_id: null,
+    sent_at: null, sent_by: null, recipient_count: null, failed_count: null,
+    location_id: null,
     created_at: '2026-08-10T12:00:00Z', updated_at: '2026-08-10T12:00:00Z',
     ...overrides,
   };
@@ -108,5 +109,38 @@ describe('shouldConfirmRegenerate', () => {
 
   it('requires a confirm once the body has been hand-edited', () => {
     expect(shouldConfirmRegenerate('Hello doctors, changed my mind', 'Hello doctors')).toBe(true);
+  });
+});
+
+describe('canConfirmSend', () => {
+  it('is false when there are no eligible doctors', () => {
+    expect(canConfirmSend(0)).toBe(false);
+  });
+
+  it('is true once there is at least one eligible doctor', () => {
+    expect(canConfirmSend(1)).toBe(true);
+    expect(canConfirmSend(12)).toBe(true);
+  });
+});
+
+describe('formatSentSummary', () => {
+  it('reports a clean count when nothing failed', () => {
+    expect(formatSentSummary(6, 0)).toBe('6 doctors');
+  });
+
+  it('uses the singular for exactly one successful send with no failures', () => {
+    expect(formatSentSummary(1, 0)).toBe('1 doctor');
+  });
+
+  it('surfaces the shortfall when some sends failed, instead of hiding it', () => {
+    expect(formatSentSummary(4, 2)).toBe('4 of 6 doctors');
+  });
+
+  it('still pluralizes the total correctly when the total is exactly one', () => {
+    expect(formatSentSummary(0, 1)).toBe('0 of 1 doctor');
+  });
+
+  it('never reads negative even if the inputs are malformed', () => {
+    expect(formatSentSummary(-1, -1)).toBe('0 doctors');
   });
 });

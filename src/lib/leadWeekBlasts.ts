@@ -57,6 +57,30 @@ export function buildSendConfirmBody(recipientCount: number): string {
 }
 
 /**
+ * QA fix: a week with zero eligible doctors must not open the send confirm
+ * at all -- there is nothing useful to confirm, and letting it through just
+ * produces a 400 from the edge function after the fact.
+ */
+export function canConfirmSend(recipientCount: number): boolean {
+  return recipientCount > 0;
+}
+
+/**
+ * The read-only summary line for a sent blast. QA fix: a partial failure
+ * (some sends failed) must stay visible in the summary, not round up to a
+ * clean "sent to everyone" once failedCount is dropped or ignored.
+ */
+export function formatSentSummary(recipientCount: number, failedCount: number): string {
+  const successCount = Math.max(0, recipientCount);
+  const failures = Math.max(0, failedCount);
+  if (failures <= 0) {
+    return `${successCount} doctor${successCount === 1 ? '' : 's'}`;
+  }
+  const total = successCount + failures;
+  return `${successCount} of ${total} doctor${total === 1 ? '' : 's'}`;
+}
+
+/**
  * Whether clicking "regenerate" while a draft exists should interrupt with
  * a "Replace the current draft? Your edits will be lost." confirm, versus
  * regenerating straight away. Only interrupts if the draft body currently

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { UserPlus, Mail, MoreHorizontal, Users, ClipboardCheck, Clock, ArrowRight, BookOpen, UserCheck, UserMinus } from 'lucide-react';
+import { UserPlus, Mail, MoreHorizontal, Users, ClipboardCheck, Clock, ArrowRight, BookOpen, UserCheck, UserMinus, Unlock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useUrlState } from '@/hooks/useUrlState';
@@ -29,6 +29,8 @@ import { useDoctorMenteeIds } from '@/hooks/useDoctorMenteeIds';
 import {
   filterDoctorsForRosterView,
   getEnrollmentConfirmCopy,
+  canReleaseBaseline,
+  getBaselineReleaseConfirmCopy,
   type RosterViewMode,
 } from '@/lib/doctorCoachingEnrollment';
 
@@ -47,6 +49,7 @@ interface DoctorRow {
   journeyStatus: DoctorJourneyStatus;
   lastSessionAt: string | null;
   coaching_enrolled_at: string | null;
+  baseline_released_at: string | null;
 }
 
 type FilterValue = 'all' | 'needs_my_action' | 'waiting_on_doctor';
@@ -59,6 +62,8 @@ export default function DoctorManagement() {
   const [viewMode, setViewMode] = useUrlState<RosterViewMode>('view', 'enrolled');
   const [enrollmentTarget, setEnrollmentTarget] = useState<{ id: string; name: string; action: 'enroll' | 'unenroll' } | null>(null);
   const [enrollmentSubmitting, setEnrollmentSubmitting] = useState(false);
+  const [releaseTarget, setReleaseTarget] = useState<{ id: string; name: string } | null>(null);
+  const [releaseSubmitting, setReleaseSubmitting] = useState(false);
   const navigate = useNavigate();
   const { organizationId, isSuperAdmin, isClinicalDirector, staffId } = useUserRole();
 
@@ -200,6 +205,7 @@ export default function DoctorManagement() {
           journeyStatus,
           lastSessionAt: lastSessionMap.get(s.id) || null,
           coaching_enrolled_at: enrollmentMap.get(s.id) ?? null,
+          baseline_released_at: (s as any).baseline_released_at ?? null,
         };
       });
     },
@@ -256,6 +262,31 @@ export default function DoctorManagement() {
     } finally {
       setEnrollmentSubmitting(false);
       setEnrollmentTarget(null);
+    }
+  }
+
+  async function handleReleaseConfirm() {
+    if (!releaseTarget) return;
+    setReleaseSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: {
+          action: 'release_baseline',
+          staff_id: releaseTarget.id,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: 'Baseline released',
+        description: `${releaseTarget.name} can now start their self-assessment.`,
+      });
+      await refetch();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to release baseline', variant: 'destructive' });
+    } finally {
+      setReleaseSubmitting(false);
+      setReleaseTarget(null);
     }
   }
 
@@ -522,6 +553,20 @@ export default function DoctorManagement() {
                               </DropdownMenuItem>
                             )
                           )}
+                          {/* DR-2: baseline release is its own action, separate
+                              from invite. Only offered for doctors who are
+                              enrolled and not yet released; once released the
+                              journey status pill already reflects it, so there
+                              is nothing more to show here. */}
+                          {(isClinicalDirector || isSuperAdmin) && canReleaseBaseline(doctor) && (
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              setReleaseTarget({ id: doctor.id, name: drName(doctor.name) });
+                            }}>
+                              <Unlock className="h-4 w-4 mr-2" />
+                              Release baseline
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -552,6 +597,28 @@ export default function DoctorManagement() {
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction disabled={enrollmentSubmitting} onClick={() => handleEnrollmentConfirm()}>
+                    {copy.confirmLabel}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            );
+          })()}
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={releaseTarget !== null} onOpenChange={(open) => { if (!open) setReleaseTarget(null); }}>
+        <AlertDialogContent>
+          {releaseTarget && (() => {
+            const copy = getBaselineReleaseConfirmCopy(releaseTarget.name);
+            return (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{copy.title}</AlertDialogTitle>
+                  <AlertDialogDescription>{copy.description}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction disabled={releaseSubmitting} onClick={() => handleReleaseConfirm()}>
                     {copy.confirmLabel}
                   </AlertDialogAction>
                 </AlertDialogFooter>

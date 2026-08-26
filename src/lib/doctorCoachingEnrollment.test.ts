@@ -3,7 +3,10 @@ import {
   isEnrolledInCoaching,
   filterDoctorsForRosterView,
   getEnrollmentConfirmCopy,
+  canReleaseBaseline,
+  getBaselineReleaseConfirmCopy,
   type EnrollmentAwareDoctor,
+  type ReleaseAwareDoctor,
 } from './doctorCoachingEnrollment';
 
 describe('isEnrolledInCoaching', () => {
@@ -63,5 +66,58 @@ describe('getEnrollmentConfirmCopy', () => {
       expect(copy.title).not.toContain('—');
       expect(copy.description).not.toContain('—');
     }
+  });
+});
+
+describe('canReleaseBaseline', () => {
+  const enrolledUnreleased: ReleaseAwareDoctor = {
+    id: 'a',
+    coaching_enrolled_at: '2026-08-20T00:00:00Z',
+    baseline_released_at: null,
+  };
+  const enrolledReleased: ReleaseAwareDoctor = {
+    id: 'b',
+    coaching_enrolled_at: '2026-08-20T00:00:00Z',
+    baseline_released_at: '2026-08-21T00:00:00Z',
+  };
+  const notEnrolledUnreleased: ReleaseAwareDoctor = {
+    id: 'c',
+    coaching_enrolled_at: null,
+    baseline_released_at: null,
+  };
+  const notEnrolledReleased: ReleaseAwareDoctor = {
+    id: 'd',
+    coaching_enrolled_at: null,
+    baseline_released_at: '2026-08-19T00:00:00Z',
+  };
+
+  it('is true when enrolled and not yet released', () => {
+    expect(canReleaseBaseline(enrolledUnreleased)).toBe(true);
+  });
+
+  it('denies when already released, even if enrolled', () => {
+    expect(canReleaseBaseline(enrolledReleased)).toBe(false);
+  });
+
+  it('denies when not enrolled, even if somehow unreleased', () => {
+    expect(canReleaseBaseline(notEnrolledUnreleased)).toBe(false);
+  });
+
+  it('denies when neither enrolled nor released', () => {
+    expect(canReleaseBaseline(notEnrolledReleased)).toBe(false);
+  });
+});
+
+describe('getBaselineReleaseConfirmCopy', () => {
+  it('names the doctor in the title and describes what they will see', () => {
+    const copy = getBaselineReleaseConfirmCopy('Dr. Alex Chen');
+    expect(copy.title).toBe('Release the baseline for Dr. Alex Chen?');
+    expect(copy.description).toContain('Your Baseline Is Ready');
+  });
+
+  it('no em dashes in the release confirm copy', () => {
+    const copy = getBaselineReleaseConfirmCopy('Dr. Test');
+    expect(copy.title).not.toContain('—');
+    expect(copy.description).not.toContain('—');
   });
 });

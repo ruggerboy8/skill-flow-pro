@@ -51,3 +51,27 @@ export function getEnrollmentConfirmCopy(doctorName: string, action: 'enroll' | 
     confirmLabel: 'Remove',
   };
 }
+
+// DR-2: baseline release is now a separate, explicit action from invite. A
+// doctor must be enrolled in coaching before their baseline can be released,
+// and release only ever happens once (idempotent on the edge function side
+// too, see admin-users' release_baseline action).
+
+export interface ReleaseAwareDoctor extends EnrollmentAwareDoctor {
+  baseline_released_at: string | null;
+}
+
+/** True only for a doctor who is enrolled in coaching and has not yet had their baseline released. */
+export function canReleaseBaseline(doctor: ReleaseAwareDoctor): boolean {
+  return isEnrolledInCoaching(doctor) && doctor.baseline_released_at == null;
+}
+
+/** Plain-language confirm copy for the Release baseline AlertDialog. */
+export function getBaselineReleaseConfirmCopy(doctorName: string) {
+  return {
+    title: `Release the baseline for ${doctorName}?`,
+    description:
+      'Next time they log in they will see Your Baseline Is Ready and can start their self-assessment.',
+    confirmLabel: 'Release baseline',
+  };
+}

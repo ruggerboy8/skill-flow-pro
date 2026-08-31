@@ -217,3 +217,56 @@ export function calculateLocationStats(
     perfExpectedCount,
   };
 }
+
+/**
+ * DASH-4: excuse-aware view of calculateLocationStats, shared by the
+ * Regional Command Center and Location Detail so an excused location can
+ * never show different numbers on the two pages. An excused metric is
+ * treated as not due: its missing/pending counts drop to zero, a fully
+ * excused location reads 100%, and the effective gates (with excused
+ * metrics turned off) drive the distinct-missed count and the due-only
+ * submission totals.
+ */
+export function calculateExcuseAdjustedLocationStats(
+  staff: StaffWeekSummary[],
+  gates: SubmissionGates,
+  excuseStatus: { isConfExcused: boolean; isPerfExcused: boolean },
+): ReturnType<typeof calculateLocationStats> & {
+  effectiveGates: SubmissionGates;
+  dueTotals: DueSubmissionTotals;
+} {
+  const locStats = calculateLocationStats(staff, gates);
+
+  let missingConfCount = locStats.missingConfCount;
+  let missingPerfCount = locStats.missingPerfCount;
+  let pendingConfCount = locStats.pendingConfCount;
+  let submissionRate = locStats.submissionRate;
+
+  if (excuseStatus.isConfExcused) {
+    missingConfCount = 0;
+    pendingConfCount = 0;
+  }
+  if (excuseStatus.isPerfExcused) {
+    missingPerfCount = 0;
+  }
+  if (excuseStatus.isConfExcused && excuseStatus.isPerfExcused) {
+    submissionRate = 100;
+  }
+
+  const effectiveGates: SubmissionGates = {
+    ...gates,
+    isPastConfidenceDeadline: gates.isPastConfidenceDeadline && !excuseStatus.isConfExcused,
+    isPastPerformanceDeadline: gates.isPastPerformanceDeadline && !excuseStatus.isPerfExcused,
+  };
+
+  return {
+    ...locStats,
+    submissionRate,
+    missingConfCount,
+    missingPerfCount,
+    pendingConfCount,
+    distinctMissedCount: calculateDistinctMissedCount(staff, effectiveGates),
+    effectiveGates,
+    dueTotals: calculateDueSubmissionTotals(staff, effectiveGates),
+  };
+}

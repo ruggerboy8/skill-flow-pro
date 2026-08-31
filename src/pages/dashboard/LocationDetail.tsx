@@ -14,7 +14,7 @@ import LocationSubmissionWidget from '@/components/dashboard/LocationSubmissionW
 import CoachDashboardV2 from '@/pages/coach/CoachDashboardV2';
 import { nowUtc } from '@/lib/centralTime';
 import { useLocationTimezone } from '@/hooks/useLocationTimezone';
-import { getLocationSubmissionGates, calculateLocationStats } from '@/lib/submissionStatus';
+import { getLocationSubmissionGates, calculateExcuseAdjustedLocationStats } from '@/lib/submissionStatus';
 import { getSubmissionPolicy } from '@/lib/submissionPolicy';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -91,8 +91,16 @@ export default function LocationDetail({
       };
     }
 
-    const stats = calculateLocationStats(staff, locationGates);
-    
+    // DASH-4: same excuse-adjusted numbers the Regional Command Center
+    // computes for this card, so the two pages can never disagree. Raw
+    // submitted/expected counts are included for the card's pre-deadline
+    // progress display.
+    const stats = calculateExcuseAdjustedLocationStats(
+      staff,
+      locationGates,
+      excuseStatus ?? { isConfExcused: false, isPerfExcused: false },
+    );
+
     const locationStats: LocationStats = {
       id: locationId!,
       name,
@@ -102,10 +110,14 @@ export default function LocationDetail({
       missingPerfCount: stats.missingPerfCount,
       distinctMissedCount: stats.distinctMissedCount,
       pendingConfCount: stats.pendingConfCount,
+      confSubmitted: stats.confSubmittedCount,
+      confExpected: stats.confExpectedCount,
+      perfSubmitted: stats.perfSubmittedCount,
+      perfExpected: stats.perfExpectedCount,
     };
 
     return { locationStaff: staff, locationStats, locationName: name };
-  }, [summaries, locationId, locationGates]);
+  }, [summaries, locationId, locationGates, excuseStatus]);
 
   if (loading) {
     return (
@@ -201,8 +213,12 @@ export default function LocationDetail({
           </CardHeader>
           <CardContent className="p-0">
             <div className="p-4">
-              <CoachDashboardV2 
+              {/* DASH-4: hand the roster this page's week so its default
+                  matches the health card above (it previously derived its
+                  own Monday from a hardcoded America/Chicago clock). */}
+              <CoachDashboardV2
                 forcedLocationId={locationId}
+                defaultWeekOf={weekOf}
                 hideHeader
                 hideOrgLocationFilters
               />

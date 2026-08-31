@@ -45,3 +45,7 @@ e2e/playwright-report/
 promoves-brand/exports/*.otf
 scripts/basecamp-corpus/.env
 scripts/basecamp-corpus/.mirror_watermark.json
+
+# Basecamp corpus working data (~1GB of pulled content) and local page previews
+data/
+.preview-sedation/

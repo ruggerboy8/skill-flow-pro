@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateMissingCounts, calculateLocationStats, calculateDistinctMissedCount, calculateDueSubmissionTotals, type SubmissionGates } from './submissionStatus';
+import { calculateMissingCounts, calculateLocationStats, calculateDistinctMissedCount, calculateDueSubmissionTotals, calculateExcuseAdjustedLocationStats, type SubmissionGates } from './submissionStatus';
 import type { StaffWeekSummary } from '@/types/coachV2';
 
 function week(overrides: Partial<StaffWeekSummary> = {}): StaffWeekSummary {
@@ -238,5 +238,88 @@ describe('calculateDueSubmissionTotals', () => {
     expect(orgConfSubmitted).toBe(7);
     expect(orgConfExpected).toBe(10);
     expect((orgConfSubmitted / orgConfExpected) * 100).toBe(70);
+  });
+});
+
+describe('calculateExcuseAdjustedLocationStats', () => {
+  const bothPastGates: SubmissionGates = {
+    isPastConfidenceDeadline: true,
+    isPastPerformanceDeadline: true,
+    isPerformanceOpen: true,
+  };
+  const noExcuse = { isConfExcused: false, isPerfExcused: false };
+
+  it('matches calculateLocationStats exactly when nothing is excused', () => {
+    const staff = [
+      week({ conf_count: 1, perf_count: 0, assignment_count: 2 }),
+      week({ staff_id: 's2', user_id: 'u2', conf_count: 2, perf_count: 2 }),
+    ];
+    const raw = calculateLocationStats(staff, bothPastGates);
+    const adjusted = calculateExcuseAdjustedLocationStats(staff, bothPastGates, noExcuse);
+    expect(adjusted.submissionRate).toBe(raw.submissionRate);
+    expect(adjusted.missingConfCount).toBe(raw.missingConfCount);
+    expect(adjusted.missingPerfCount).toBe(raw.missingPerfCount);
+    expect(adjusted.pendingConfCount).toBe(raw.pendingConfCount);
+    expect(adjusted.distinctMissedCount).toBe(raw.distinctMissedCount);
+    expect(adjusted.effectiveGates).toEqual(bothPastGates);
+  });
+
+  it('zeroes missing and pending confidence when confidence is excused', () => {
+    const staff = [week({ conf_count: 0, perf_count: 2, assignment_count: 2 })];
+    const adjusted = calculateExcuseAdjustedLocationStats(staff, bothPastGates, {
+      isConfExcused: true,
+      isPerfExcused: false,
+    });
+    expect(adjusted.missingConfCount).toBe(0);
+    expect(adjusted.pendingConfCount).toBe(0);
+    expect(adjusted.effectiveGates.isPastConfidenceDeadline).toBe(false);
+    expect(adjusted.effectiveGates.isPastPerformanceDeadline).toBe(true);
+  });
+
+  it('zeroes missing performance when performance is excused', () => {
+    const staff = [week({ conf_count: 2, perf_count: 0, assignment_count: 2 })];
+    const adjusted = calculateExcuseAdjustedLocationStats(staff, bothPastGates, {
+      isConfExcused: false,
+      isPerfExcused: true,
+    });
+    expect(adjusted.missingPerfCount).toBe(0);
+    expect(adjusted.effectiveGates.isPastPerformanceDeadline).toBe(false);
+  });
+
+  it('forces the rate to 100 only when both metrics are excused', () => {
+    const staff = [week({ conf_count: 0, perf_count: 0, assignment_count: 2 })];
+    const fully = calculateExcuseAdjustedLocationStats(staff, bothPastGates, {
+      isConfExcused: true,
+      isPerfExcused: true,
+    });
+    expect(fully.submissionRate).toBe(100);
+
+    const confOnly = calculateExcuseAdjustedLocationStats(staff, bothPastGates, {
+      isConfExcused: true,
+      isPerfExcused: false,
+    });
+    expect(confOnly.submissionRate).toBe(0);
+  });
+
+  it('excludes an excused metric from the distinct-missed count', () => {
+    // Missing conf only; conf excused -> not counted as missed at all
+    const staff = [week({ conf_count: 0, perf_count: 2, assignment_count: 2 })];
+    const adjusted = calculateExcuseAdjustedLocationStats(staff, bothPastGates, {
+      isConfExcused: true,
+      isPerfExcused: false,
+    });
+    expect(adjusted.distinctMissedCount).toBe(0);
+  });
+
+  it('excludes an excused metric from the due submission totals', () => {
+    const staff = [week({ conf_count: 1, perf_count: 2, assignment_count: 2 })];
+    const adjusted = calculateExcuseAdjustedLocationStats(staff, bothPastGates, {
+      isConfExcused: true,
+      isPerfExcused: false,
+    });
+    expect(adjusted.dueTotals.confExpected).toBe(0);
+    expect(adjusted.dueTotals.confSubmitted).toBe(0);
+    expect(adjusted.dueTotals.perfExpected).toBe(2);
+    expect(adjusted.dueTotals.perfSubmitted).toBe(2);
   });
 });

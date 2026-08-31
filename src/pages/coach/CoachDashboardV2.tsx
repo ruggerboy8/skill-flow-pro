@@ -31,14 +31,16 @@ import { formatDistanceToNow } from 'date-fns';
 
 interface CoachDashboardProps {
   forcedLocationId?: string;        // Locks to specific location by UUID
+  defaultWeekOf?: string;           // Initial week (yyyy-MM-dd Monday) when no ?week= param; embedding pages pass their own week so both surfaces agree
   hideHeader?: boolean;             // Hides "Coach Dashboard" h1
   hideOrgLocationFilters?: boolean; // Hides org/location dropdowns
 }
 
-export default function CoachDashboardV2({ 
-  forcedLocationId, 
-  hideHeader = false, 
-  hideOrgLocationFilters = false 
+export default function CoachDashboardV2({
+  forcedLocationId,
+  defaultWeekOf,
+  hideHeader = false,
+  hideOrgLocationFilters = false
 }: CoachDashboardProps = {}) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -50,10 +52,14 @@ export default function CoachDashboardV2({
   // audience rule as the Facilitate surface (owner decision, 2026-07-25).
   const canSendReminders = (isOrgAdmin || isSuperAdmin || isRegional) && !isParticipant;
 
-  // Week selection - always normalize to Monday
+  // Week selection - always normalize to Monday. An explicit ?week= deep
+  // link wins; otherwise an embedding page's defaultWeekOf (already a
+  // policy-resolved Monday) wins over the standalone Chicago-clock default.
   const [selectedWeek, setSelectedWeek] = useState<Date>(() => {
     const weekParam = searchParams.get('week');
-    const mondayStr = weekParam ? getChicagoMonday(weekParam) : getChicagoMonday(new Date());
+    const mondayStr = weekParam
+      ? getChicagoMonday(weekParam)
+      : defaultWeekOf ?? getChicagoMonday(new Date());
     return new Date(mondayStr + 'T12:00:00');
   });
 

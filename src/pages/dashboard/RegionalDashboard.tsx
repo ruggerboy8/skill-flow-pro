@@ -15,7 +15,7 @@ import { format as formatDate } from 'date-fns';
 import { StaffWeekSummary } from '@/types/coachV2';
 import { nowUtc } from '@/lib/centralTime';
 import { useLocationTimezone } from '@/hooks/useLocationTimezone';
-import { getLocationSubmissionGates, calculateLocationStats, calculateDistinctMissedCount, calculateDueSubmissionTotals, type SubmissionGates } from '@/lib/submissionStatus';
+import { getLocationSubmissionGates, calculateExcuseAdjustedLocationStats, calculateDueSubmissionTotals, type SubmissionGates } from '@/lib/submissionStatus';
 import { getSubmissionPolicy, getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
 import { participationTier, tierColorTokens } from '@/lib/participationTier';
 import { getDashboardMoment } from '@/lib/dashboardMoment';
@@ -128,47 +128,21 @@ export default function RegionalDashboard() {
         isPerformanceOpen: false,
       };
       
-      const locStats = calculateLocationStats(staff, gates);
-      const excuseStatus = getExcuseStatus(locId);
-
-      let adjustedMissingConf = locStats.missingConfCount;
-      let adjustedMissingPerf = locStats.missingPerfCount;
-      let adjustedPendingConf = locStats.pendingConfCount;
-      let adjustedSubmissionRate = locStats.submissionRate;
-
-      if (excuseStatus.isConfExcused) {
-        adjustedMissingConf = 0;
-        adjustedPendingConf = 0;
-      }
-      if (excuseStatus.isPerfExcused) {
-        adjustedMissingPerf = 0;
-      }
-
-      if (excuseStatus.isConfExcused && excuseStatus.isPerfExcused) {
-        adjustedSubmissionRate = 100;
-      }
-
-      // Gates with any excused metric turned off, so an excused-but-due
-      // metric is treated as not due either. Shared by distinctMissedCount
-      // (DASH-1a QA fix) and the due-only submission totals (DASH-1a Codex
-      // fix, P1) below.
-      const effectiveGates: SubmissionGates = {
-        ...gates,
-        isPastConfidenceDeadline: gates.isPastConfidenceDeadline && !excuseStatus.isConfExcused,
-        isPastPerformanceDeadline: gates.isPastPerformanceDeadline && !excuseStatus.isPerfExcused,
-      };
-      const distinctMissedCount = calculateDistinctMissedCount(staff, effectiveGates);
-      dueTotalsList.push(calculateDueSubmissionTotals(staff, effectiveGates));
+      // DASH-4: excuse adjustments (zeroed counts, 100% when fully excused,
+      // excuse-off effective gates for distinct-missed and due totals) live
+      // in this shared helper so Location Detail shows the same numbers.
+      const locStats = calculateExcuseAdjustedLocationStats(staff, gates, getExcuseStatus(locId));
+      dueTotalsList.push(locStats.dueTotals);
 
       return {
         id: locId,
         name: staff[0]?.location_name || 'Unknown',
         staffCount: locStats.staffCount,
-        submissionRate: adjustedSubmissionRate,
-        missingConfCount: adjustedMissingConf,
-        missingPerfCount: adjustedMissingPerf,
-        distinctMissedCount,
-        pendingConfCount: adjustedPendingConf,
+        submissionRate: locStats.submissionRate,
+        missingConfCount: locStats.missingConfCount,
+        missingPerfCount: locStats.missingPerfCount,
+        distinctMissedCount: locStats.distinctMissedCount,
+        pendingConfCount: locStats.pendingConfCount,
         confSubmitted: locStats.confSubmittedCount,
         confExpected: locStats.confExpectedCount,
         perfSubmitted: locStats.perfSubmittedCount,

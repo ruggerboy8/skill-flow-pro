@@ -164,11 +164,37 @@ the copy first (see above); re-run `--refresh` afterward.
 There's also `npm run demo:seed -- --refresh` if you'd rather not type
 `npx tsx` every time.
 
+## The two assignment eras (found 2026-08-20, first seed attempt)
+
+In February 2026 the live app stopped writing per-location
+`weekly_assignments` rows and switched to org-level rows (`location_id`
+null, `source = 'org'`). Every location's location-scoped rows are frozen
+at 2026-02-09 or earlier; everything since lives only at the org level.
+The original version of this script read only `location_id = <source>`,
+which would have copied history ending in February and silently skipped
+every score since -- and staff hired after the switch would have arrived
+with no history at all (10 of Lake Orion's 14, at the time this was
+caught).
+
+The script now reads both eras and merges them via
+`lib/mergeAssignmentEras.ts` (unit tested): future weeks are dropped from
+both, and where the eras overlap (Dec 2025 - Feb 2026) the location-scoped
+rows win for any role+week they cover, since they are what that location's
+staff actually scored against. The seed and dry-run output print the kept /
+dropped counts per era so a surprising merge is visible before anything is
+written.
+
 ## Persona selection
 
 Which three copied staff members become the demo-staff (participant),
-demo-coach, and demo-admin logins is not arbitrary. `lib/anonymize.ts`
-picks them by suitability, in this order:
+demo-coach, and demo-admin logins can be pinned explicitly on the first
+seed with `--participant=<name>`, `--coach=<name>`, `--admin=<name>`
+(case-insensitive real name or email; a unique name fragment works too).
+An override for the participant must still pass the same suitability bar
+as an automatic pick (role + at least one score), because Clip 1 depends
+on it. Any persona not pinned falls back to the automatic pick below.
+
+Absent overrides, `lib/anonymize.ts` picks by suitability, in this order:
 
 1. **demo-staff (participant)**: must have a `role_id` and at least one
    `weekly_scores` row of their own; among those, whoever's most recently

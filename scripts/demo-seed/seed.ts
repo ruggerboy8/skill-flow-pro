@@ -42,6 +42,7 @@ import {
   type DemoScoreDraft,
 } from './lib/rowBuilders';
 import { shapeVariance, type ScoreLike } from './lib/variance';
+import { mergeAssignmentEras } from './lib/mergeAssignmentEras';
 import { computeWeekShiftDays, shiftDateString } from './lib/refreshWeek';
 // Same app helper lib/refreshWeek.ts uses, imported directly here too for
 // computing program_start_date at first-seed time. See COR-1 / calendarDate.ts.
@@ -93,12 +94,18 @@ interface CliArgs {
   sourceLocationId: string | null;
   dryRun: boolean;
   refresh: boolean;
+  participantName: string | null;
+  coachName: string | null;
+  adminName: string | null;
 }
 
 function parseArgs(argv: string[]): CliArgs {
   let sourceLocationId: string | null = null;
   let dryRun = false;
   let refresh = false;
+  let participantName: string | null = null;
+  let coachName: string | null = null;
+  let adminName: string | null = null;
 
   for (const arg of argv) {
     if (arg === '--dry-run') dryRun = true;
@@ -108,6 +115,12 @@ function parseArgs(argv: string[]): CliArgs {
       process.exit(0);
     } else if (arg.startsWith('--source-location=')) {
       sourceLocationId = arg.slice('--source-location='.length);
+    } else if (arg.startsWith('--participant=')) {
+      participantName = arg.slice('--participant='.length);
+    } else if (arg.startsWith('--coach=')) {
+      coachName = arg.slice('--coach='.length);
+    } else if (arg.startsWith('--admin=')) {
+      adminName = arg.slice('--admin='.length);
     } else {
       console.error(`Unrecognized argument: ${arg}`);
       printHelp();
@@ -115,7 +128,7 @@ function parseArgs(argv: string[]): CliArgs {
     }
   }
 
-  return { sourceLocationId, dryRun, refresh };
+  return { sourceLocationId, dryRun, refresh, participantName, coachName, adminName };
 }
 
 function printHelp(): void {
@@ -127,6 +140,11 @@ Usage: npx tsx scripts/demo-seed/seed.ts --source-location=<uuid> [--dry-run] [-
                              + weekly_scores get copied and anonymized into
                              the Bluebird Dental demo org. Ignored if the
                              demo org already exists.
+  --participant=<name>      Pin which source staff member becomes the
+  --coach=<name>            demo-staff / demo-coach / demo-admin login,
+  --admin=<name>            by (case-insensitive) real name or email.
+                             Any not given falls back to the automatic
+                             suitability pick. First seed only.
   --dry-run                 Print what would be written without writing.
   --refresh                 If the demo org already exists, re-point its
                              copied weeks so the "current week" lands on
@@ -161,6 +179,31 @@ function randomUnusedPassword(): string {
 
 const demoAssignmentKey = (locationId: string, roleId: number, week: string, slot: number): string =>
   `${locationId}|${roleId}|${week}|${slot}`;
+
+/**
+ * Resolves a --participant/--coach/--admin value to a source staff id.
+ * Exact (case-insensitive) name or email match wins; otherwise a unique
+ * name substring match is accepted. No match or an ambiguous match stops
+ * the run with the roster printed, so the fix is always visible.
+ */
+function resolveStaffOverride(
+  sourceStaff: readonly SourceStaffRow[],
+  requested: string | null,
+  flag: string,
+): string | null {
+  if (requested == null) return null;
+  const q = requested.trim().toLowerCase();
+  const exact = sourceStaff.filter((s) => s.name.toLowerCase() === q || s.email.toLowerCase() === q);
+  const matches = exact.length > 0 ? exact : sourceStaff.filter((s) => s.name.toLowerCase().includes(q));
+  if (matches.length === 1) return matches[0].id;
+  console.error(
+    matches.length === 0
+      ? `${flag}="${requested}" matches nobody in the source roster.`
+      : `${flag}="${requested}" is ambiguous: ${matches.map((m) => m.name).join(', ')}.`,
+  );
+  console.error(`Source roster: ${sourceStaff.map((s) => s.name).join(', ')}`);
+  process.exit(1);
+}
 
 // ---------------------------------------------------------------------------
 // main
@@ -217,7 +260,7 @@ async function main(): Promise<void> {
       if (args.refresh) {
         console.log('Ignoring --refresh until the initial copy finishes; re-run --refresh afterward.');
       }
-      await freshSeed(supabase, args.sourceLocationId, args.dryRun);
+      await freshSeed(supabase, args.sourceLocationId, args.dryRun, args);
       return;
     }
 
@@ -235,7 +278,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  await freshSeed(supabase, args.sourceLocationId, args.dryRun);
+  await freshSeed(supabase, args.sourceLocationId, args.dryRun, args);
 }
 
 /**
@@ -281,7 +324,12 @@ async function assessOrgCompleteness(
 // Fresh seed: source location does not exist in the demo org yet
 // ---------------------------------------------------------------------------
 
-async function freshSeed(supabase: SupabaseClient, sourceLocationId: string, dryRun: boolean): Promise<void> {
+async function freshSeed(
+  supabase: SupabaseClient,
+  sourceLocationId: string,
+  dryRun: boolean,
+  personaArgs: Pick<CliArgs, 'participantName' | 'coachName' | 'adminName'>,
+): Promise<void> {
   // --- 1. Read every source row we need, up front ---------------------------
   const { data: sourceLocation, error: locErr } = await supabase
     .from('locations')
@@ -330,16 +378,32 @@ async function freshSeed(supabase: SupabaseClient, sourceLocationId: string, dry
     process.exit(1);
   }
 
-  const { data: sourceAssignmentsRaw, error: assignErr } = await supabase
+  // Assignments come from TWO eras (see lib/mergeAssignmentEras.ts): the
+  // per-location rows the app wrote until Feb 2026, and the org-level rows
+  // (location_id null, source 'org') it has written since. Reading only the
+  // location-scoped rows silently loses everything after the switch, which
+  // for staff hired later means their entire history.
+  const { data: locationAssignmentsRaw, error: assignErr } = await supabase
     .from('weekly_assignments')
     .select('id, role_id, week_start_date, display_order, action_id, competency_id, self_select')
     .eq('location_id', sourceLocationId)
     .is('superseded_at', null);
   if (assignErr) throw assignErr;
-  const sourceAssignments = (sourceAssignmentsRaw ?? []) as (SourceAssignmentRow & { id: string })[];
+  const locationAssignments = (locationAssignmentsRaw ?? []) as (SourceAssignmentRow & { id: string })[];
 
-  if (sourceAssignments.length === 0) {
-    console.error(`Location ${sourceLocationId} has no weekly_assignments to copy.`);
+  const { data: orgAssignmentsRaw, error: orgAssignErr } = await supabase
+    .from('weekly_assignments')
+    .select('id, role_id, week_start_date, display_order, action_id, competency_id, self_select')
+    .eq('org_id', sourceGroup.organization_id)
+    .is('location_id', null)
+    .is('superseded_at', null);
+  if (orgAssignErr) throw orgAssignErr;
+  const orgAssignments = (orgAssignmentsRaw ?? []) as (SourceAssignmentRow & { id: string })[];
+
+  if (locationAssignments.length === 0 && orgAssignments.length === 0) {
+    console.error(
+      `Location ${sourceLocationId} has no weekly_assignments to copy (neither location-scoped nor org-level).`,
+    );
     process.exit(1);
   }
 
@@ -362,7 +426,11 @@ async function freshSeed(supabase: SupabaseClient, sourceLocationId: string, dry
     (competencies ?? []).filter((c) => c.domain_id != null).map((c) => [c.competency_id, c.domain_id as number]),
   );
 
-  const actionIds = Array.from(new Set(sourceAssignments.map((a) => a.action_id).filter((id): id is number => id != null)));
+  const actionIds = Array.from(
+    new Set(
+      [...locationAssignments, ...orgAssignments].map((a) => a.action_id).filter((id): id is number => id != null),
+    ),
+  );
   const { data: proMoves, error: pmErr } = actionIds.length
     ? await supabase.from('pro_moves').select('action_id, competency_id').in('action_id', actionIds)
     : { data: [], error: null };
@@ -399,7 +467,12 @@ async function freshSeed(supabase: SupabaseClient, sourceLocationId: string, dry
   // the demo-staff (participant) login -- see selectParticipant. That is
   // intentional: Clip 1 depends entirely on this choice, so an unsuitable
   // --source-location must stop the run here, not degrade to a warning.
-  const castAssignment = assignCast(personaCandidates, CAST);
+  const overrides = {
+    participantId: resolveStaffOverride(sourceStaff, personaArgs.participantName, '--participant'),
+    coachId: resolveStaffOverride(sourceStaff, personaArgs.coachName, '--coach'),
+    adminId: resolveStaffOverride(sourceStaff, personaArgs.adminName, '--admin'),
+  };
+  const castAssignment = assignCast(personaCandidates, CAST, overrides);
   const castBySourceId = new Map(castAssignment.map((c) => [c.sourceId, c.cast]));
 
   console.log(`Copying ${sourceStaff.length} staff from location ${sourceLocationId}:`);
@@ -410,7 +483,16 @@ async function freshSeed(supabase: SupabaseClient, sourceLocationId: string, dry
   }
 
   if (dryRun) {
-    console.log(`\nWould create org "${DEMO_ORG.name}" (${DEMO_ORG.slug}), 1 group, 3 locations.`);
+    // Dry-run has no demo org row to anchor on, so the cap uses wall-clock
+    // "now". The real run below anchors on the org's created_at instead
+    // (resumability); on a first seed the two agree.
+    const dryRunMerge = mergeAssignmentEras(locationAssignments, orgAssignments, mondayInTimezone(ANCHOR_TZ, new Date()));
+    const sourceAssignments = dryRunMerge.merged;
+    console.log(
+      `\nAssignment eras: ${dryRunMerge.locationKept} location-scoped + ${dryRunMerge.orgKept} org-level rows kept ` +
+        `(${dryRunMerge.droppedFuture} future row(s) dropped, ${dryRunMerge.droppedOverlap} org-level row(s) dropped where the location era already covers that role+week).`,
+    );
+    console.log(`Would create org "${DEMO_ORG.name}" (${DEMO_ORG.slug}), 1 group, 3 locations.`);
     console.log(`Would copy ${sourceAssignments.length} weekly_assignments x 3 locations = ${sourceAssignments.length * 3} demo assignment rows, all status=locked.`);
     console.log(`Would copy ${sourceScores.length} weekly_scores rows (reshaped for variance).`);
     console.log('Would create 3 auth users with known passwords (demo-staff / demo-coach / demo-admin)');
@@ -511,6 +593,21 @@ async function freshSeed(supabase: SupabaseClient, sourceLocationId: string, dry
   // Get-or-create on the natural key (org, location, role, week, slot), so
   // resuming after a partial previous run reuses rows that already made it
   // in instead of duplicating them.
+  // Merge the two assignment eras, capped at the demo org's own "current
+  // Monday" (anchored on created_at, same as every other date computation
+  // here, so a resumed run reproduces the exact same merged set and the
+  // natural-key lookups still line up).
+  const eraMerge = mergeAssignmentEras(locationAssignments, orgAssignments, mondayInTimezone(ANCHOR_TZ, now));
+  const sourceAssignments = eraMerge.merged;
+  console.log(
+    `Assignment eras: ${eraMerge.locationKept} location-scoped + ${eraMerge.orgKept} org-level rows kept ` +
+      `(${eraMerge.droppedFuture} future, ${eraMerge.droppedOverlap} overlap-superseded org row(s) dropped).`,
+  );
+  if (sourceAssignments.length === 0) {
+    console.error('After the era merge and future-week cap, no weekly_assignments remain to copy.');
+    process.exit(1);
+  }
+
   const sourceMaxWeek = sourceAssignments.reduce((max, a) => (a.week_start_date > max ? a.week_start_date : max), sourceAssignments[0].week_start_date);
   const shiftDays = computeWeekShiftDays(sourceMaxWeek, now, ANCHOR_TZ);
   console.log(`\nShifting copied weeks by ${shiftDays} day(s) so ${sourceMaxWeek} lands on this week's Monday.`);

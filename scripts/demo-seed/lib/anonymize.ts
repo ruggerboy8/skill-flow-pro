@@ -126,9 +126,24 @@ function selectBySuitability(
  * add names to scripts/demo-seed/cast.ts, not to wrap around and reuse a
  * cast member for two different source people.
  */
+/**
+ * Optional manual persona picks (source staff ids), e.g. from the
+ * --participant / --coach / --admin CLI flags. Any persona left unset
+ * falls back to the automatic suitability selection. An overridden
+ * participant must still pass the same suitability bar as an automatic
+ * pick (role + at least one weekly_scores row), because Clip 1 depends on
+ * it; coach/admin overrides are accepted as-is.
+ */
+export interface PersonaOverrides {
+  participantId?: string | null;
+  coachId?: string | null;
+  adminId?: string | null;
+}
+
 export function assignCast(
   candidates: readonly PersonaCandidate[],
   cast: readonly CastMember[],
+  overrides: PersonaOverrides = {},
 ): CastAssignment[] {
   if (candidates.length > cast.length) {
     throw new Error(
@@ -146,9 +161,41 @@ export function assignCast(
     );
   }
 
-  const participantId = selectParticipant(candidates);
-  const coachId = selectCoach(candidates, [participantId]);
-  const adminId = selectAdmin(candidates, [participantId, coachId]);
+  const candidateById = new Map(candidates.map((c) => [c.id, c]));
+  for (const [label, id] of [
+    ['participant', overrides.participantId],
+    ['coach', overrides.coachId],
+    ['admin', overrides.adminId],
+  ] as const) {
+    if (id != null && !candidateById.has(id)) {
+      throw new Error(`Persona override for ${label} (${id}) is not in the source roster.`);
+    }
+  }
+  const overrideIds = [overrides.participantId, overrides.coachId, overrides.adminId].filter(
+    (id): id is string => id != null,
+  );
+  if (new Set(overrideIds).size !== overrideIds.length) {
+    throw new Error('Persona overrides must name three different people.');
+  }
+
+  let participantId: string;
+  if (overrides.participantId != null) {
+    const c = candidateById.get(overrides.participantId)!;
+    if (c.roleId == null || c.lastActivity == null) {
+      throw new Error(
+        'The requested participant override has no role_id or no weekly_scores history; Clip 1 ' +
+          'needs both. Pick someone with a role and at least one submitted score.',
+      );
+    }
+    participantId = c.id;
+  } else {
+    participantId = selectParticipant(
+      candidates.filter((c) => c.id !== overrides.coachId && c.id !== overrides.adminId),
+    );
+  }
+  const coachId =
+    overrides.coachId ?? selectCoach(candidates, [participantId, overrides.adminId ?? ''].filter(Boolean));
+  const adminId = overrides.adminId ?? selectAdmin(candidates, [participantId, coachId]);
 
   const claimed = new Set([participantId, coachId, adminId]);
   const remainingCandidates = [...candidates]

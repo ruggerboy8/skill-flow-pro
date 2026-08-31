@@ -60,6 +60,7 @@
 
   /* ---- phone frame ---- */
   .phone {
+    position: relative;   /* containing block for the study sheet + scrim */
     width: 100%; max-width: 430px; height: min(880px, calc(100dvh - 96px));
     background: hsl(var(--bg)); display: flex; flex-direction: column;
     border-radius: 22px; overflow: hidden; box-shadow: 0 8px 40px hsl(215 30% 20% / .18);
@@ -228,6 +229,57 @@
   @keyframes fall { to { transform: translateY(380px) rotate(300deg); opacity: 0; } }
   .bigcheck { width: 64px; height: 64px; border-radius: 50%; background: hsl(var(--complete-bg)); color: hsl(var(--complete-ink)); display: inline-flex; align-items: center; justify-content: center; font-size: 30px; margin-bottom: 14px; }
 
+  /* ---- competency accordion + study sheet ---- */
+  .comp { background: hsl(var(--card)); border: 1.5px solid hsl(var(--border)); border-radius: var(--radius); margin-top: var(--gap-card); overflow: hidden; }
+  .comp.open { border-color: hsl(var(--accent-domain) / .45); }
+  .comp-head { display: flex; align-items: center; gap: 10px; padding: 14px; width: 100%; background: none; border: 0; text-align: left; min-height: 60px; }
+  .comp-head:active { background: hsl(var(--primary) / .04); }
+  .comp-head .t { flex: 1; }
+  .comp-head .t b { font-size: 15px; font-weight: 600; display: block; line-height: 1.3; }
+  .comp-head .t i { font-size: 12px; color: hsl(var(--muted)); font-style: italic; display: block; margin-top: 3px; }
+  .comp-head .chev { color: hsl(var(--muted)); transition: transform 200ms ease; flex: none; font-size: 15px; }
+  .comp.open .comp-head .chev { transform: rotate(180deg); }
+  .comp-body { padding: 0 14px 12px; }
+  .comp-desc { font-size: 12px; color: hsl(var(--muted)); line-height: 1.5; padding-bottom: 10px; }
+  .lvl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; border-radius: 999px; padding: 4px 9px; white-space: nowrap; flex: none; }
+  .lvl-mastery { background: hsl(var(--score4-bg)); color: hsl(var(--score4-ink)); }
+  .lvl-proficient { background: hsl(var(--score3-bg)); color: hsl(var(--score3-ink)); }
+  .lvl-building { background: hsl(var(--score2-bg)); color: hsl(var(--score2-ink)); }
+  .lvl-explore { background: hsl(215 25% 27% / .07); color: hsl(var(--muted-tint)); }
+  .pm-row { display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid hsl(var(--border)); padding: 13px 0; min-height: 56px; }
+  .pm-row:active { background: hsl(var(--primary) / .05); }
+  .pm-row .pm-t { flex: 1; font-size: 13px; line-height: 1.45; }
+  .pm-row .pm-m { font-size: 11px; color: hsl(var(--muted)); margin-top: 4px; display: block; }
+  .pm-row .arrow { color: hsl(var(--muted)); font-size: 17px; flex: none; }
+  .newbadge { font-size: 10px; font-weight: 700; background: hsl(var(--primary) / .08); color: hsl(var(--primary)); border-radius: 999px; padding: 3px 8px; }
+
+  .sheet-scrim { position: absolute; inset: 0; background: hsl(222 47% 11% / .45); opacity: 0; pointer-events: none; transition: opacity 200ms ease; z-index: 20; }
+  .sheet-scrim.open { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 21;
+    background: hsl(var(--card)); border-radius: 20px 20px 0 0;
+    max-height: 88%; display: flex; flex-direction: column;
+    transform: translateY(101%); transition: transform 260ms cubic-bezier(.32,.72,0,1);
+    box-shadow: 0 -8px 30px hsl(222 47% 11% / .18);
+  }
+  .sheet.open { transform: none; }
+  .sheet-grab { width: 36px; height: 4px; border-radius: 2px; background: hsl(var(--border)); margin: 8px auto 0; flex: none; }
+  .sheet-head { padding: 12px 18px 14px; border-bottom: 1px solid hsl(var(--border)); flex: none; }
+  .sheet-title { font-size: 18px; font-weight: 700; line-height: 1.3; margin-top: 8px; text-wrap: balance; }
+  .sheet-body { overflow-y: auto; padding: 16px 18px 8px; flex: 1; }
+  .sheet-foot { padding: 12px 18px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid hsl(var(--border)); flex: none; }
+  .sec-head { display: flex; align-items: center; gap: 8px; margin: 20px 0 10px; }
+  .sec-head .ico { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .sec-head .ico svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .sec-head h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: hsl(var(--muted)); }
+  .verbiage { font-size: 15px; line-height: 1.6; padding: 16px; border-radius: 16px; border: 2px dashed hsl(var(--accent-domain) / .3); background: hsl(var(--accent-domain) / .04); }
+  .audio-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid hsl(var(--border)); border-radius: 999px; }
+  .audio-row .play { width: 40px; height: 40px; border-radius: 50%; border: 0; background: hsl(var(--accent-domain) / .12); color: hsl(var(--accent-domain-ink)); display: flex; align-items: center; justify-content: center; font-size: 15px; flex: none; }
+  .audio-row .bar { flex: 1; height: 4px; border-radius: 2px; background: hsl(var(--border)); position: relative; }
+  .audio-row .bar::after { content: ''; position: absolute; inset: 0 70% 0 0; border-radius: 2px; background: hsl(var(--accent-domain)); }
+  .empty-study { text-align: center; padding: 32px 0; color: hsl(var(--muted)); }
+  .empty-study svg { width: 40px; height: 40px; stroke: currentColor; fill: none; stroke-width: 1.6; opacity: .5; margin-bottom: 10px; }
+
   @media (prefers-reduced-motion: reduce) {
     .confetti { display: none; }
     .screen.active, #wizBody { animation: none; }
@@ -338,45 +390,17 @@
       <p class="footnote">Averages from your Fall 2026 evaluation.</p>
     </section>
 
-    <!-- ============ DOMAIN DETAIL ============ -->
+    <!-- ============ DOMAIN DETAIL ============
+         Mirrors the real flow: domain -> competency accordions (collapsed,
+         each with its evaluation-derived level badge) -> pro move rows ->
+         Study Mode sheet. See DomainDetail.tsx / CompetencyAccordion.tsx /
+         ProMoveRow.tsx / LearnerLearnDrawer.tsx. -->
     <section class="screen" id="scr-domain">
-      <button class="backlink" onclick="back()">‹ Back</button>
-      <span class="tag t-clinical">Clinical</span>
-      <h1 style="margin-top:8px">Clinical</h1>
-      <p class="sub" style="margin-top:4px">14 Pro Moves across 4 competencies.</p>
-
-      <div class="card">
-        <p class="eyebrow">Competency</p>
-        <h2 style="margin-top:3px">Patient comfort &amp; narration</h2>
-        <div style="margin-top:6px">
-          <div class="move-item">
-            <p>Tell the parent and patient what you're about to do before you do it.</p>
-            <p class="meta" style="margin-top:5px">Last practiced Aug 10 · Avg confidence 3.2</p>
-            <button class="res"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> Script</button><button class="res"><svg viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg> Audio example</button>
-          </div>
-          <div class="move-item">
-            <p>Name the sensation before it happens ("you'll feel a little cold water").</p>
-            <p class="meta" style="margin-top:5px">Last practiced Jul 27 · Avg confidence 2.8</p>
-            <button class="res"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> Script</button>
-          </div>
-        </div>
-      </div>
-      <div class="card">
-        <p class="eyebrow">Competency</p>
-        <h2 style="margin-top:3px">Room readiness</h2>
-        <div style="margin-top:6px">
-          <div class="move-item">
-            <p>Hygiene rooms fully turned over before morning huddle starts.</p>
-            <p class="meta" style="margin-top:5px">Last practiced Aug 10 · Avg confidence 3.6</p>
-            <button class="res"><svg viewBox="0 0 24 24"><path d="M9 11a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M15 13a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg> Checklist</button>
-          </div>
-          <div class="move-item">
-            <p>Anticipate the next instrument during pro fees; keep the parent conversation flowing.</p>
-            <p class="meta" style="margin-top:5px">Last practiced Aug 3 · Avg confidence 3.1</p>
-            <button class="res"><svg viewBox="0 0 24 24"><path d="m23 7-7 5 7 5z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg> Video</button><button class="res"><svg viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg> Audio example</button>
-          </div>
-        </div>
-      </div>
+      <button class="backlink" onclick="back()">‹ My Role</button>
+      <span class="tag t-clinical" id="domainTag">Clinical</span>
+      <h1 style="margin-top:8px" id="domainTitle">Clinical</h1>
+      <p class="sub" style="margin-top:4px" id="domainSub">4 competencies · 14 Pro Moves</p>
+      <div id="competencyList"></div>
     </section>
 
     <!-- ============ PERFORMANCE ============ -->
@@ -475,6 +499,23 @@
       <p class="footnote">Prototype v6 · fake people, real product shapes</p>
     </section>
 
+  </div>
+
+  <!-- ============ STUDY MODE SHEET (learning materials) ============
+       Models LearnerLearnDrawer as a bottom sheet: domain-tinted header,
+       the description ("the why", present on 328 of 339 moves), then
+       Suggested Verbiage and Listen when a script/audio exists (only 55
+       moves have any resource today), else the honest empty state. -->
+  <div class="sheet-scrim" id="studyScrim" onclick="closeStudy()"></div>
+  <div class="sheet" id="studySheet" role="dialog" aria-modal="true" aria-labelledby="studyTitle">
+    <div class="sheet-grab"></div>
+    <div class="sheet-head" id="studyHead">
+      <span class="tag" id="studyTag">Clinical</span>
+      <h2 id="studyTitle" class="sheet-title">Pro Move</h2>
+      <p class="meta" id="studyMeta">Study Mode</p>
+    </div>
+    <div class="sheet-body" id="studyBody"></div>
+    <div class="sheet-foot"><button class="btn quiet" onclick="closeStudy()">Close</button></div>
   </div>
 
   <nav class="tabbar" role="tablist" aria-label="Main navigation">
@@ -623,12 +664,131 @@
     { name: 'Case Acceptance', key: 'caseacc', desc: 'Helping families say yes to the care their kids need.', score: 2.4, level: 'Building' },
   ];
   document.getElementById('roleCards').innerHTML = domains.map(d => `
-    <button class="radar-card" onclick="go('scr-domain','scr-role')">
+    <button class="radar-card" onclick="openDomain('${d.key}')">
       <div class="spine s-${d.key}"></div>
       <div class="body"><b>${d.name}</b><p>${d.desc}</p>
         <span class="level" style="color:hsl(var(--${d.key}-ink))">${d.level}</span></div>
       <div class="scoresq" style="background:hsl(var(--${d.key}-pastel)); color:hsl(var(--${d.key}-ink))">${d.score.toFixed(1)}</div>
     </button>`).join('');
+
+  // ---------- domain -> competency -> pro move -> study mode ----------
+  // Resource reality (live DB): 339 active moves, 328 have a description,
+  // but only 55 have any script/audio/video/link. Most moves open to the
+  // description alone, so the sheet must read well with just that.
+  const ICONS = {
+    script: '<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+    audio: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m10 8 6 4-6 4z"/></svg>',
+    cap: '<svg viewBox="0 0 24 24"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 3 3 6 3s6-2 6-3v-5"/></svg>',
+  };
+  const domainData = {
+    clinical: { name: 'Clinical', competencies: [
+      { title: 'Patient comfort & narration', tagline: 'Nobody in the room wonders what happens next.',
+        desc: 'Families relax when they know what is coming. Narration is the difference between a procedure that feels done to a child and one that feels done with them.',
+        level: 'Proficient', moves: [
+          { t: "Tell the parent and patient what you're about to do before you do it.", last: 'Aug 10', conf: 3.2,
+            why: 'A parent who knows what is happening stops filling the silence with worry, and the child takes the cue from the parent.',
+            script: "I'm going to count your teeth now. You'll feel me tap each one, and I'll tell you what I see as I go.",
+            audio: true },
+          { t: 'Name the sensation before it happens ("you\'ll feel a little cold water").', last: 'Jul 27', conf: 2.8,
+            why: 'Surprise is what startles kids, not sensation. Naming it first turns a scary moment into an expected one.',
+            script: "This is going to feel cold and a little wet, like a tiny rain shower. Ready?", audio: false },
+        ] },
+      { title: 'Room readiness', tagline: 'The room is ready before the family is.',
+        desc: 'Turnover is invisible when it works and impossible to hide when it does not.',
+        level: 'Mastery', moves: [
+          { t: 'Hygiene rooms fully turned over before morning huddle starts.', last: 'Aug 10', conf: 3.6,
+            why: 'A room that is ready before huddle means the first family of the day is never waiting on us.', script: null, audio: false },
+          { t: 'Anticipate the next instrument during pro fees; keep the parent conversation flowing.', last: 'Aug 3', conf: 3.1,
+            why: 'When the doctor never has to ask, the parent hears a conversation instead of a series of requests.', script: null, audio: true },
+        ] },
+      { title: 'Radiographs', tagline: 'Clear images, first try, calm kid.',
+        desc: 'Retakes cost time and trust. Positioning and coaching do most of the work.',
+        level: 'Building', moves: [
+          { t: 'Position and coach the child before taking the image, not during.', last: null, conf: null,
+            why: 'A child who knows to hold still for three seconds usually can. Coaching mid-exposure is too late.', script: null, audio: false },
+        ] },
+      { title: 'Sterilization flow', tagline: 'Instruments move one direction, always.',
+        desc: 'A single flow direction is what keeps clean and dirty from ever meeting.',
+        level: 'Exploration', moves: [
+          { t: 'Run the ultrasonic before the room turns over, not after.', last: null, conf: null,
+            why: 'Starting the cycle early means the next room is never waiting on instruments.', script: null, audio: false },
+        ] },
+    ] },
+  };
+  let currentDomain = 'clinical';
+  function openDomain(key) {
+    currentDomain = key;
+    const d = domains.find(x => x.key === key), data = domainData[key] || domainData.clinical;
+    const tag = document.getElementById('domainTag');
+    tag.className = 'tag t-' + key; tag.textContent = d.name;
+    document.getElementById('domainTitle').textContent = d.name;
+    const moveCount = data.competencies.reduce((n, c) => n + c.moves.length, 0);
+    document.getElementById('domainSub').textContent = `${data.competencies.length} competencies · ${moveCount} Pro Moves`;
+    document.getElementById('competencyList').innerHTML = data.competencies.map((c, ci) => {
+      const lvl = { Mastery: 'lvl-mastery', Proficient: 'lvl-proficient', Building: 'lvl-building', Exploration: 'lvl-explore' }[c.level];
+      return `<div class="comp" id="comp-${ci}" style="--accent-domain:var(--${key}); --accent-domain-ink:var(--${key}-ink)">
+        <button class="comp-head" onclick="toggleComp(${ci})" aria-expanded="false">
+          <div class="t"><b>${c.title}</b><i>${c.tagline}</i></div>
+          <span class="lvl ${lvl}">${c.level}</span>
+          <span class="chev">⌄</span>
+        </button>
+        <div class="comp-body" style="display:none">
+          <p class="comp-desc">${c.desc}</p>
+          ${c.moves.map((m, mi) => `
+            <button class="pm-row" onclick="openStudy(${ci},${mi})">
+              <span class="pm-t">${m.t}
+                <span class="pm-m">${m.last ? `Last: ${m.last} · Avg conf <b style="color:hsl(var(--ink))">${m.conf.toFixed(1)}</b>` : ''}</span>
+              </span>
+              ${m.last ? '' : '<span class="newbadge">Ready to try?</span>'}
+              <span class="arrow">›</span>
+            </button>`).join('')}
+        </div>
+      </div>`;
+    }).join('');
+    go('scr-domain', 'scr-role');
+  }
+  function openDomainFrom(from) { openDomain('clinical'); backTarget = from; }
+  function toggleComp(ci) {
+    const el = document.getElementById('comp-' + ci);
+    const body = el.querySelector('.comp-body');
+    const open = el.classList.toggle('open');
+    body.style.display = open ? 'block' : 'none';
+    el.querySelector('.comp-head').setAttribute('aria-expanded', String(open));
+  }
+
+  function openStudy(ci, mi) {
+    const data = domainData[currentDomain] || domainData.clinical;
+    const d = domains.find(x => x.key === currentDomain);
+    const m = data.competencies[ci].moves[mi];
+    const sheet = document.getElementById('studySheet');
+    sheet.style.setProperty('--accent-domain', `var(--${currentDomain})`);
+    sheet.style.setProperty('--accent-domain-ink', `var(--${currentDomain}-ink)`);
+    document.getElementById('studyHead').style.background = `hsl(var(--${currentDomain}) / .08)`;
+    const tag = document.getElementById('studyTag');
+    tag.className = 'tag t-' + currentDomain; tag.textContent = d.name;
+    document.getElementById('studyTitle').textContent = m.t;
+    document.getElementById('studyMeta').textContent = m.last
+      ? `Study Mode · last practiced ${m.last}` : 'Study Mode · not practiced yet';
+
+    const hasAny = m.why || m.script || m.audio;
+    document.getElementById('studyBody').innerHTML = hasAny ? `
+      ${m.why ? `<p class="sub" style="font-size:14px; line-height:1.6">${m.why}</p>` : ''}
+      ${m.script ? `
+        <div class="sec-head"><span class="ico" style="background:hsl(var(--${currentDomain}) / .1); color:hsl(var(--${currentDomain}))">${ICONS.script}</span><h3>Suggested verbiage</h3></div>
+        <div class="verbiage">"${m.script}"</div>` : ''}
+      ${m.audio ? `
+        <div class="sec-head"><span class="ico" style="background:hsl(var(--${currentDomain}) / .1); color:hsl(var(--${currentDomain}))">${ICONS.audio}</span><h3>Listen</h3></div>
+        <div class="audio-row"><button class="play">▶</button><div class="bar"></div><span class="meta">0:42</span></div>` : ''}
+      ${!m.script && !m.audio ? `<p class="meta" style="margin-top:20px">No script or audio for this one yet.</p>` : ''}
+    ` : `<div class="empty-study">${ICONS.cap}<p class="sub">No learning materials available yet.</p></div>`;
+
+    document.getElementById('studyScrim').classList.add('open');
+    sheet.classList.add('open');
+  }
+  function closeStudy() {
+    document.getElementById('studyScrim').classList.remove('open');
+    document.getElementById('studySheet').classList.remove('open');
+  }
 
   // ---------- confidence + flagged (shared window) ----------
   const confWindows = {
@@ -679,7 +839,7 @@
     const shown = flaggedItems.filter(f => f.weeksAgo <= win);
     document.getElementById(id + '-flagged').innerHTML = shown.length
       ? shown.map((f, i) => `
-          <button class="lowitem" style="${i < shown.length - 1 ? 'border-bottom:1px solid hsl(var(--border))' : ''}" onclick="go('scr-domain','${id === 'perf' ? 'scr-perf' : 'scr-staffdetail'}')">
+          <button class="lowitem" style="${i < shown.length - 1 ? 'border-bottom:1px solid hsl(var(--border))' : ''}" onclick="openDomainFrom('${id === 'perf' ? 'scr-perf' : 'scr-staffdetail'}')">
             <div class="spine ${f.spine}"></div>
             <p>${f.text}<br><span class="meta">${f.week}</span></p>
             <span class="p ${f.score === 1 ? 'p1' : 'p2'}">${f.score}</span>
@@ -705,7 +865,7 @@
           <p class="gl">Ariyana's next step</p>
           <p>"When a family leaves knowing what happens next, treatment actually happens."</p>
         </div>
-        <button class="btn quiet sm" style="margin-top:14px" onclick="go('scr-domain','scr-perf')">Learning resources for this move</button>
+        <button class="btn quiet sm" style="margin-top:14px" onclick="openDomainFrom('scr-perf')">Learning resources for this move</button>
         <button class="protolink" onclick="showNoFocus()">Prototype: no focus chosen</button>
       </div>
 

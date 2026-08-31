@@ -193,6 +193,56 @@ describe('assignCast', () => {
   });
 });
 
+describe('assignCast persona overrides', () => {
+  const five = ['a', 'b', 'c', 'd', 'e'].map((id) => candidate(id));
+
+  function loginFor(assignments: ReturnType<typeof assignCast>, role: string): string | undefined {
+    return assignments.find((x) => x.cast.loginRole === role)?.sourceId;
+  }
+
+  it('pins all three personas when overridden', () => {
+    const result = assignCast(five, cast, { participantId: 'd', coachId: 'e', adminId: 'a' });
+    expect(loginFor(result, 'participant')).toBe('d');
+    expect(loginFor(result, 'coach')).toBe('e');
+    expect(loginFor(result, 'admin')).toBe('a');
+  });
+
+  it('auto-selects only the personas not overridden, never re-using an overridden person', () => {
+    // 'b' is the automatic participant pick (most recent activity), but is
+    // pinned as coach -- the participant fallback must skip them.
+    const candidates = [
+      candidate('a', { lastActivity: '2026-07-01' }),
+      candidate('b', { lastActivity: '2026-08-10' }),
+      candidate('c', { lastActivity: '2026-07-20' }),
+      candidate('d'),
+      candidate('e'),
+    ];
+    const result = assignCast(candidates, cast, { coachId: 'b' });
+    expect(loginFor(result, 'coach')).toBe('b');
+    expect(loginFor(result, 'participant')).toBe('d'); // next most recent ('d'/'e' tie on 2026-08-01, id-order tie-break)
+    expect(loginFor(result, 'admin')).not.toBe('b');
+  });
+
+  it('rejects a participant override with no history (Clip 1 suitability still applies)', () => {
+    const candidates = [candidate('a', { lastActivity: null }), candidate('b'), candidate('c'), candidate('d'), candidate('e')];
+    expect(() => assignCast(candidates, cast, { participantId: 'a' })).toThrow(/participant override/);
+  });
+
+  it('rejects an override naming someone outside the roster', () => {
+    expect(() => assignCast(five, cast, { adminId: 'nope' })).toThrow(/not in the source roster/);
+  });
+
+  it('rejects two personas pinned to the same person', () => {
+    expect(() => assignCast(five, cast, { participantId: 'a', coachId: 'a' })).toThrow(/three different people/);
+  });
+
+  it('is deterministic with overrides: same inputs, same full mapping', () => {
+    const one = assignCast(five, cast, { participantId: 'd' });
+    const two = assignCast(five, cast, { participantId: 'd' });
+    expect(one).toEqual(two);
+  });
+});
+
 describe('containsAnySourceIdentity', () => {
   const sourceNames = ['Kelly Acuna', 'Sam Rivera'];
   const sourceEmails = ['kelly.acuna@alcandental.example'];

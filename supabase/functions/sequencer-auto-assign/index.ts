@@ -244,7 +244,13 @@ serve(async (req) => {
           action_id: pick.proMoveId,
           competency_id: competencyId,
           source: 'org',
-          status: 'draft',
+          // ASG-1a: write 'locked' so auto-generated moves are visible to staff
+          // immediately (the participant read only shows status='locked'). The
+          // 'draft' status is deprecated: a slot's real edit-lock is governed by
+          // whether a weekly_scores row exists for it (see lockedOrders above and
+          // WeekBuilderPanel's isLocked = scoresBySlot.has(key)), NOT by status.
+          // Rows here stay fully editable/regenerable until the first score lands.
+          status: 'locked',
           self_select: false,
           generated_by: 'auto',
           ai_rationale: rationale,

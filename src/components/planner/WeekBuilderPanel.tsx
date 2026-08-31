@@ -1,11 +1,12 @@
-import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useMemo, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X, Trash2, Unlock, CalendarOff, Sparkles } from 'lucide-react';
-import { normalizeToPlannerWeek, formatWeekOf } from '@/lib/plannerUtils';
+import { formatWeekOf } from '@/lib/plannerUtils';
+import { getAssignmentWeekMondayStr } from '@/lib/submissionPolicy';
 import { CT_TZ } from '@/lib/centralTime';
 import { addDaysToDateString, firstMondayOfMonth } from '@/lib/dateUtils';
 import { ProMovePickerDialog } from './ProMovePickerDialog';
@@ -20,6 +21,9 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { MonthView } from './MonthView';
 
+// ASG-1 Fix 2: matches plannerUtils.PLANNER_TZ. See the comment on
+// `orgTimezone` in the component below for when this is used.
+const PLANNER_FALLBACK_TZ = 'America/Chicago';
 
 interface WeekSlot {
   displayOrder: 1 | 2 | 3;
@@ -75,7 +79,31 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
 }, ref) {
   const { toast } = useToast();
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
-  const [selectedMonday, setSelectedMonday] = useState(normalizeToPlannerWeek(new Date()));
+  // ASG-1 Fix 2: the assignment-lookup week key must be computed from ONE
+  // canonical org timezone (matching locationState.assembleWeek's read
+  // side), not hardcoded America/Chicago. `orgTimezone` starts null and is
+  // fetched below; PLANNER_FALLBACK_TZ is used only (a) as a transient
+  // value until that fetch resolves, or (b) permanently when this builder
+  // has no orgId at all (the "global"/platform-scoped mode, whose rows are
+  // org_id IS NULL and are never matched to a location's org-tz read
+  // anyway, so Chicago there is an actual default, not a stand-in).
+  const [orgTimezone, setOrgTimezone] = useState<string | null>(null);
+  // True once the user has navigated the week/month picker themselves, so
+  // the org-timezone fetch resolving late doesn't clobber a week they
+  // already chose.
+  const userNavigatedRef = useRef(false);
+  // ASG-1 Fix 2 (Codex P2): loadWeeks(selectedMonday) fires once for the
+  // transient PLANNER_FALLBACK_TZ Monday on mount, then again for the real
+  // org-tz Monday once the org-timezone fetch resolves and updates
+  // selectedMonday. loadWeeks has no built-in cancellation, so if the
+  // stale fallback-tz request resolves AFTER the real org-tz request, its
+  // (wrong-week) result silently overwrites `weeks`. Every loadWeeks call
+  // stamps its own generation number here and only commits its results if
+  // it is still the most recent call by the time it finishes.
+  const loadWeeksGenerationRef = useRef(0);
+  const [selectedMonday, setSelectedMonday] = useState(() =>
+    getAssignmentWeekMondayStr(new Date(), PLANNER_FALLBACK_TZ)
+  );
   const [showTwoWeeks, setShowTwoWeeks] = useState(false);
   const [weeks, setWeeks] = useState<WeekAssignment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +118,10 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
   const [excusedWeeks, setExcusedWeeks] = useState<Set<string>>(new Set());
   const [autoFillingWeek, setAutoFillingWeek] = useState<string | null>(null);
 
-  const currentMonday = normalizeToPlannerWeek(new Date());
+  const currentMonday = useMemo(
+    () => getAssignmentWeekMondayStr(new Date(), orgTimezone ?? PLANNER_FALLBACK_TZ),
+    [orgTimezone]
+  );
 
   useImperativeHandle(ref, () => ({
     selectMove: handleSelectProMove,
@@ -99,6 +130,39 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
   useEffect(() => {
     checkSuperAdmin();
   }, []);
+
+  // ASG-1 Fix 2: fetch the org's canonical timezone and use it (not
+  // hardcoded Chicago) to compute the assignment-lookup week, matching
+  // locationState.assembleWeek's read side.
+  useEffect(() => {
+    if (!orgId) {
+      // Global/platform-scoped builder: no org to key a canonical week off of.
+      setOrgTimezone(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('organizations')
+        .select('timezone' as 'id')
+        .eq('id', orgId)
+        .maybeSingle();
+      if (cancelled) return;
+      // organizations.timezone is a recent additive column; generated types
+      // lag until Lovable's next regen, so the row is typed by hand here
+      // (repo convention, see useAuth.tsx pwa_enabled).
+      const row = data as unknown as { timezone: string } | null;
+      const tz = row?.timezone || PLANNER_FALLBACK_TZ;
+      setOrgTimezone(tz);
+      // Recompute the displayed week now that the org's real timezone is
+      // known, unless the user already navigated away from the transient
+      // fallback week while this fetch was in flight.
+      if (!userNavigatedRef.current) {
+        setSelectedMonday(getAssignmentWeekMondayStr(new Date(), tz));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [orgId]);
 
   useEffect(() => {
     if (viewMode === 'month') return; // skip week fetching in month view
@@ -119,9 +183,10 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
   };
 
   const loadWeeks = async (startMonday: string) => {
+    const generation = ++loadWeeksGenerationRef.current;
     setLoading(true);
-    
-    const mondays = showTwoWeeks 
+
+    const mondays = showTwoWeeks
       ? [startMonday, getNextMonday(startMonday)]
       : [startMonday];
 
@@ -237,14 +302,22 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
       });
     });
 
+    // ASG-1 Fix 2 (Codex P2): a newer loadWeeks call (the real org-tz Monday
+    // superseding the transient fallback-tz Monday, or a user navigation)
+    // has started since this call began — drop these results instead of
+    // clobbering what the newer call already committed or is about to.
+    if (generation !== loadWeeksGenerationRef.current) return;
+
     setWeeks(weeks);
     // Load excused weeks
     const { data: excusedData } = await supabase
       .from('excused_weeks')
       .select('week_start_date')
       .in('week_start_date', mondays);
-    setExcusedWeeks(new Set(excusedData?.map(e => e.week_start_date) || []));
 
+    if (generation !== loadWeeksGenerationRef.current) return;
+
+    setExcusedWeeks(new Set(excusedData?.map(e => e.week_start_date) || []));
     setLoading(false);
   };
 
@@ -257,10 +330,12 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
   const getPrevMonday = (monday: string): string => addDaysToDateString(monday, -7, CT_TZ);
 
   const handleNavigatePrev = () => {
+    userNavigatedRef.current = true;
     setSelectedMonday(getPrevMonday(selectedMonday));
   };
 
   const handleNavigateNext = () => {
+    userNavigatedRef.current = true;
     setSelectedMonday(getNextMonday(selectedMonday));
   };
 
@@ -284,10 +359,12 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
   };
 
   const handleMonthPrev = () => {
+    userNavigatedRef.current = true;
     setSelectedMonday(getFirstMondayOfMonth(shiftMonthStart(selectedMonday, -1)));
   };
 
   const handleMonthNext = () => {
+    userNavigatedRef.current = true;
     setSelectedMonday(getFirstMondayOfMonth(shiftMonthStart(selectedMonday, 1)));
   };
 
@@ -696,6 +773,7 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
               roleId={roleId}
               selectedMonthAnchor={getMonthStart(selectedMonday)}
               onSelectWeek={(monday) => {
+                userNavigatedRef.current = true;
                 setSelectedMonday(monday);
                 setViewMode('week');
               }}

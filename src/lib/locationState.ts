@@ -1,10 +1,9 @@
 import { getWeekAnchors } from '@/v2/time';
-import { getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
+import { getPolicyOffsetsForLocation, getAssignmentWeekMondayStr } from '@/lib/submissionPolicy';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchOrgProMoveMetaByIds } from '@/lib/proMoves';
 // (backlog helpers removed 2026-07-25 — no missed-assignment workflow; roadmap 2.3)
 import { format } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
 import { computeWeekCycleMath } from '@/lib/weekCycleMath';
 import { computeWeekStateCore, type WeekStateFacts } from '@/lib/weekStateCore';
 
@@ -101,7 +100,79 @@ export function getOnboardingWeeksLeft(_staff: { hire_date?: string | null }, _n
 }
 
 /**
- * Assemble weekly assignments for a user based on location context
+ * ASG-1 Fix 2: resolves a practice group's parent organization id. One half
+ * of the location -> group -> org chain every participant surface must use
+ * to find the ONE canonical timezone behind the org-level
+ * `weekly_assignments` week key. Reused by `assembleWeek` below and by
+ * every other participant surface that already has a `group_id` in hand
+ * (via a `locations` join) but not yet an orgId — see
+ * `resolveOrgTimezoneForGroup`.
+ */
+export async function resolveOrgIdForGroup(groupId: string): Promise<string | null> {
+  const { data: pgData, error: pgErr } = await supabase
+    .from('practice_groups')
+    .select('organization_id')
+    .eq('id', groupId)
+    .maybeSingle();
+
+  if (pgErr) {
+    console.warn('[resolveOrgIdForGroup] Failed to resolve organization_id for group=%s: %o', groupId, pgErr);
+  }
+  return pgData?.organization_id ?? null;
+}
+
+/**
+ * ASG-1 Fix 2: resolves `organizations.timezone` for a known org id. Falls
+ * back to 'America/Chicago' on any missing value or error — same fallback
+ * `assembleWeek` always used — so a not-yet-backfilled column or an
+ * out-of-order deploy never throws; it just serves the platform default
+ * until the real value is available.
+ */
+export async function resolveOrgTimezoneById(orgId: string): Promise<string> {
+  const { data: orgData, error: orgErr } = await supabase
+    .from('organizations')
+    // organizations.timezone is a recent additive column; generated types
+    // lag until Lovable's next regen, so the row is typed by hand below
+    // (repo convention, see useAuth.tsx pwa_enabled).
+    .select('timezone' as 'id')
+    .eq('id', orgId)
+    .maybeSingle();
+
+  if (orgErr) {
+    console.warn('[resolveOrgTimezoneById] Failed to fetch organizations.timezone for org=%s, falling back to America/Chicago: %o', orgId, orgErr);
+  }
+  return (orgData as unknown as { timezone: string } | null)?.timezone || 'America/Chicago';
+}
+
+/**
+ * ASG-1 Fix 2: the shared "what org-canonical timezone applies to this
+ * practice group" resolver — composes `resolveOrgIdForGroup` +
+ * `resolveOrgTimezoneById`, the exact chain `assembleWeek` uses. Every
+ * participant surface that already has a location's `group_id` in hand
+ * (e.g. a `staff.locations(...group_id)` join) should call this instead of
+ * re-deriving the location -> group -> org -> timezone chain itself, so
+ * there is one definition of "the org-canonical week" to keep correct.
+ * Falls back to 'America/Chicago' (and `orgId: null`) when `groupId` is
+ * missing or has no resolvable organization, matching `assembleWeek`.
+ */
+export async function resolveOrgTimezoneForGroup(
+  groupId: string | null | undefined
+): Promise<{ orgId: string | null; timezone: string }> {
+  if (!groupId) return { orgId: null, timezone: 'America/Chicago' };
+  const orgId = await resolveOrgIdForGroup(groupId);
+  if (!orgId) return { orgId: null, timezone: 'America/Chicago' };
+  return { orgId, timezone: await resolveOrgTimezoneById(orgId) };
+}
+
+/**
+ * Assemble weekly assignments for a user based on location context.
+ *
+ * Returns the canonical `weekStartDate` ('yyyy-MM-dd', org-tz Monday)
+ * alongside the assignments, so every caller that also needs to key a
+ * "Week of" label or an excused-week lookup off the same week can reuse
+ * this ONE resolution instead of recomputing it (ASG-1 Fix 2). `null` only
+ * when the location or its org could not be resolved at all (in which case
+ * `assignments` is always `[]` too).
  */
 export async function assembleWeek(params: {
   userId: string;
@@ -110,7 +181,7 @@ export async function assembleWeek(params: {
   cycleNumber: number;
   weekInCycle: number;
   simOverrides?: any;
-}): Promise<any[]> {
+}): Promise<{ assignments: any[]; weekStartDate: string | null }> {
   const { userId, roleId, locationId, cycleNumber, weekInCycle } = params;
 
   console.info(`🔎 [assembleWeek] START — userId=${userId} roleId=${roleId} locationId=${locationId} cycle=${cycleNumber} week=${weekInCycle}`);
@@ -124,35 +195,37 @@ export async function assembleWeek(params: {
 
   if (!locationData) {
     console.warn('[assembleWeek] ❌ Location not found for id=%s error=%o', locationId, locErr);
-    return [];
+    return { assignments: [], weekStartDate: null };
   }
 
   console.info('[assembleWeek] Location resolved — group_id=%s tz=%s', locationData.group_id, locationData.timezone);
 
-  const now = params.simOverrides?.enabled && params.simOverrides?.nowISO 
-    ? new Date(params.simOverrides.nowISO) 
+  const now = params.simOverrides?.enabled && params.simOverrides?.nowISO
+    ? new Date(params.simOverrides.nowISO)
     : new Date();
-  const offsets2 = getPolicyOffsetsForLocation(locationData);
-  const anchors = getWeekAnchors(now, locationData.timezone, offsets2);
-  const mondayStr = formatInTimeZone(anchors.mondayZ, locationData.timezone, 'yyyy-MM-dd');
 
-  console.info('[assembleWeek] Computed mondayStr=%s from now=%s tz=%s', mondayStr, now.toISOString(), locationData.timezone);
+  // ASG-1 Fix 2: resolve the org BEFORE computing the assignment-lookup
+  // Monday. weekly_assignments rows are org-level (location_id is null),
+  // so the lookup key must come from the org's ONE canonical timezone, not
+  // this location's own timezone. Per-location timezone/offsets still drive
+  // due-date/deadline display elsewhere (getLocationWeekContext,
+  // computeWeekState below); nothing about that changes here. This also
+  // makes the now-unneeded getWeekAnchors(now, locationData.timezone, ...)
+  // call (previously used only to derive the old location-tz mondayStr)
+  // go away, since its one consumer moved to the org-tz path below.
+  const orgId = await resolveOrgIdForGroup(locationData.group_id);
 
-  // Resolve the location's organization_id
-  const { data: pgData, error: pgErr } = await supabase
-    .from('practice_groups')
-    .select('organization_id')
-    .eq('id', locationData.group_id)
-    .maybeSingle();
+  console.info(`[assembleWeek] Org resolution — group_id=${locationData.group_id} → organization_id=${orgId}`);
 
-  const orgId = pgData?.organization_id;
-
-  console.info(`[assembleWeek] Org resolution — group_id=${locationData.group_id} → organization_id=${orgId} (pgErr=${pgErr?.message ?? 'none'})`);
-  
   if (!orgId) {
     console.warn('[assembleWeek] ❌ No organization_id found for location=%s group_id=%s', locationId, locationData.group_id);
-    return [];
+    return { assignments: [], weekStartDate: null };
   }
+
+  const orgTimezone = await resolveOrgTimezoneById(orgId);
+  const mondayStr = getAssignmentWeekMondayStr(now, orgTimezone);
+
+  console.info('[assembleWeek] Computed mondayStr=%s from now=%s orgTz=%s (org-canonical, not location tz)', mondayStr, now.toISOString(), orgTimezone);
 
   // Query weekly_assignments scoped to the organization (no fallback)
   console.info('[assembleWeek] Querying weekly_assignments — role_id=%d week=%s status=locked org_id=%s', roleId, mondayStr, orgId);
@@ -198,7 +271,7 @@ export async function assembleWeek(params: {
 
     if (enrichErr || !enrichedAssign) {
       console.error('[assembleWeek] Failed to fetch enriched assignments:', enrichErr);
-      return [];
+      return { assignments: [], weekStartDate: mondayStr };
     }
 
     // Resolve org-custom move metadata (rows where org_move_id is set instead of action_id)
@@ -209,7 +282,7 @@ export async function assembleWeek(params: {
       ? await fetchOrgProMoveMetaByIds(orgMoveIds)
       : new Map();
 
-    return enrichedAssign.map((assign: any) => {
+    const assignments = enrichedAssign.map((assign: any) => {
       const om = assign.org_move_id ? orgMeta.get(assign.org_move_id) : undefined;
       return {
         weekly_focus_id: `assign:${assign.id}`,
@@ -227,9 +300,10 @@ export async function assembleWeek(params: {
         weekLabel: `Week of ${mondayStr}`
       };
     });
+    return { assignments, weekStartDate: mondayStr };
   } else {
     console.warn('[assembleWeek] ❌ No weekly_assignments for week=%s role=%d', mondayStr, roleId);
-    return [];
+    return { assignments: [], weekStartDate: mondayStr };
   }
 }
 
@@ -283,7 +357,6 @@ export async function computeWeekState(params: {
     (staff as any).organization_id ||
     (staff.locations as any)?.practice_groups?.organization_id ||
     null;
-  const orgTz = (staff.locations as any)?.timezone || 'America/Chicago';
 
   // Check eligibility (onboarding status). isEligibleForProMoves is pure and
   // always true today, so this never actually short-circuits in practice —
@@ -302,11 +375,20 @@ export async function computeWeekState(params: {
     };
   }
 
-  // Calculate Monday anchor in org timezone
-  const mondayStr = formatInTimeZone(anchors.mondayZ, orgTz, 'yyyy-MM-dd');
+  // ASG-1 Fix 2 (secondary): the excused_submissions/excused_locations
+  // lookups below key by 'week_of', which must match the same org-canonical
+  // week assembleWeek() now resolves assignments under, not this staff
+  // member's location timezone (the previous computation here, despite
+  // being named "org timezone", actually used staff.locations.timezone).
+  // Org resolution itself (`orgId` above) is unchanged, out of scope here
+  // per ASG-1 Fix 3. The organizations.timezone lookup itself now goes
+  // through the same shared resolver assembleWeek() uses, instead of a
+  // second inlined copy of the same query.
+  const canonicalOrgTz = orgId ? await resolveOrgTimezoneById(orgId) : 'America/Chicago';
+  const mondayStr = getAssignmentWeekMondayStr(now, canonicalOrgTz);
 
   // ----- P0 FIX: Use assembleWeek as single source of truth for IDs -----
-  const assignments = await assembleWeek({
+  const { assignments } = await assembleWeek({
     userId,
     roleId,
     locationId,

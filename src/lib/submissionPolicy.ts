@@ -137,6 +137,29 @@ export function resolveNextMonday(now: Date, tz: string): Date {
   return fromZonedTime(`${nextMondayStr}T00:00:00`, tz);
 }
 
+/**
+ * ASG-1 Fix 2: the ONE function both the assignment write side (planner
+ * save, auto-assign, GlobalAssignmentBuilder) and the assignment read side
+ * (locationState.assembleWeek) must call to compute the
+ * `weekly_assignments.week_start_date` lookup key.
+ *
+ * weekly_assignments rows are org-level (location_id is null), so the week
+ * key they are written and read under must be ONE canonical org timezone,
+ * not each location's own timezone: otherwise a multi-timezone org (Alcan
+ * spans Chicago, Denver, and New York) can write under one Monday and read
+ * under a different one in the Sunday-night-to-Monday-morning rollover
+ * window. See docs/specs/asg-1-weekly-assignment-visibility.md, Fix 2.
+ *
+ * Per-location timezone is untouched by this function and keeps driving
+ * due-date/deadline display via getWeekAnchors(now, location.timezone, ...).
+ * This function is ONLY for the assignment-lookup week key.
+ *
+ * Pure: same (now, orgTimezone) always produces the same 'yyyy-MM-dd' string.
+ */
+export function getAssignmentWeekMondayStr(now: Date, orgTimezone: string): string {
+  return formatInTimeZone(resolveMonday(now, orgTimezone), orgTimezone, 'yyyy-MM-dd');
+}
+
 function resolveOffset(mondayZ: Date, offset: PolicyOffset, tz: string): Date {
   const mondayStr = formatInTimeZone(mondayZ, tz, 'yyyy-MM-dd');
   const targetStr = addCalendarDays(mondayStr, offset.dayOffset);

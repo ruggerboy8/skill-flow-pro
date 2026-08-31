@@ -17,10 +17,14 @@ import {
   resolveNextMonday,
   getSubmissionPolicy,
   getPolicyOffsetsForLocation,
+  getAssignmentWeekMondayStr,
   DEFAULT_POLICY_OFFSETS,
 } from './submissionPolicy';
 
 const CHICAGO = 'America/Chicago';
+const NEW_YORK = 'America/New_York';
+const DENVER = 'America/Denver';
+const LONDON = 'Europe/London';
 
 describe('resolveMonday', () => {
   it('a normal midweek Wednesday resolves to that week\'s Monday 00:00 CST', () => {
@@ -145,5 +149,61 @@ describe('getSubmissionPolicy — each policy offset', () => {
       perf_due_time: null,
     });
     expect(offsets).toEqual(DEFAULT_POLICY_OFFSETS);
+  });
+});
+
+describe('getAssignmentWeekMondayStr — ASG-1 Fix 2 (canonical org-timezone week key)', () => {
+  it('returns the Monday in the given timezone as yyyy-MM-dd', () => {
+    const now = new Date('2026-08-12T20:00:00Z'); // Wed
+    expect(getAssignmentWeekMondayStr(now, CHICAGO)).toBe('2026-08-10');
+  });
+
+  it('a UK org resolves its week in Europe/London', () => {
+    const now = new Date('2026-08-12T20:00:00Z');
+    expect(getAssignmentWeekMondayStr(now, LONDON)).toBe('2026-08-10');
+  });
+
+  it('is pure: the same inputs always produce the same string', () => {
+    const now = new Date('2026-08-12T20:00:00Z');
+    expect(getAssignmentWeekMondayStr(now, DENVER)).toBe(getAssignmentWeekMondayStr(now, DENVER));
+  });
+
+  it('rollover window: America/Chicago and America/New_York disagree on the raw Monday boundary (this IS the ASG-1 bug)', () => {
+    // Mon Aug 17 2026, 04:30 UTC = Mon 00:30 EDT (New York, already CDT+1 ahead
+    // of Chicago) but Sun 23:30 CDT (Chicago). New York has already turned
+    // over to the new week; Chicago has not. Before the fix, the planner
+    // wrote week_start_date in hardcoded America/Chicago while a New York
+    // Alcan location read it in its own timezone: in this window those two
+    // raw computations land on different Mondays, and the New York location
+    // sees no assignments at all.
+    const rolloverInstant = new Date('2026-08-17T04:30:00Z');
+    const chicagoMonday = getAssignmentWeekMondayStr(rolloverInstant, CHICAGO);
+    const newYorkMonday = getAssignmentWeekMondayStr(rolloverInstant, NEW_YORK);
+    expect(chicagoMonday).toBe('2026-08-10'); // still last week for Chicago
+    expect(newYorkMonday).toBe('2026-08-17'); // already this week for New York
+    expect(chicagoMonday).not.toBe(newYorkMonday);
+  });
+
+  it('rollover window: per-location timezone still disagrees (Denver vs New York), but the SAME org timezone on both sides does not (this IS the fix)', () => {
+    const rolloverInstant = new Date('2026-08-17T04:30:00Z');
+
+    // If the read side still resolved the lookup key from each location's
+    // OWN timezone (the pre-fix behavior), a Denver location and a New York
+    // location would land on different weeks in this window, same as the
+    // Chicago/New York case above.
+    const denverOwnTz = getAssignmentWeekMondayStr(rolloverInstant, DENVER);
+    const newYorkOwnTz = getAssignmentWeekMondayStr(rolloverInstant, NEW_YORK);
+    expect(denverOwnTz).not.toBe(newYorkOwnTz);
+
+    // ASG-1 Fix 2: both the write side (planner/auto-assign) and the read
+    // side (locationState.assembleWeek) instead call this helper with the
+    // ORG's canonical timezone, never the location's own timezone. A
+    // Denver location and a New York location in the same org now resolve
+    // the identical week key, closing the gap the spec describes.
+    const orgTz = CHICAGO; // Alcan's org timezone (organizations.timezone default)
+    const denverLookupViaOrgTz = getAssignmentWeekMondayStr(rolloverInstant, orgTz);
+    const newYorkLookupViaOrgTz = getAssignmentWeekMondayStr(rolloverInstant, orgTz);
+    expect(denverLookupViaOrgTz).toBe(newYorkLookupViaOrgTz);
+    expect(denverLookupViaOrgTz).toBe('2026-08-10');
   });
 });

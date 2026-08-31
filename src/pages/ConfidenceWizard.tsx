@@ -12,9 +12,9 @@ import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
 import { getAnchors } from '@/lib/centralTime';
 import { useLocationTimezone } from '@/hooks/useLocationTimezone';
 import { format } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
 import { getWeekAnchors } from '@/v2/time';
-import { getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
+import { getPolicyOffsetsForLocation, getAssignmentWeekMondayStr } from '@/lib/submissionPolicy';
+import { resolveOrgTimezoneForGroup } from '@/lib/locationState';
 import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -221,9 +221,15 @@ export default function ConfidenceWizard() {
     setStaff(staffData);
 
     // --- Excuse gate: block submission if confidence is excused ---
-    const staffTz = (staffData.locations as any)?.timezone || 'America/Chicago';
-    const excuseWeekAnchors = getWeekAnchors(effectiveNow, staffTz);
-    const excuseMondayStr = isRepair && weekOf ? weekOf : formatInTimeZone(excuseWeekAnchors.mondayZ, staffTz, 'yyyy-MM-dd');
+    // ASG-1 Fix 2: key on the SAME org-canonical Monday
+    // assembleCurrentWeek() loads this participant's assignments under
+    // (location -> practice_groups.organization_id -> organizations.timezone,
+    // the same lineage locationState.assembleWeek uses), not this staff
+    // member's own location timezone — otherwise a Denver/New York Alcan
+    // participant can be excused under a different week than the one their
+    // assignments actually loaded for.
+    const { timezone: excuseOrgTz } = await resolveOrgTimezoneForGroup((staffData.locations as any)?.group_id);
+    const excuseMondayStr = isRepair && weekOf ? weekOf : getAssignmentWeekMondayStr(effectiveNow, excuseOrgTz);
 
     const [{ data: locExcuse }, { data: indivExcuse }] = await Promise.all([
       supabase
@@ -736,9 +742,10 @@ export default function ConfidenceWizard() {
     if (!staff || !currentFocus) return;
 
     // --- Submit-time excuse re-check ---
-    const submitStaffTz = (staff as any).locations?.timezone || 'America/Chicago';
-    const submitWeekAnchors = getWeekAnchors(effectiveNow, submitStaffTz);
-    const submitMondayStr = isRepair && weekOf ? weekOf : formatInTimeZone(submitWeekAnchors.mondayZ, submitStaffTz, 'yyyy-MM-dd');
+    // ASG-1 Fix 2: same org-canonical week key as the load-time excuse gate
+    // above (not staff.locations.timezone).
+    const { timezone: submitOrgTz } = await resolveOrgTimezoneForGroup((staff as any).locations?.group_id);
+    const submitMondayStr = isRepair && weekOf ? weekOf : getAssignmentWeekMondayStr(effectiveNow, submitOrgTz);
 
     const [{ data: submitLocExcuse }, { data: submitIndivExcuse }] = await Promise.all([
       supabase

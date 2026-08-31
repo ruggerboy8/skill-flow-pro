@@ -34,7 +34,7 @@ export function useFacilitatorWeek(roleId: number | null) {
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const ctx = await getLocationWeekContext(locationId!);
-      const rows = await assembleWeek({
+      const { assignments: rows } = await assembleWeek({
         userId: user!.id,
         roleId: roleId!,
         locationId: locationId!,

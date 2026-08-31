@@ -92,6 +92,15 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
   // the org-timezone fetch resolving late doesn't clobber a week they
   // already chose.
   const userNavigatedRef = useRef(false);
+  // ASG-1 Fix 2 (Codex P2): loadWeeks(selectedMonday) fires once for the
+  // transient PLANNER_FALLBACK_TZ Monday on mount, then again for the real
+  // org-tz Monday once the org-timezone fetch resolves and updates
+  // selectedMonday. loadWeeks has no built-in cancellation, so if the
+  // stale fallback-tz request resolves AFTER the real org-tz request, its
+  // (wrong-week) result silently overwrites `weeks`. Every loadWeeks call
+  // stamps its own generation number here and only commits its results if
+  // it is still the most recent call by the time it finishes.
+  const loadWeeksGenerationRef = useRef(0);
   const [selectedMonday, setSelectedMonday] = useState(() =>
     getAssignmentWeekMondayStr(new Date(), PLANNER_FALLBACK_TZ)
   );
@@ -174,9 +183,10 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
   };
 
   const loadWeeks = async (startMonday: string) => {
+    const generation = ++loadWeeksGenerationRef.current;
     setLoading(true);
-    
-    const mondays = showTwoWeeks 
+
+    const mondays = showTwoWeeks
       ? [startMonday, getNextMonday(startMonday)]
       : [startMonday];
 
@@ -292,14 +302,22 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
       });
     });
 
+    // ASG-1 Fix 2 (Codex P2): a newer loadWeeks call (the real org-tz Monday
+    // superseding the transient fallback-tz Monday, or a user navigation)
+    // has started since this call began — drop these results instead of
+    // clobbering what the newer call already committed or is about to.
+    if (generation !== loadWeeksGenerationRef.current) return;
+
     setWeeks(weeks);
     // Load excused weeks
     const { data: excusedData } = await supabase
       .from('excused_weeks')
       .select('week_start_date')
       .in('week_start_date', mondays);
-    setExcusedWeeks(new Set(excusedData?.map(e => e.week_start_date) || []));
 
+    if (generation !== loadWeeksGenerationRef.current) return;
+
+    setExcusedWeeks(new Set(excusedData?.map(e => e.week_start_date) || []));
     setLoading(false);
   };
 

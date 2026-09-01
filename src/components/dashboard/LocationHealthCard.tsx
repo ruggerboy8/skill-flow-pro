@@ -9,15 +9,16 @@ export interface LocationStats {
   id: string;
   name: string;
   staffCount: number;
+  owedStaffCount: number;      // staff with locked assignments this week; 0 = nothing published (DASH-5)
   submissionRate: number;      // 0-100 (conf+perf complete %)
   missingConfCount: number;    // staff missing confidence (after deadline - LATE)
   missingPerfCount: number;    // staff missing performance (after deadline - LATE)
   distinctMissedCount: number; // DISTINCT staff missing anything (a person missing both conf and perf counts once)
-  pendingConfCount?: number;   // staff not yet submitted but before deadline
-  confSubmitted?: number;      // raw count of conf submissions
-  confExpected?: number;       // raw count of expected conf submissions
-  perfSubmitted?: number;      // raw count of perf submissions
-  perfExpected?: number;       // raw count of expected perf submissions
+  pendingConfCount?: number;   // staff not yet checked in but before deadline
+  confSubmitted?: number;      // people fully checked in (all required moves rated)
+  confExpected?: number;       // people owing check-in (owedStaffCount)
+  perfSubmitted?: number;      // people fully checked out
+  perfExpected?: number;       // people owing check-out (owedStaffCount)
 }
 
 export interface ExcuseStatus {
@@ -75,6 +76,12 @@ export function LocationHealthCard({
   const perfOpen = submissionGates?.performanceOpen ?? false;
   const anyDeadlinePassed = confClosed || perfClosed;
 
+  // DASH-5: nothing published for anyone this week. Nothing is owed, so no
+  // rate, no tier, no missing counts - a quiet factual state instead of a
+  // phantom 0%. Takes precedence over excused (you can't excuse work that
+  // was never assigned).
+  const noAssignments = stats.owedStaffCount === 0;
+
   // Round once and reuse everywhere (tier decision AND display) so a
   // displayed 60% can never be judged red and a displayed 85% can never
   // read as below the watch threshold (DASH-1a QA fix: rounding mismatch).
@@ -85,11 +92,13 @@ export function LocationHealthCard({
   // in the watch band, otherwise the default surface. See DASH-1a spec.
   // Uses distinctMissedCount (DASH-1a QA fix), not missingConfCount +
   // missingPerfCount, which double-counts anyone missing both metrics.
+  // teamSize is the people who actually owe work (DASH-5), so a location
+  // with no assignments can never trip the small-team guard into red.
   const tier = participationTier({
     rate: displayRate,
     missedCount: stats.distinctMissedCount,
-    teamSize: stats.staffCount,
-    anyDeadlinePassed,
+    teamSize: stats.owedStaffCount,
+    anyDeadlinePassed: anyDeadlinePassed && !noAssignments,
   });
   const tierTokens = tierColorTokens(tier);
 
@@ -116,6 +125,14 @@ export function LocationHealthCard({
   // One big number per state (spec rule 1): a raw progress fraction before
   // anything is due, otherwise a rate percent, never both stacked together.
   const renderBigNumber = () => {
+    if (noAssignments) {
+      return (
+        <div className="text-sm font-medium text-muted-foreground">
+          No assignments published this week
+        </div>
+      );
+    }
+
     if (isFullyExcused) {
       const reason = excuseStatus?.confReason || excuseStatus?.perfReason;
       return (
@@ -153,7 +170,7 @@ export function LocationHealthCard({
   // rule 5). A partially excused metric's slot reads "Conf excused" instead
   // of a fraction so the excuse isn't lost once its number stops appearing.
   const renderFractions = () => {
-    if (isFullyExcused) return null;
+    if (noAssignments || isFullyExcused) return null;
 
     if (!anyDeadlinePassed) {
       if (perfOpen && confExp > 0 && !perfExcused) {
@@ -168,6 +185,7 @@ export function LocationHealthCard({
   };
 
   const headerChip = (() => {
+    if (noAssignments) return null;
     if (isFullyExcused) return <ExcusedChip label="Excused" />;
     if (isPartiallyExcused) {
       const metric = confExcused ? 'Conf' : 'Perf';
@@ -194,7 +212,7 @@ export function LocationHealthCard({
     return null;
   })();
 
-  const statusPhrases = buildLocationStatusLine({
+  const statusPhrases = noAssignments ? [] : buildLocationStatusLine({
     tier,
     isFullyExcused,
     isPartiallyExcused,

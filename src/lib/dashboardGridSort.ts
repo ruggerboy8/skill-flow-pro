@@ -1,52 +1,59 @@
-// DASH-1b: pure comparators for the Command Center's location grid. Which
-// comparator runs depends on the page's moment (see dashboardMoment.ts) -
-// wrap-up wants the worst-performing locations surfaced first as a calm
-// archive, mid-week wants the locations that most need a nudge surfaced
-// first.
+// DASH-5: one severity comparator for the Command Center's location grid,
+// replacing the DASH-1b moment-switched pair (wrapupComparator /
+// midweekComparator). The grid always leads with whoever is in the worst
+// shape given the current point in the weekly timeline:
+//
+//   1. red        - past a deadline with a real shortfall, worst rate first
+//   2. watch      - past a deadline, 60-84%, worst rate first
+//   3. at risk    - nothing due yet but people still pending: soonest
+//                   deadline first, then most people pending
+//   4. on track   - done or healthy, worst rate first (a post-deadline 86%
+//                   sits above a clean 100%)
+//   5. no work    - nothing published this week (owedStaffCount 0), last
+//
+// Pure data in, number out - the page computes tier/deadline/pending once
+// (the same values the cards already render) so sort and display can never
+// disagree.
 
-/** Minimal shape wrapupComparator needs from a location's stats. */
-export interface WrapupSortEntry {
+import type { ParticipationTier } from '@/lib/participationTier';
+
+export interface GridSortEntry {
+  /** The same tier the location's card renders (excuse-adjusted). */
+  tier: ParticipationTier;
+  /** People who owe submissions this week; 0 = nothing published. */
+  owedStaffCount: number;
+  /** The card's excuse-adjusted submission rate, 0-100. */
   submissionRate: number;
-}
-
-/**
- * Wrap-up ordering: worst final rate first. This is exactly the dashboard's
- * original unconditional sort, extracted and named - behavior unchanged.
- */
-export function wrapupComparator(a: WrapupSortEntry, b: WrapupSortEntry): number {
-  return a.submissionRate - b.submissionRate;
-}
-
-/**
- * Minimal shape midweekComparator needs per location. Deliberately just
- * these two plain values (not live Date/timezone machinery) so the
- * comparator stays pure and testable - the page computes both once from
- * its existing policy calls, the same place it already builds
- * `locDeadlineLabel`.
- */
-export interface MidweekSortEntry {
-  /** The location's next upcoming deadline (confidence or performance), or
-   * null when neither is known / both have already passed. */
+  /** Next upcoming deadline, or null when none is pending. */
   nextDeadlineAt: Date | null;
-  /** How many staff still need to submit before that next deadline. */
+  /** People still outstanding before that next deadline. */
   pendingCount: number;
 }
 
-/**
- * Mid-week ordering: "who needs a nudge first." Soonest deadline sorts
- * first. On a tie (including a tie of null vs null), higher pending count
- * sorts first, since a location with more people still outstanding needs
- * the nudge more urgently. A null deadline (nothing known, or everything
- * already past) always sorts after any location with a real deadline.
- */
-export function midweekComparator(a: MidweekSortEntry, b: MidweekSortEntry): number {
-  if (a.nextDeadlineAt === null && b.nextDeadlineAt === null) {
+type SeverityBand = 0 | 1 | 2 | 3 | 4;
+
+export function severityBand(e: GridSortEntry): SeverityBand {
+  if (e.owedStaffCount === 0) return 4;
+  if (e.tier === 'red') return 0;
+  if (e.tier === 'watch') return 1;
+  if (e.nextDeadlineAt !== null && e.pendingCount > 0) return 2;
+  return 3;
+}
+
+export function severityComparator(a: GridSortEntry, b: GridSortEntry): number {
+  const bandA = severityBand(a);
+  const bandB = severityBand(b);
+  if (bandA !== bandB) return bandA - bandB;
+
+  if (bandA === 2) {
+    // At risk: soonest deadline first, then most people pending.
+    const timeA = a.nextDeadlineAt!.getTime();
+    const timeB = b.nextDeadlineAt!.getTime();
+    if (timeA !== timeB) return timeA - timeB;
     return b.pendingCount - a.pendingCount;
   }
-  if (a.nextDeadlineAt === null) return 1;
-  if (b.nextDeadlineAt === null) return -1;
 
-  const deadlineDiff = a.nextDeadlineAt.getTime() - b.nextDeadlineAt.getTime();
-  if (deadlineDiff !== 0) return deadlineDiff;
+  // Everywhere else: worst rate first, most pending as the tiebreak.
+  if (a.submissionRate !== b.submissionRate) return a.submissionRate - b.submissionRate;
   return b.pendingCount - a.pendingCount;
 }

@@ -1,8 +1,18 @@
 import { RawScoreRow, StaffWeekSummary } from '@/types/coachV2';
 
+/**
+ * DASH-5: resolves how many locked, required (non-self-select) pro moves a
+ * staff member was actually assigned for the week. Supplied by the data
+ * layer (useStaffWeeklyScores) from weekly_assignments; when absent (e.g.
+ * TeamPage's weekOf-less call), required_count stays 0 and location-level
+ * stats treat everyone as owing nothing.
+ */
+export type RequiredCountResolver = (row: RawScoreRow) => number;
+
 export function aggregateStaffWeekSummary(
   rawRows: RawScoreRow[],
-  weekOf: string
+  weekOf: string,
+  resolveRequiredCount?: RequiredCountResolver
 ): StaffWeekSummary[] {
   const staffMap = new Map<string, StaffWeekSummary>();
 
@@ -23,6 +33,9 @@ export function aggregateStaffWeekSummary(
         assignment_count: 0,
         conf_count: 0,
         perf_count: 0,
+        required_count: resolveRequiredCount ? resolveRequiredCount(row) : 0,
+        conf_required_done: 0,
+        perf_required_done: 0,
         has_any_late: false,
         is_complete: false,
         scores: [],
@@ -30,15 +43,24 @@ export function aggregateStaffWeekSummary(
     }
 
     const summary = staffMap.get(row.staff_id)!;
+    // NOTE: assignment_count is the count of returned rows (a non-submitter
+    // gets one all-null placeholder row from the RPC), NOT the person's real
+    // workload - that's required_count. Kept for per-row consumers (roster
+    // score lists); location-level stats must use required_count.
     summary.assignment_count++;
     summary.scores.push(row);
 
     // Count scores
     if (row.confidence_score !== null) {
       summary.conf_count++;
+      // self_select !== true also catches null (placeholder or unjoined
+      // rows): a real score whose assignment didn't join is still credit
+      // toward the required set, never silently dropped.
+      if (row.self_select !== true) summary.conf_required_done++;
     }
     if (row.performance_score !== null) {
       summary.perf_count++;
+      if (row.self_select !== true) summary.perf_required_done++;
     }
 
     // Track late flags
@@ -57,4 +79,24 @@ export function aggregateStaffWeekSummary(
   });
 
   return Array.from(staffMap.values());
+}
+
+/**
+ * DASH-5 person-level completion: the week's task is done only when EVERY
+ * required move has the rating. Fewer scores than required means a glitch
+ * or an abandoned submission - either way, not done. required_count 0
+ * means nothing was published for this person, so they can be neither
+ * checked in nor missing.
+ */
+export function isCheckedIn(s: StaffWeekSummary): boolean {
+  return s.required_count > 0 && s.conf_required_done >= s.required_count;
+}
+
+export function isCheckedOut(s: StaffWeekSummary): boolean {
+  return s.required_count > 0 && s.perf_required_done >= s.required_count;
+}
+
+/** Staff who actually owe submissions this week (assignments published). */
+export function owedStaff(staff: StaffWeekSummary[]): StaffWeekSummary[] {
+  return staff.filter((s) => s.required_count > 0);
 }

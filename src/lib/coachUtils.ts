@@ -1,23 +1,30 @@
 import { RawScoreRow, StaffWeekSummary } from '@/types/coachV2';
 
 /**
- * DASH-5: resolves how many locked, required (non-self-select) pro moves a
+ * DASH-5: resolves the set of locked assignments (as "assign:<id>" keys) a
  * staff member was actually assigned for the week. Supplied by the data
  * layer (useStaffWeeklyScores) from weekly_assignments; when absent (e.g.
  * TeamPage's weekOf-less call), required_count stays 0 and location-level
  * stats treat everyone as owing nothing.
  */
-export type RequiredCountResolver = (row: RawScoreRow) => number;
+export type RequiredAssignmentsResolver = (row: RawScoreRow) => ReadonlySet<string>;
+
+const NO_ASSIGNMENTS: ReadonlySet<string> = new Set();
 
 export function aggregateStaffWeekSummary(
   rawRows: RawScoreRow[],
   weekOf: string,
-  resolveRequiredCount?: RequiredCountResolver
+  resolveRequiredAssignments?: RequiredAssignmentsResolver
 ): StaffWeekSummary[] {
   const staffMap = new Map<string, StaffWeekSummary>();
+  const requiredByStaff = new Map<string, ReadonlySet<string>>();
 
   rawRows.forEach((row) => {
     if (!staffMap.has(row.staff_id)) {
+      requiredByStaff.set(
+        row.staff_id,
+        resolveRequiredAssignments ? resolveRequiredAssignments(row) : NO_ASSIGNMENTS,
+      );
       staffMap.set(row.staff_id, {
         staff_id: row.staff_id,
         staff_name: row.staff_name,
@@ -33,7 +40,7 @@ export function aggregateStaffWeekSummary(
         assignment_count: 0,
         conf_count: 0,
         perf_count: 0,
-        required_count: resolveRequiredCount ? resolveRequiredCount(row) : 0,
+        required_count: requiredByStaff.get(row.staff_id)!.size,
         conf_required_done: 0,
         perf_required_done: 0,
         has_any_late: false,
@@ -50,17 +57,21 @@ export function aggregateStaffWeekSummary(
     summary.assignment_count++;
     summary.scores.push(row);
 
+    // A score only advances the required tally when it belongs to one of
+    // this person's required assignments for the week (Codex P2 on PR #104):
+    // a stray row from a superseded or unjoined assignment can never
+    // substitute for a missing required rating.
+    const countsTowardRequired =
+      row.assignment_id !== null && requiredByStaff.get(row.staff_id)!.has(row.assignment_id);
+
     // Count scores
     if (row.confidence_score !== null) {
       summary.conf_count++;
-      // self_select !== true also catches null (placeholder or unjoined
-      // rows): a real score whose assignment didn't join is still credit
-      // toward the required set, never silently dropped.
-      if (row.self_select !== true) summary.conf_required_done++;
+      if (countsTowardRequired) summary.conf_required_done++;
     }
     if (row.performance_score !== null) {
       summary.perf_count++;
-      if (row.self_select !== true) summary.perf_required_done++;
+      if (countsTowardRequired) summary.perf_required_done++;
     }
 
     // Track late flags

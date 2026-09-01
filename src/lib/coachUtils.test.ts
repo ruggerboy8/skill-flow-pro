@@ -52,14 +52,17 @@ function placeholderRow(staffId: string): RawScoreRow {
   });
 }
 
-describe('aggregateStaffWeekSummary with a required-count resolver (DASH-5)', () => {
+const REQUIRED_3: ReadonlySet<string> = new Set(['assign:a1', 'assign:a2', 'assign:a3']);
+const REQUIRED_2: ReadonlySet<string> = new Set(['assign:a1', 'assign:a2']);
+
+describe('aggregateStaffWeekSummary with a required-assignments resolver (DASH-5)', () => {
   it('a full check-in on all required moves marks the person checked in', () => {
     const rows = [
       row({ score_id: 'sc1', assignment_id: 'assign:a1', confidence_score: 3 }),
       row({ score_id: 'sc2', assignment_id: 'assign:a2', confidence_score: 2 }),
       row({ score_id: 'sc3', assignment_id: 'assign:a3', confidence_score: 4 }),
     ];
-    const [summary] = aggregateStaffWeekSummary(rows, '2026-08-31', () => 3);
+    const [summary] = aggregateStaffWeekSummary(rows, '2026-08-31', () => REQUIRED_3);
     expect(summary.required_count).toBe(3);
     expect(summary.conf_required_done).toBe(3);
     expect(isCheckedIn(summary)).toBe(true);
@@ -71,25 +74,27 @@ describe('aggregateStaffWeekSummary with a required-count resolver (DASH-5)', ()
       row({ score_id: 'sc1', assignment_id: 'assign:a1', confidence_score: 3 }),
       row({ score_id: 'sc2', assignment_id: 'assign:a2', confidence_score: 2 }),
     ];
-    const [summary] = aggregateStaffWeekSummary(rows, '2026-08-31', () => 3);
+    const [summary] = aggregateStaffWeekSummary(rows, '2026-08-31', () => REQUIRED_3);
     expect(summary.conf_required_done).toBe(2);
     expect(isCheckedIn(summary)).toBe(false);
   });
 
   it('a zero-submission placeholder row leaves the person owing their full workload, not 1', () => {
-    const [summary] = aggregateStaffWeekSummary([placeholderRow('s9')], '2026-08-31', () => 3);
+    const [summary] = aggregateStaffWeekSummary([placeholderRow('s9')], '2026-08-31', () => REQUIRED_3);
     // The old bug: assignment_count (row count) floored this person at 1.
     expect(summary.assignment_count).toBe(1);
     expect(summary.required_count).toBe(3);
     expect(isCheckedIn(summary)).toBe(false);
   });
 
-  it('self-select scores do not substitute for unrated required moves', () => {
+  it('a score on an assignment OUTSIDE the required set never substitutes for a missing one (Codex P2)', () => {
+    // Two required moves; one rated, plus a stray score from a superseded
+    // or otherwise unjoined assignment. Person must read as not done.
     const rows = [
       row({ score_id: 'sc1', assignment_id: 'assign:a1', confidence_score: 3 }),
-      row({ score_id: 'sc2', assignment_id: 'assign:a2', confidence_score: 2, self_select: true }),
+      row({ score_id: 'sc2', assignment_id: 'assign:stale', confidence_score: 2 }),
     ];
-    const [summary] = aggregateStaffWeekSummary(rows, '2026-08-31', () => 2);
+    const [summary] = aggregateStaffWeekSummary(rows, '2026-08-31', () => REQUIRED_2);
     expect(summary.conf_count).toBe(2);
     expect(summary.conf_required_done).toBe(1);
     expect(isCheckedIn(summary)).toBe(false);
@@ -100,13 +105,13 @@ describe('aggregateStaffWeekSummary with a required-count resolver (DASH-5)', ()
       row({ score_id: 'sc1', assignment_id: 'assign:a1', confidence_score: 3, performance_score: 3 }),
       row({ score_id: 'sc2', assignment_id: 'assign:a2', confidence_score: 2, performance_score: null }),
     ];
-    const [summary] = aggregateStaffWeekSummary(rows, '2026-08-31', () => 2);
+    const [summary] = aggregateStaffWeekSummary(rows, '2026-08-31', () => REQUIRED_2);
     expect(isCheckedIn(summary)).toBe(true);
     expect(isCheckedOut(summary)).toBe(false);
   });
 
   it('a person with no published assignments can never be checked in or out', () => {
-    const [summary] = aggregateStaffWeekSummary([placeholderRow('s9')], '2026-08-31', () => 0);
+    const [summary] = aggregateStaffWeekSummary([placeholderRow('s9')], '2026-08-31', () => new Set<string>());
     expect(summary.required_count).toBe(0);
     expect(isCheckedIn(summary)).toBe(false);
     expect(isCheckedOut(summary)).toBe(false);

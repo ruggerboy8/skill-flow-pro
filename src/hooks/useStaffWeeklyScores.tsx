@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { RawScoreRow, StaffWeekSummary } from '@/types/coachV2';
 import { aggregateStaffWeekSummary } from '@/lib/coachUtils';
-import { buildRequiredCountResolver, type RequiredMoveAssignment } from '@/lib/requiredMoves';
+import { buildRequiredAssignmentsResolver, type RequiredMoveAssignment } from '@/lib/requiredMoves';
 import { useSim } from '@/devtools/SimProvider';
 
 interface UseStaffWeeklyScoresOptions {
@@ -15,16 +15,21 @@ interface UseStaffWeeklyScoresOptions {
  * workload. Throws on failure - a dashboard rendering made-up denominators
  * is worse than a visible error (that's the bug this replaces).
  */
-async function fetchRequiredCountResolver(weekOf: string, rows: RawScoreRow[]) {
+async function fetchRequiredAssignmentsResolver(weekOf: string, rows: RawScoreRow[]) {
   const groupIds = [...new Set(rows.map(r => r.group_id).filter(Boolean))];
 
   const [assignRes, groupRes] = await Promise.all([
     supabase
       .from('weekly_assignments')
-      .select('role_id, org_id, location_id, self_select')
+      .select('id, role_id, org_id, location_id')
       .eq('week_start_date', weekOf)
       .eq('status', 'locked')
-      .is('superseded_at', null),
+      .is('superseded_at', null)
+      // source='onboarding' is a retired concept: 1080 legacy rows, all
+      // location-scoped, none newer than Feb 2026. They are not anyone's
+      // current workload and (being org_id-null) aren't even readable
+      // under the org RLS policy this query runs against.
+      .neq('source', 'onboarding'),
     groupIds.length > 0
       ? supabase.from('practice_groups').select('id, organization_id').in('id', groupIds)
       : Promise.resolve({ data: [], error: null }),
@@ -38,7 +43,13 @@ async function fetchRequiredCountResolver(weekOf: string, rows: RawScoreRow[]) {
     if (g.organization_id) orgIdByGroupId.set(g.id, g.organization_id);
   });
 
-  const resolver = buildRequiredCountResolver(
+  // NOTE (Codex P1 on PR #104): this query runs under the caller's RLS.
+  // Today that is sufficient - every live locked assignment is org-scoped
+  // and readable via the "view own org assignments" policy, and no coach
+  // scope crosses orgs (verified 2026-09-01). If location-scoped
+  // assignments ever come back, this must move into a scope-aware
+  // SECURITY DEFINER RPC like get_staff_weekly_scores.
+  const resolver = buildRequiredAssignmentsResolver(
     (assignRes.data ?? []) as RequiredMoveAssignment[],
     orgIdByGroupId,
   );
@@ -102,12 +113,12 @@ export function useStaffWeeklyScores(options: UseStaffWeeklyScoresOptions = {}) 
       // possible when the caller names a week; the weekOf-less path
       // (TeamPage) never reads location-level stats, so required_count
       // safely stays 0 there.
-      const resolveRequiredCount = weekOf
-        ? await fetchRequiredCountResolver(weekOf, rows)
+      const resolveRequiredAssignments = weekOf
+        ? await fetchRequiredAssignmentsResolver(weekOf, rows)
         : undefined;
 
       setRawData(rows);
-      setSummaries(aggregateStaffWeekSummary(rows, weekOf || 'current', resolveRequiredCount));
+      setSummaries(aggregateStaffWeekSummary(rows, weekOf || 'current', resolveRequiredAssignments));
     } catch (err) {
       console.error('[useStaffWeeklyScores] Error:', err);
       setError(err as Error);

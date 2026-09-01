@@ -1,67 +1,73 @@
-import { describe, expect, it } from 'vitest';
-import { wrapupComparator, midweekComparator } from './dashboardGridSort';
+import { describe, it, expect } from 'vitest';
+import { severityComparator, severityBand, type GridSortEntry } from './dashboardGridSort';
 
-describe('wrapupComparator', () => {
-  it('sorts ascending by submission rate, worst first', () => {
-    const list = [
-      { submissionRate: 90 },
-      { submissionRate: 40 },
-      { submissionRate: 70 },
-    ];
-    const sorted = [...list].sort(wrapupComparator);
-    expect(sorted.map(s => s.submissionRate)).toEqual([40, 70, 90]);
+function entry(overrides: Partial<GridSortEntry> = {}): GridSortEntry {
+  return {
+    tier: 'neutral',
+    owedStaffCount: 8,
+    submissionRate: 100,
+    nextDeadlineAt: null,
+    pendingCount: 0,
+    ...overrides,
+  };
+}
+
+const noon = new Date('2026-09-01T12:00:00Z');
+const later = new Date('2026-09-01T17:00:00Z');
+
+describe('severityBand', () => {
+  it('puts red first, then watch, then at-risk pending, then on-track, then no-assignments last', () => {
+    expect(severityBand(entry({ tier: 'red', submissionRate: 40 }))).toBe(0);
+    expect(severityBand(entry({ tier: 'watch', submissionRate: 70 }))).toBe(1);
+    expect(severityBand(entry({ nextDeadlineAt: noon, pendingCount: 3 }))).toBe(2);
+    expect(severityBand(entry({ tier: 'good', submissionRate: 90 }))).toBe(3);
+    expect(severityBand(entry({ nextDeadlineAt: noon, pendingCount: 0 }))).toBe(3);
+    expect(severityBand(entry({ owedStaffCount: 0 }))).toBe(4);
   });
 
-  it('is a stable no-op comparator on ties (does not assert a tiebreak)', () => {
-    const list = [
-      { submissionRate: 50 },
-      { submissionRate: 50 },
-    ];
-    const sorted = [...list].sort(wrapupComparator);
-    expect(sorted.map(s => s.submissionRate)).toEqual([50, 50]);
+  it('a no-assignments location is band 4 even if its tier somehow reads alarmed', () => {
+    expect(severityBand(entry({ owedStaffCount: 0, tier: 'red', submissionRate: 0 }))).toBe(4);
   });
 });
 
-describe('midweekComparator', () => {
-  const at = (isoTime: string) => new Date(`2026-08-25T${isoTime}Z`);
+describe('severityComparator', () => {
+  it('orders bands: red, watch, at-risk, on-track, no-assignments', () => {
+    const red = entry({ tier: 'red', submissionRate: 40 });
+    const watch = entry({ tier: 'watch', submissionRate: 70 });
+    const atRisk = entry({ nextDeadlineAt: noon, pendingCount: 3 });
+    const onTrack = entry({ tier: 'good', submissionRate: 90 });
+    const noWork = entry({ owedStaffCount: 0 });
 
-  it('sorts by soonest deadline first', () => {
-    const list = [
-      { nextDeadlineAt: at('18:00:00'), pendingCount: 1 },
-      { nextDeadlineAt: at('09:00:00'), pendingCount: 1 },
-      { nextDeadlineAt: at('14:00:00'), pendingCount: 1 },
-    ];
-    const sorted = [...list].sort(midweekComparator);
-    expect(sorted.map(s => s.nextDeadlineAt.getUTCHours())).toEqual([9, 14, 18]);
+    const sorted = [noWork, onTrack, atRisk, watch, red].sort(severityComparator);
+    expect(sorted).toEqual([red, watch, atRisk, onTrack, noWork]);
   });
 
-  it('breaks a same-deadline tie by higher pending count first', () => {
-    const deadline = at('14:00:00');
-    const list = [
-      { nextDeadlineAt: deadline, pendingCount: 2 },
-      { nextDeadlineAt: deadline, pendingCount: 9 },
-      { nextDeadlineAt: deadline, pendingCount: 5 },
-    ];
-    const sorted = [...list].sort(midweekComparator);
-    expect(sorted.map(s => s.pendingCount)).toEqual([9, 5, 2]);
+  it('within red/watch, worst rate first', () => {
+    const worse = entry({ tier: 'red', submissionRate: 20 });
+    const bad = entry({ tier: 'red', submissionRate: 50 });
+    expect([bad, worse].sort(severityComparator)).toEqual([worse, bad]);
   });
 
-  it('sorts null deadlines after any real deadline', () => {
-    const list = [
-      { nextDeadlineAt: null, pendingCount: 10 },
-      { nextDeadlineAt: at('09:00:00'), pendingCount: 1 },
-    ];
-    const sorted = [...list].sort(midweekComparator);
-    expect(sorted[0].nextDeadlineAt).not.toBeNull();
-    expect(sorted[1].nextDeadlineAt).toBeNull();
+  it('within at-risk, soonest deadline first, then most pending', () => {
+    const soonFew = entry({ nextDeadlineAt: noon, pendingCount: 1 });
+    const soonMany = entry({ nextDeadlineAt: noon, pendingCount: 5 });
+    const lateMany = entry({ nextDeadlineAt: later, pendingCount: 9 });
+    expect([lateMany, soonFew, soonMany].sort(severityComparator))
+      .toEqual([soonMany, soonFew, lateMany]);
   });
 
-  it('when both deadlines are null, breaks the tie by higher pending count first', () => {
-    const list = [
-      { nextDeadlineAt: null, pendingCount: 3 },
-      { nextDeadlineAt: null, pendingCount: 8 },
-    ];
-    const sorted = [...list].sort(midweekComparator);
-    expect(sorted.map(s => s.pendingCount)).toEqual([8, 3]);
+  it('a struggling post-deadline location outranks a pre-deadline one with many pending', () => {
+    // The Tuesday-morning regression this replaces: a healthy Michigan card
+    // (early deadline) must not outrank a struggling Texas one.
+    const struggling = entry({ tier: 'watch', submissionRate: 65 });
+    const earlyDeadlineHealthy = entry({ nextDeadlineAt: noon, pendingCount: 6 });
+    expect([earlyDeadlineHealthy, struggling].sort(severityComparator))
+      .toEqual([struggling, earlyDeadlineHealthy]);
+  });
+
+  it('a post-deadline 86% (on-track) sorts above a clean 100%', () => {
+    const barely = entry({ tier: 'good', submissionRate: 86 });
+    const clean = entry({ tier: 'good', submissionRate: 100 });
+    expect([clean, barely].sort(severityComparator)).toEqual([barely, clean]);
   });
 });

@@ -1,4 +1,5 @@
 import { StaffWeekSummary } from '@/types/coachV2';
+import { isCheckedIn, isCheckedOut, owedStaff } from '@/lib/coachUtils';
 import { getSubmissionPolicy, getPolicyOffsetsForLocation, type PolicyOffsets } from '@/lib/submissionPolicy';
 
 interface WeekAnchors {
@@ -38,20 +39,29 @@ export function getLocationSubmissionGates(
   };
 }
 
+/**
+ * DASH-5: all location-level counting is PEOPLE-based. A person counts as
+ * checked in/out only when every required move for the week has the rating
+ * (see isCheckedIn/isCheckedOut in coachUtils); a person with
+ * required_count 0 (no assignments published for them this week) is
+ * excluded from every numerator and denominator here, so a location whose
+ * whole roster owes nothing reads as "no assignments", never as 0%.
+ */
 export function calculateMissingCounts(
-  staff: StaffWeekSummary[], 
+  staff: StaffWeekSummary[],
   gates: SubmissionGates
 ): { missingConfCount: number; missingPerfCount: number } {
+  const owed = owedStaff(staff);
   // Count STAFF members missing confidence (only after deadline)
-  const missingConfCount = gates.isPastConfidenceDeadline 
-    ? staff.filter(s => s.conf_count < s.assignment_count).length 
+  const missingConfCount = gates.isPastConfidenceDeadline
+    ? owed.filter(s => !isCheckedIn(s)).length
     : 0;
-  
+
   // Count STAFF members missing performance (only after perf deadline)
-  const missingPerfCount = gates.isPastPerformanceDeadline 
-    ? staff.filter(s => s.perf_count < s.assignment_count).length 
+  const missingPerfCount = gates.isPastPerformanceDeadline
+    ? owed.filter(s => !isCheckedOut(s)).length
     : 0;
-  
+
   return { missingConfCount, missingPerfCount };
 }
 
@@ -66,9 +76,9 @@ export function calculateDistinctMissedCount(
   staff: StaffWeekSummary[],
   gates: SubmissionGates
 ): number {
-  return staff.filter(s => {
-    const missedConf = gates.isPastConfidenceDeadline && s.conf_count < s.assignment_count;
-    const missedPerf = gates.isPastPerformanceDeadline && s.perf_count < s.assignment_count;
+  return owedStaff(staff).filter(s => {
+    const missedConf = gates.isPastConfidenceDeadline && !isCheckedIn(s);
+    const missedPerf = gates.isPastPerformanceDeadline && !isCheckedOut(s);
     return missedConf || missedPerf;
   }).length;
 }
@@ -81,36 +91,30 @@ export interface DueSubmissionTotals {
 }
 
 /**
- * DASH-1a Codex fix (P1): raw conf/perf submitted & expected counts, but
- * only for whichever metric is actually due (its deadline gate is true).
- * Summing RAW counts across locations regardless of deadline state let a
- * not-yet-due (or excused) location's full "expected" denominator drag
- * down an org-wide colored rate that should only reflect participation
- * that is actually owed yet. Pass gates with any excused metric already
- * turned off, the same way calculateDistinctMissedCount is called, so an
- * excused-but-due metric is treated as not due either.
+ * DASH-1a Codex fix (P1), reworked people-based in DASH-5: counts of PEOPLE
+ * done vs owing, but only for whichever metric is actually due (its deadline
+ * gate is true). Pass gates with any excused metric already turned off, the
+ * same way calculateDistinctMissedCount is called, so an excused-but-due
+ * metric is treated as not due either.
  */
 export function calculateDueSubmissionTotals(
   staff: StaffWeekSummary[],
   gates: SubmissionGates
 ): DueSubmissionTotals {
+  const owed = owedStaff(staff);
   let confSubmitted = 0;
   let confExpected = 0;
   let perfSubmitted = 0;
   let perfExpected = 0;
 
   if (gates.isPastConfidenceDeadline) {
-    staff.forEach(s => {
-      confSubmitted += s.conf_count;
-      confExpected += s.assignment_count;
-    });
+    confExpected = owed.length;
+    confSubmitted = owed.filter(isCheckedIn).length;
   }
 
   if (gates.isPastPerformanceDeadline) {
-    staff.forEach(s => {
-      perfSubmitted += s.perf_count;
-      perfExpected += s.assignment_count;
-    });
+    perfExpected = owed.length;
+    perfSubmitted = owed.filter(isCheckedOut).length;
   }
 
   return { confSubmitted, confExpected, perfSubmitted, perfExpected };
@@ -121,6 +125,7 @@ export function calculateLocationStats(
   gates: SubmissionGates
 ): {
   staffCount: number;
+  owedStaffCount: number;
   submissionRate: number;
   missingConfCount: number;
   missingPerfCount: number;
@@ -134,46 +139,46 @@ export function calculateLocationStats(
   perfExpectedCount: number;
 } {
   const staffCount = staff.length;
-  
-  // Deadline-aware submission rate:
+  const owed = owedStaff(staff);
+  const owedStaffCount = owed.length;
+  const checkedInCount = owed.filter(isCheckedIn).length;
+  const checkedOutCount = owed.filter(isCheckedOut).length;
+
+  // Deadline-aware submission rate, people-based (DASH-5):
   // Only count a metric toward totalRequired once its deadline has passed.
   // Before any deadline → rate is 100% (nothing is due yet).
   let totalRequired = 0;
   let totalSubmitted = 0;
-  
+
   // Confidence counts toward rate only after confidence deadline
   if (gates.isPastConfidenceDeadline) {
-    staff.forEach(s => {
-      totalRequired += s.assignment_count;
-      totalSubmitted += s.conf_count;
-    });
+    totalRequired += owedStaffCount;
+    totalSubmitted += checkedInCount;
   }
-  
+
   // Performance counts toward rate only after performance deadline
   if (gates.isPastPerformanceDeadline) {
-    staff.forEach(s => {
-      totalRequired += s.assignment_count;
-      totalSubmitted += s.perf_count;
-    });
+    totalRequired += owedStaffCount;
+    totalSubmitted += checkedOutCount;
   }
-  
+
   const submissionRate = totalRequired > 0 ? (totalSubmitted / totalRequired) * 100 : 100;
-  
+
   // "Missing" counts are for LATE submissions (past deadline)
   const { missingConfCount, missingPerfCount } = calculateMissingCounts(staff, gates);
   const distinctMissedCount = calculateDistinctMissedCount(staff, gates);
 
   // "Pending" count is for not-yet-submitted but not yet late (before deadline)
-  const pendingConfCount = !gates.isPastConfidenceDeadline 
-    ? staff.filter(s => s.conf_count < s.assignment_count).length 
+  const pendingConfCount = !gates.isPastConfidenceDeadline
+    ? owed.filter(s => !isCheckedIn(s)).length
     : 0;
-  
+
   // Calculate averages from scores
   let totalConf = 0;
   let confCount = 0;
   let totalPerf = 0;
   let perfCount = 0;
-  
+
   staff.forEach(s => {
     s.scores.forEach(score => {
       if (score.confidence_score !== null) {
@@ -186,24 +191,13 @@ export function calculateLocationStats(
       }
     });
   });
-  
+
   const avgConfidence = confCount > 0 ? totalConf / confCount : 0;
   const avgPerformance = perfCount > 0 ? totalPerf / perfCount : 0;
-  
-  // Raw submission counts (regardless of deadline state)
-  let confSubmittedCount = 0;
-  let confExpectedCount = 0;
-  let perfSubmittedCount = 0;
-  let perfExpectedCount = 0;
-  staff.forEach(s => {
-    confExpectedCount += s.assignment_count;
-    perfExpectedCount += s.assignment_count;
-    confSubmittedCount += s.conf_count;
-    perfSubmittedCount += s.perf_count;
-  });
 
   return {
     staffCount,
+    owedStaffCount,
     submissionRate,
     missingConfCount,
     missingPerfCount,
@@ -211,10 +205,12 @@ export function calculateLocationStats(
     pendingConfCount,
     avgConfidence,
     avgPerformance,
-    confSubmittedCount,
-    confExpectedCount,
-    perfSubmittedCount,
-    perfExpectedCount,
+    // People done vs people owing, regardless of deadline state - the
+    // card's neutral pre-deadline progress display ("5/8 checked in").
+    confSubmittedCount: checkedInCount,
+    confExpectedCount: owedStaffCount,
+    perfSubmittedCount: checkedOutCount,
+    perfExpectedCount: owedStaffCount,
   };
 }
 

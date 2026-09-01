@@ -105,6 +105,7 @@ export default function LocationDetail({
       id: locationId!,
       name,
       staffCount: stats.staffCount,
+      owedStaffCount: stats.owedStaffCount,
       submissionRate: stats.submissionRate,
       missingConfCount: stats.missingConfCount,
       missingPerfCount: stats.missingPerfCount,

@@ -24,7 +24,12 @@ export function NowProvider({ children, simulatedTime }: NowProviderProps) {
 export function useNow(): Date {
   const context = useContext(NowContext);
   if (!context) {
-    throw new Error('useNow must be used within a NowProvider');
+    // NowProvider is only mounted when VITE_ENABLE_SIMTOOLS is on
+    // (src/main.tsx) -- it exists to inject simulated time. Without it,
+    // real time is the correct answer, not a crash: throwing here broke
+    // ThisWeekPanel/ConfidenceWizard/PerformanceWizard in any
+    // simtools-off build (found 2026-09-02 recording demo clips).
+    return new Date();
   }
   return context.now();
 }

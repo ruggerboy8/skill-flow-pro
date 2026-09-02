@@ -230,6 +230,31 @@ implementation detail to satisfy the schema, not a scope change -- flagging
 it here since the spec's wording could otherwise read as "create exactly 3
 auth users."
 
+## Permissions are caps-only (found 2026-09-02, pre-seed review)
+
+The app reads permissions exclusively from `user_capabilities` (+
+`coach_scopes` for the coach persona) since 2026-07-25 — see the CAPS-ONLY
+comment in `src/hooks/deriveUserRole.ts`. The legacy `staff.is_*` flags this
+script copies grant nothing by themselves; a staff row without a
+capabilities row renders as a permissionless user (demo-staff wouldn't even
+count as a participant, and every clip's route guard would fail).
+
+So after creating staff, the seed also:
+
+- **Upserts one `user_capabilities` row per copied staff member**
+  (`lib/capabilities.ts`, unit tested), using the exact formula of the
+  2026-07-24 backfill migration
+  (`20260724120000_backfill_user_capabilities.sql`) applied to the demo
+  staff draft's flags. Because every draft pins `is_super_admin` to false,
+  no demo row can ever receive `is_platform_admin` or `can_manage_library`.
+- **Gives demo-coach an org-wide `coach_scopes` row** on the demo org.
+  `can_view_submissions` alone already makes `isCoach` true, but the org
+  scope is what makes `isRegional` true, which is what `/facilitate`
+  (Clip 2's route, `allowFacilitate`) actually requires. It also scopes the
+  coach surface to all three Bluebird locations, like a real regional coach.
+
+Both writes are idempotent upserts, safe on resume and re-run.
+
 ## Design decisions worth knowing about
 
 - **Every copied `weekly_assignments` row is forced to `status = 'locked'`,

@@ -42,6 +42,7 @@ import {
   type DemoScoreDraft,
 } from './lib/rowBuilders';
 import { shapeVariance, type ScoreLike } from './lib/variance';
+import { buildCapabilityRow, type UserCapabilityRow } from './lib/capabilities';
 import { mergeAssignmentEras } from './lib/mergeAssignmentEras';
 import { computeWeekShiftDays, shiftDateString } from './lib/refreshWeek';
 // Same app helper lib/refreshWeek.ts uses, imported directly here too for
@@ -497,6 +498,8 @@ async function freshSeed(
     console.log(`Would copy ${sourceScores.length} weekly_scores rows (reshaped for variance).`);
     console.log('Would create 3 auth users with known passwords (demo-staff / demo-coach / demo-admin)');
     console.log(`and ${sourceStaff.length - 3 >= 0 ? sourceStaff.length - 3 : sourceStaff.length} more auth users with random, unused passwords.`);
+    console.log(`Would upsert ${sourceStaff.length} user_capabilities rows (the app is caps-only; staff.is_* flags`);
+    console.log('alone grant nothing) and one org-wide coach_scopes row for demo-coach.');
     console.log('Already-existing rows (org/group/locations/staff/assignments/scores, if resuming a');
     console.log('partial previous run) would be detected and skipped, not duplicated.');
     console.log('\nDry run only -- nothing was written.');
@@ -541,6 +544,8 @@ async function freshSeed(
 
   const demoStaffIdBySourceId = new Map<string, string>();
   const demoRoleIdByStaffId = new Map<string, number | null>();
+  const capabilityRows: UserCapabilityRow[] = [];
+  let coachLoginStaffId: string | null = null;
   let staffCreated = 0;
   let staffReused = 0;
 
@@ -582,12 +587,44 @@ async function freshSeed(
 
     demoStaffIdBySourceId.set(source.id, demoStaffId);
     demoRoleIdByStaffId.set(demoStaffId, draft.role_id);
+    capabilityRows.push(buildCapabilityRow(demoStaffId, draft));
+    if (cast.loginRole === 'coach') coachLoginStaffId = demoStaffId;
 
     if (cast.loginRole) {
       console.log(`  Login ${existingStaff ? 'reused' : 'created'}: ${cast.email} (${cast.loginRole}) -> staff id ${demoStaffId}`);
     }
   }
   console.log(`Staff: ${staffCreated} created, ${staffReused} already existed and were reused.`);
+
+  // --- 4b. user_capabilities + coach scope -----------------------------------
+  // The app is CAPS-ONLY (deriveUserRole.ts, since 2026-07-25): permissions
+  // come from user_capabilities, never from staff.is_* directly. Without
+  // these rows every demo login renders permissionless -- demo-staff would
+  // not even count as a participant. Upsert (PK = staff_id) so a resumed or
+  // re-run seed refreshes them the same way the staff update above does.
+  const { error: capsErr } = await supabase
+    .from('user_capabilities')
+    .upsert(capabilityRows, { onConflict: 'staff_id' });
+  if (capsErr) throw capsErr;
+  console.log(`user_capabilities: upserted ${capabilityRows.length} rows (caps-only permission model).`);
+
+  // demo-coach also gets an org-wide coach scope. isCoach would already
+  // derive true from can_view_submissions alone, but the org scope is what
+  // makes deriveUserRole's isRegional true, which is what /facilitate
+  // (Clip 2, allowFacilitate) actually requires -- and it scopes the coach
+  // surface to the whole demo org, matching how a real regional coach sees
+  // all three Bluebird locations.
+  if (!coachLoginStaffId) {
+    throw new Error('No cast member carries loginRole "coach"; cannot create the demo-coach org scope.');
+  }
+  const { error: scopeErr } = await supabase
+    .from('coach_scopes')
+    .upsert(
+      { staff_id: coachLoginStaffId, scope_type: 'org', scope_id: demoOrg.id },
+      { onConflict: 'staff_id,scope_type,scope_id' },
+    );
+  if (scopeErr) throw scopeErr;
+  console.log('coach_scopes: demo-coach granted an org-wide scope on the demo org.');
 
   // --- 5. weekly_assignments: replicate to all 3 demo locations --------------
   // Get-or-create on the natural key (org, location, role, week, slot), so

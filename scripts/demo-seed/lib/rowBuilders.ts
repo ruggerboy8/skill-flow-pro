@@ -109,6 +109,7 @@ export type ScoreSource = 'live' | 'backfill' | 'backfill_historical';
 export interface DemoScoreDraft {
   staff_id: string;
   assignment_id: string;
+  weekly_focus_id: string;
   entered_by: string;
   confidence_score: number | null;
   confidence_date: string | null;
@@ -145,6 +146,13 @@ export function buildDemoScoreDraft(
   return {
     staff_id: demoStaffId,
     assignment_id: `assign:${demoAssignmentId}`,
+    // Same 'assign:' value in BOTH columns, exactly like rows the live app
+    // writes (useReliableSubmission). The app upserts on
+    // (staff_id, weekly_focus_id); a seeded row with only assignment_id
+    // set can never be matched by that upsert, so the app tries to INSERT
+    // instead and hits the unique (staff_id, assignment_id) index --
+    // found live when Clip 1's real submit 409'd (2026-09-02).
+    weekly_focus_id: `assign:${demoAssignmentId}`,
     entered_by: demoStaffId,
     confidence_score: copied.confidence_score ?? null,
     confidence_date: copied.confidence_date ?? null,

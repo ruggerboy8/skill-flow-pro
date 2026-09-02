@@ -1160,7 +1160,12 @@ async function getOrCreateAuthUserId(
     email,
     password,
     email_confirm: true,
-    user_metadata: { demo_seed: true, demo_org_slug: DEMO_ORG.slug },
+    // password_set: useAuth.tsx routes any session lacking this metadata
+    // flag into the first-login "create your password" screen. The seed
+    // already sets real passwords, so demo users must skip that flow --
+    // found live when Clip 1's first recording landed on the welcome
+    // screen instead of the staff home (2026-09-02).
+    user_metadata: { demo_seed: true, demo_org_slug: DEMO_ORG.slug, password_set: true },
   });
   if (createErr) throw new Error(`auth.admin.createUser(${email}) failed: ${createErr.message}`);
   const userId = created.user!.id;

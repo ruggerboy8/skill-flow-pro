@@ -64,11 +64,34 @@ test("staff self-eval: rate confidence on this week's Pro Moves and submit", asy
   const MAX_STEPS = 6; // generous bound; the seed determines the real count
   for (let i = 0; i < MAX_STEPS; i++) {
     await waitReady(page);
-    const scoreFour = page.getByRole("button", { name: /^Confidence 4/ });
-    if ((await scoreFour.count()) === 0) break;
+    // The step transition is a client-side route change, so networkidle
+    // (waitReady) can already be satisfied before the next step renders --
+    // an instant count() here raced the wizard and broke out on step 1
+    // (found live, first real recording 2026-09-02). Wait for the score
+    // button to actually appear; when it doesn't within the window, the
+    // wizard is done and we're back on the home screen.
+    const scoreFour = page.getByRole("button", { name: /^Confidence 4/ }).first();
+    try {
+      await scoreFour.waitFor({ state: "visible", timeout: 10_000 });
+    } catch {
+      break;
+    }
 
     await scoreFour.click();
-    await page.getByRole("button", { name: /^(Next|Submit|Backfill)\b/ }).click();
+
+    // Clicking the shared Next locator blindly deadlocks: the wizard
+    // advances on click, the locator re-resolves to the NEXT step's
+    // still-disabled button, and Playwright waits forever for it to
+    // enable (found live, first real recording 2026-09-02). Instead:
+    // assert the CURRENT step's button is enabled (it enables once a
+    // score is picked), click it, then sync on the URL actually changing
+    // -- to the next step, or home after the final submit's celebration
+    // delay (ConfidenceWizard navigates ~1.8s after submitting).
+    const advance = page.getByRole("button", { name: /^(Next|Submit|Backfill)\b/ }).first();
+    await expect(advance).toBeEnabled({ timeout: 10_000 });
+    const urlBefore = page.url();
+    await advance.click({ timeout: 10_000 });
+    await page.waitForURL((u) => u.toString() !== urlBefore, { timeout: 20_000 });
   }
 
   await waitReady(page);

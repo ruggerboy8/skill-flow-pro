@@ -22,9 +22,28 @@
 import { test, expect } from "@playwright/test";
 import { CLIP_PERSONAS, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, credsFor, storageStatePath } from "../config.ts";
 import { waitReady } from "../lib/waitReady.ts";
+import { dwell } from "../lib/pace.ts";
 import { resetClip1ConfidenceScore } from "../setup/reset-clip1.ts";
 
-test.use({ storageState: storageStatePath(CLIP_PERSONAS.staffSelfEval) });
+// Phone-sized by default (John's direction, 2026-09-02): the staff-facing
+// demo is the mobile PWA experience. demo-staff has staff.pwa_enabled = true
+// in the seeded org, and useMobileShell requires viewport < 768px on top of
+// that flag, so this viewport is what actually switches the recording onto
+// the mobile shell (tab bar, mobile home). DEMO_CLIP1_VIEWPORT=desktop
+// reverts to the shared 1920x1080 frame.
+const MOBILE = process.env.DEMO_CLIP1_VIEWPORT !== "desktop";
+test.use({
+  storageState: storageStatePath(CLIP_PERSONAS.staffSelfEval),
+  ...(MOBILE
+    ? {
+        viewport: { width: 390, height: 844 },
+        deviceScaleFactor: 3,
+        isMobile: true,
+        hasTouch: true,
+        video: { mode: "on" as const, size: { width: 390, height: 844 } },
+      }
+    : {}),
+});
 
 test.beforeEach(async () => {
   const staffEmail = credsFor(CLIP_PERSONAS.staffSelfEval).email;
@@ -40,6 +59,13 @@ test.beforeEach(async () => {
 });
 
 test("staff self-eval: rate confidence on this week's Pro Moves and submit", async ({ page }) => {
+  // Suppress the PWA install banner ("Get the Pro Moves app"): it floats
+  // fixed over the wizard's Next button (intercepted the click on the
+  // first mobile take) and doesn't belong in conference footage. 'on' is
+  // the exact value src/lib/pwa.ts stores when a user taps Dismiss.
+  await page.addInitScript(() => {
+    localStorage.setItem("pwa_banner_dismissed", "on");
+  });
   await page.goto("/");
   await waitReady(page);
 
@@ -54,13 +80,17 @@ test("staff self-eval: rate confidence on this week's Pro Moves and submit", asy
       "demo-capture/.env, or run `npx tsx scripts/demo-seed/seed.ts --refresh` " +
       "(DEMO-1a) before recording this clip again."
   ).toBeVisible({ timeout: 15_000 });
+  // Let the viewer take in the home screen (this week's moves) before acting.
+  await dwell(page, 2500);
   await rateConfidence.click();
   await waitReady(page);
 
-  // One screen per assigned Pro Move (spec: three). Always score 4 — a low
-  // score (1 or 2) opens the "Smart Friction" intervention modal, which
-  // isn't part of what this clip needs and would leave the recording
-  // stopped mid-modal instead of back at the completed home screen.
+  // One screen per assigned Pro Move (spec: three). Scores vary (4, 3, 4,
+  // ...) so the take reads like a person, not a script — but never 1 or 2:
+  // a low score opens the "Smart Friction" intervention modal, which isn't
+  // part of what this clip needs and would leave the recording stopped
+  // mid-modal instead of back at the completed home screen.
+  const SCORE_PATTERN = [4, 3, 4];
   const MAX_STEPS = 6; // generous bound; the seed determines the real count
   for (let i = 0; i < MAX_STEPS; i++) {
     await waitReady(page);
@@ -70,14 +100,19 @@ test("staff self-eval: rate confidence on this week's Pro Moves and submit", asy
     // (found live, first real recording 2026-09-02). Wait for the score
     // button to actually appear; when it doesn't within the window, the
     // wizard is done and we're back on the home screen.
-    const scoreFour = page.getByRole("button", { name: /^Confidence 4/ }).first();
+    const score = SCORE_PATTERN[i % SCORE_PATTERN.length];
+    const scoreButton = page.getByRole("button", { name: new RegExp(`^Confidence ${score}`) }).first();
     try {
-      await scoreFour.waitFor({ state: "visible", timeout: 10_000 });
+      await scoreButton.waitFor({ state: "visible", timeout: 10_000 });
     } catch {
       break;
     }
 
-    await scoreFour.click();
+    // Reading pause: a person reads the Pro Move and the question before
+    // picking a number, and glances at their choice before moving on.
+    await dwell(page, 1600);
+    await scoreButton.click();
+    await dwell(page, 700);
 
     // Clicking the shared Next locator blindly deadlocks: the wizard
     // advances on click, the locator re-resolves to the NEXT step's
@@ -97,4 +132,7 @@ test("staff self-eval: rate confidence on this week's Pro Moves and submit", asy
   await waitReady(page);
   await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
   await expect(page.getByRole("button", { name: "Rate Confidence" })).toHaveCount(0);
+  // Hold on the completed home screen so the clip doesn't cut the moment
+  // the assertion passes — the "done" state is the payoff frame.
+  await dwell(page, 3000);
 });

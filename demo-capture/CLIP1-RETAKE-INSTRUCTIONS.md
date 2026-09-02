@@ -90,3 +90,77 @@ The header's PRO MOVES lockup is not the final mark — the P is off-weight and 
 - [ ] ≤ ~3s of hold after "Confidence submitted"
 - [ ] Header shows the production PRO MOVES wordmark
 - [ ] Same choreography as take 2 otherwise (flow and pacing were approved)
+
+---
+
+# TAKE 3 REVIEW (2026-09-02) — three items remain + one new clip
+
+Take 3 passed: resolution (780×1688) · late advisory gone (clock fake working) · ripples firing · taps.json correct · choreography unchanged. Remaining:
+
+## A · Trim the tail (still ~10s)
+"Confidence submitted" lands ~0:18; the clip runs to 0:28.8. After the submitted state is visible: `dwell(page, 2500)` and END the test. Nothing after that hold belongs in the take.
+
+## B · Suppress the "Recovered submission" toast
+A toast — "Recovered submission — previously pending confidence scores have been saved" — appears near the end. It's a side effect of the reset/clock setup and reads like error recovery on camera. Find its trigger (likely a pending-state flag the reset leaves behind, or the frozen clock re-validating a draft) and pre-clear it the same way the PWA banner is handled (init script or reset-clip1). Add an assertion: `await expect(page.getByText(/recovered submission/i)).toHaveCount(0);`
+
+## C · Header wordmark — RESOLVED, new instruction (2026-09-02)
+Item C as originally written was wrong: the header already renders the production master (byte-identical to the kit) — the reviewer misread the master's small-size aliasing as an old asset. The real fix now exists in the kit: a **small-build wordmark** (icon-build P: wider gap, dot r7) for renders below ~32px cap height. Replace the header asset with `promoves-wordmark-small.svg` (a `-small-dark` variant exists too); keep the master for hero/marketing sizes. Comparison render: `wm-small-compare.png` beside it in the kit. Ask Johno for the files if the kit folder isn't reachable from the app repo's environment.
+
+## Optional polish
+Ripple visibility: bump the ripple background from `rgba(17,59,98,.25)` to `rgba(17,59,98,.35)` — it reads faint on the pale wizard screens.
+
+## NEW · clip5-mobile-explore (the new Explore surface)
+Separate spec, same mobile setup as clip 1 (same viewport/scale/video size, clock fake, ripple + taps init, taps output to `recordings/clip5-taps.json`):
+1. Start on home (staff login, seeded state — no reset needed; read-only flow)
+2. dwell ~1200ms → tap the Explore tab
+3. Scroll the ProMoves library slowly (one smooth pass, ~4–5s — use small incremental scrolls, not one jump)
+4. Open one move's detail view → dwell ~2500ms → end
+Target 15–20s. No submits, no state changes — this clip is re-runnable by nature. Deck placement TBD (needs a script line); capturing it now regardless — it's also web/app-store material.
+
+## Acceptance for take 4
+- [ ] ≤ ~3s after "Confidence submitted"
+- [ ] No "Recovered submission" toast (assertion in place)
+- [ ] Header shows the production PRO MOVES wordmark
+- [ ] clip5-mobile-explore.webm + clip5-taps.json exist, 15–20s, same visual standards
+
+---
+
+# TAKE 4 — FINAL CAPTURE RUN (consolidated; last run before polish)
+
+Everything outstanding in one list. When this passes, clip 1 + clip 5 go to the polish stage as-is.
+
+## 1 · Trim the tail
+After "Confidence submitted" is visible: `dwell(page, 2500)`, then end the test. Nothing else after.
+
+## 2 · Suppress the "Recovered submission" toast
+Pre-clear whatever pending state triggers it (init script or reset-clip1, same pattern as the PWA banner), and lock it with:
+```ts
+await expect(page.getByText(/recovered submission/i)).toHaveCount(0);
+```
+
+## 3 · Header wordmark → small build
+New kit asset, readable at this absolute path:
+`/Users/johnoberly/Documents/shared/edustack-sales-os/EduStack Sales OS/promoves-brand/promoves-design-kit/promoves-wordmark-small.svg`
+- Copy it into the app as `/brand/promoves-wordmark-small.svg` — do NOT overwrite `/brand/promoves-wordmark.svg` (the master stays for hero/marketing sizes).
+- Point the app-header component at the small build. Rule for any future surface: below ~32px cap height → small build; otherwise master. (`promoves-wordmark-small-dark.svg` exists beside it if a dark header ever ships.)
+
+## 4 · Ripple visibility (small tweak)
+Ripple background `rgba(17,59,98,.25)` → `rgba(17,59,98,.35)`. Everything else about the ripple stays.
+
+## 5 · Capture clip 5 (Explore) in the same run
+Spec as written in the TAKE 3 section above ("NEW · clip5-mobile-explore"). Same mobile setup, clock fake, ripple+taps init; outputs `recordings/clip5-mobile-explore.webm` + `recordings/clip5-taps.json`. 15–20s, read-only, no submits.
+
+## 6 · Port the shared recipe (so clips 2–4 inherit it)
+Move the shared pieces — clock fake, ripple+taps init script, taps.json writer, 2× video size, toast/banner suppressions — into a shared helper (e.g. `lib/capture.ts`) and have specs 01 and 05 consume it. Clips 2–4 (desktop, 1920×1080) then get the same treatment for free next round; their video size should be `{ width: 2560, height: 1440 }` with `deviceScaleFactor: 2` when we capture them.
+
+## Acceptance — take 4 (both clips)
+- [ ] clip1: ≤ ~3s after "Confidence submitted"; total well under 25s
+- [ ] clip1: no "Recovered submission" toast (assertion in place)
+- [ ] Header shows the SMALL-BUILD wordmark (dot clearly separate at header size)
+- [ ] Ripples visible on every tap at .35 opacity
+- [ ] clip5-mobile-explore.webm (15–20s) + clip5-taps.json exist, same standards
+- [ ] Both taps.json tap counts match on-screen taps
+- [ ] No "late" advisory, header date = Monday, Aug 31 (regression check)
+
+## Handoff to polish (per approved clip)
+Exactly two files, in `recordings/`: `<clip>.webm` + `<clip>-taps.json`. No editing, no trimming beyond the spec'd dwells, no re-encoding — the polish stage (brand compositor: device frame, eased zooms keyed from taps, 1080p60 re-render) takes them raw.

@@ -13,6 +13,7 @@
     "check:colors": "node scripts/check-hardcoded-colors.mjs",
     "check": "tsc --noEmit -p tsconfig.app.json && npm run lint && npm run check:colors && vitest run && vite build",
     "demo:capture": "playwright test --config=demo-capture/playwright.config.ts",
+    "demo:seed": "tsx scripts/demo-seed/seed.ts",
     "preview": "vite preview"
   },
   "dependencies": {

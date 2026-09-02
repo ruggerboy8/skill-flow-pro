@@ -27,6 +27,9 @@ dist-ssr
 supabase/.temp/
 .mcp.json
 
+# DEMO-1a seed script secrets (service role key + demo login passwords)
+scripts/demo-seed/.env
+
 # DEMO-1b capture harness: local secrets, live login sessions, and raw
 # recorded footage. Never commit any of these.
 demo-capture/.env

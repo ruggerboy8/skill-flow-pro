@@ -50,6 +50,17 @@ export async function assembleCurrentWeek(
   assignments: WeekAssignment[];
   cycleNumber: number;
   weekInCycle: number;
+  /**
+   * ASG-1 Fix 2: the canonical org-timezone Monday ('yyyy-MM-dd') the
+   * assignments above were loaded under (forwarded from
+   * locationState.assembleWeek). Callers that also need a "Week of" label
+   * or an excused-week lookup should key off THIS value instead of
+   * recomputing a Monday from the location's own timezone, so the label,
+   * the exemption check, and the loaded assignments can never disagree.
+   * `null` only when the location/org couldn't be resolved at all (in
+   * which case `assignments` is always `[]` too).
+   */
+  weekStartDate: string | null;
 }> {
   try {
     const effectiveNow =
@@ -72,7 +83,7 @@ export async function assembleCurrentWeek(
     );
 
     // Build assignments
-    const assignments = await locationAssembleWeek({
+    const { assignments, weekStartDate } = await locationAssembleWeek({
       userId,
       roleId: staffData.role_id,
       locationId: staffData.primary_location_id,
@@ -85,10 +96,11 @@ export async function assembleCurrentWeek(
       assignments: assignments.sort((a, b) => a.display_order - b.display_order),
       cycleNumber,
       weekInCycle,
+      weekStartDate,
     };
   } catch (error) {
     console.error("Error assembling current week:", error);
-    return { assignments: [], cycleNumber: 1, weekInCycle: 1 };
+    return { assignments: [], cycleNumber: 1, weekInCycle: 1, weekStartDate: null };
   }
 }
 

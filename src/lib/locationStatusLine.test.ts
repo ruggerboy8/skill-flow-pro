@@ -1,0 +1,273 @@
+import { describe, expect, it } from 'vitest';
+import { buildLocationStatusLine, type LocationStatusLineInput } from './locationStatusLine';
+
+const base: LocationStatusLineInput = {
+  tier: 'good',
+  isFullyExcused: false,
+  isPartiallyExcused: false,
+  confExcused: false,
+  perfExcused: false,
+  confReason: null,
+  perfReason: null,
+  confClosed: false,
+  perfClosed: false,
+  perfOpen: false,
+  missingConfCount: 0,
+  missingPerfCount: 0,
+  distinctMissedCount: 0,
+  nextDeadlineLabel: null,
+};
+
+describe('buildLocationStatusLine', () => {
+  describe('pre-deadline (nothing due yet)', () => {
+    it('shows the next deadline as a lowercased prose phrase', () => {
+      expect(
+        buildLocationStatusLine({ ...base, nextDeadlineLabel: 'Conf due Tue 10:00 AM' }),
+      ).toEqual([{ text: 'conf due Tue 10:00 AM' }]);
+    });
+
+    it('returns no phrases when there is no next-deadline label', () => {
+      expect(buildLocationStatusLine({ ...base, nextDeadlineLabel: null })).toEqual([]);
+    });
+  });
+
+  describe('conf closed, perf open, good', () => {
+    const state: LocationStatusLineInput = {
+      ...base,
+      tier: 'good',
+      confClosed: true,
+      perfOpen: true,
+      nextDeadlineLabel: 'Perf due Fri 5:00 PM',
+    };
+
+    it('rewords the perf-due label as a window-open phrase when there is no lateness', () => {
+      expect(buildLocationStatusLine(state)).toEqual([
+        { text: 'perf window open until Fri 5:00 PM' },
+      ]);
+    });
+
+    // Late-straggler amendment (John, 2026-08-26): a late count on a good
+    // tier card gets the --status-late accent (icon: 'late'), not a fully
+    // muted phrase - the rest of the line (the perf window fact) stays
+    // muted.
+    it('leads with a late-toned late-conf fact when there are stragglers', () => {
+      expect(buildLocationStatusLine({ ...state, missingConfCount: 1 })).toEqual([
+        { text: '1 late (conf)', icon: 'late' },
+        { text: 'perf window open until Fri 5:00 PM' },
+      ]);
+    });
+  });
+
+  describe('conf closed, perf open, watch', () => {
+    it('reads as a quiet late-count fact, not an alarm phrase', () => {
+      expect(
+        buildLocationStatusLine({
+          ...base,
+          tier: 'watch',
+          confClosed: true,
+          perfOpen: true,
+          missingConfCount: 3,
+          nextDeadlineLabel: 'Perf due Fri 5:00 PM',
+        }),
+      ).toEqual([{ text: '3 late (conf)' }, { text: 'perf window open until Fri 5:00 PM' }]);
+    });
+  });
+
+  describe('conf closed, perf open, red', () => {
+    it('collapses to a single people-missing sentence using the distinct count', () => {
+      expect(
+        buildLocationStatusLine({
+          ...base,
+          tier: 'red',
+          confClosed: true,
+          perfOpen: true,
+          missingConfCount: 7,
+          distinctMissedCount: 7,
+          nextDeadlineLabel: 'Perf due Fri 5:00 PM',
+        }),
+      ).toEqual([
+        { text: '7 people missing (conf)' },
+        { text: 'perf window open until Fri 5:00 PM' },
+      ]);
+    });
+  });
+
+  describe('both closed, good', () => {
+    const state: LocationStatusLineInput = {
+      ...base,
+      tier: 'good',
+      confClosed: true,
+      perfClosed: true,
+    };
+
+    it('shows a quiet check-icon "all in" phrase when nothing is late', () => {
+      expect(buildLocationStatusLine(state)).toEqual([{ text: 'all in', icon: 'check' }]);
+    });
+
+    // Late-straggler amendment (John, 2026-08-26): stays a status-line
+    // phrase (no pill, no fill), but takes the --status-late icon + text
+    // accent instead of full muting.
+    it('shows a late-toned late fact for a single straggler', () => {
+      expect(buildLocationStatusLine({ ...state, missingConfCount: 1 })).toEqual([
+        { text: '1 late (conf)', icon: 'late' },
+      ]);
+    });
+
+    it('shows both metrics, both late-toned, when both have stragglers', () => {
+      expect(
+        buildLocationStatusLine({ ...state, missingConfCount: 1, missingPerfCount: 2 }),
+      ).toEqual([
+        { text: '1 late (conf)', icon: 'late' },
+        { text: '2 late (perf)', icon: 'late' },
+      ]);
+    });
+  });
+
+  describe('both closed, watch', () => {
+    it('uses the same late-breakdown phrasing as good, just under the watch tier', () => {
+      expect(
+        buildLocationStatusLine({
+          ...base,
+          tier: 'watch',
+          confClosed: true,
+          perfClosed: true,
+          missingConfCount: 2,
+          missingPerfCount: 1,
+        }),
+      ).toEqual([{ text: '2 late (conf)' }, { text: '1 late (perf)' }]);
+    });
+  });
+
+  describe('both closed, red', () => {
+    it('combines both metrics into one people-missing sentence', () => {
+      expect(
+        buildLocationStatusLine({
+          ...base,
+          tier: 'red',
+          confClosed: true,
+          perfClosed: true,
+          missingConfCount: 6,
+          missingPerfCount: 5,
+          distinctMissedCount: 7,
+        }),
+      ).toEqual([{ text: '7 people missing: 6 conf, 5 perf' }]);
+    });
+
+    it('simplifies to one metric when only that metric has misses', () => {
+      expect(
+        buildLocationStatusLine({
+          ...base,
+          tier: 'red',
+          confClosed: true,
+          perfClosed: true,
+          missingConfCount: 0,
+          missingPerfCount: 4,
+          distinctMissedCount: 4,
+        }),
+      ).toEqual([{ text: '4 people missing (perf)' }]);
+    });
+  });
+
+  describe('fully excused', () => {
+    it('always reads "no submissions required", regardless of tier or reason', () => {
+      expect(
+        buildLocationStatusLine({
+          ...base,
+          isFullyExcused: true,
+          confExcused: true,
+          perfExcused: true,
+          confReason: 'holiday closure',
+        }),
+      ).toEqual([{ text: 'no submissions required' }]);
+    });
+  });
+
+  describe('partially excused', () => {
+    it('names the excused metric with its reason when the live metric has nothing to report', () => {
+      expect(
+        buildLocationStatusLine({
+          ...base,
+          isPartiallyExcused: true,
+          confExcused: true,
+          confReason: 'new location ramp-up',
+          nextDeadlineLabel: null,
+        }),
+      ).toEqual([{ text: 'conf excused: new location ramp-up' }]);
+    });
+
+    it('names the excused metric without a reason', () => {
+      expect(
+        buildLocationStatusLine({
+          ...base,
+          isPartiallyExcused: true,
+          perfExcused: true,
+          perfReason: null,
+        }),
+      ).toEqual([{ text: 'perf excused' }]);
+    });
+
+    // DASH-2 QA fix 3: an excuse on one metric must never hide stragglers on
+    // the other, still-live metric - it only adds a reason phrase on top.
+    it('conf excused, perf late: reports the live perf lateness before the excuse reason', () => {
+      expect(
+        buildLocationStatusLine({
+          ...base,
+          tier: 'watch',
+          isPartiallyExcused: true,
+          confExcused: true,
+          confReason: 'holiday closure',
+          confClosed: true,
+          perfClosed: true,
+          missingConfCount: 0, // caller zeroes the excused metric's count
+          missingPerfCount: 3,
+        }),
+      ).toEqual([{ text: '3 late (perf)' }, { text: 'conf excused: holiday closure' }]);
+    });
+
+    it('perf excused, conf late at red tier: reports the live conf misses before the excuse reason', () => {
+      expect(
+        buildLocationStatusLine({
+          ...base,
+          tier: 'red',
+          isPartiallyExcused: true,
+          perfExcused: true,
+          perfReason: 'system outage',
+          confClosed: true,
+          perfClosed: true,
+          missingConfCount: 5,
+          missingPerfCount: 0, // caller zeroes the excused metric's count
+          distinctMissedCount: 5,
+        }),
+      ).toEqual([
+        { text: '5 people missing (conf)' },
+        { text: 'perf excused: system outage' },
+      ]);
+    });
+
+    it('conf excused, perf still open with no misses: appends the reason after the window phrase', () => {
+      expect(
+        buildLocationStatusLine({
+          ...base,
+          tier: 'good',
+          isPartiallyExcused: true,
+          confExcused: true,
+          confReason: 'new location ramp-up',
+          confClosed: true,
+          perfOpen: true,
+          nextDeadlineLabel: 'Perf due Fri 5:00 PM',
+        }),
+      ).toEqual([
+        { text: 'perf window open until Fri 5:00 PM' },
+        { text: 'conf excused: new location ramp-up' },
+      ]);
+    });
+  });
+
+  describe('deadline label formatting edge cases', () => {
+    it('lowercases an unrecognized label shape as a fallback', () => {
+      expect(
+        buildLocationStatusLine({ ...base, nextDeadlineLabel: 'Something else due soon' }),
+      ).toEqual([{ text: 'something else due soon' }]);
+    });
+  });
+});

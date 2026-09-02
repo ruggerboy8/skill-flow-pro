@@ -2,7 +2,7 @@
  * Per-role, per-domain framing for the rebuilt evaluation capture flow.
  *
  * Source of truth (for now): this module, seeded from
- * docs/features/evaluation-capture-stems.md. Summaries are third person
+ * docs/archive/features/evaluation-capture-stems.md. Summaries are third person
  * ("they" / "this team member") and prompt the EVALUATOR to recall what they
  * observed. The starter stems are second person ("you") -- the evaluator's
  * words to the staff member -- and are shared across all roles and domains.

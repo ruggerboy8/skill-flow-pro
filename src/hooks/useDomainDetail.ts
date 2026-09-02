@@ -10,6 +10,14 @@ export interface ProMoveDetail {
   action_statement: string;
   lastPracticed: string | null; // Formatted date string or null
   avgConfidence: number | null; // 1-4 scale average or null
+  /**
+   * Optional: populated by useCraftAtlas (which adds `description` to its
+   * pro_moves select — see docs/specs/mob-6-craft-atlas.md) so the Craft
+   * Atlas search can match move descriptions and a result row can show a
+   * snippet. useDomainDetail (desktop) does not select this column, so it
+   * stays undefined there.
+   */
+  description?: string | null;
 }
 
 export interface CompetencyDetail {

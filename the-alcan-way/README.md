@@ -9,8 +9,8 @@ local tooling, but it does not import from or depend on the main app. It is
 intended to deploy independently (e.g. `way.mypromoves.com`) and be linked to
 from inside ProMoves.
 
-- **Plan:** `../docs/features/the-alcan-way-build-plan.md`
-- **Art spec / prompts:** `../docs/features/the-alcan-way-art-prompts.md`
+- **Plan:** `../docs/archive/features/the-alcan-way-build-plan.md`
+- **Art spec / prompts:** `../docs/archive/features/the-alcan-way-art-prompts.md`
 - **Creative brief / PRD:** source of all copy and scene structure.
 
 ## Run it
@@ -58,6 +58,12 @@ whole experience is one pinned stage scrubbed by scroll.
   (arrival + title) and Act 1 / Scene 1 (greeting: front-desk stand-up, cup
   offer, parent relaxes) run end to end on placeholder blocks.
 - **M3+** — see the build plan roadmap.
+
+## License
+
+This sub-project is proprietary, same as the parent repo (see `../LICENSE`).
+It depends on GSAP under GreenSock's Standard "No Charge" license, not an
+open-source license. See `../THIRD-PARTY-LICENSES.md` for details.
 
 ## Dev-only helpers
 

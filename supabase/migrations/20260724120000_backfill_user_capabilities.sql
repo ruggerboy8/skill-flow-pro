@@ -1,5 +1,5 @@
 -- Backfill user_capabilities for every staff member who lacks a row.
--- Simplification roadmap Track 1.1 (docs/simplification-roadmap.md).
+-- Simplification roadmap Track 1.1 (docs/archive/simplification-roadmap.md).
 --
 -- The inserted values mirror useUserRole's legacy-fallback formulas EXACTLY
 -- (src/hooks/useUserRole.tsx, the `caps ? ... : legacy` branches), so adding a

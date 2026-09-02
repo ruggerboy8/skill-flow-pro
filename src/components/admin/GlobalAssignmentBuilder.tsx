@@ -1,12 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { useUserRole } from '@/hooks/useUserRole';
-import { getNextMondayChicago } from '@/lib/plannerUtils';
+import { resolveNextMonday } from '@/lib/submissionPolicy';
+import { formatInTimeZone } from 'date-fns-tz';
+import { findScoredSlotsBlockingSave, type ExistingAssignmentSlot } from '@/lib/assignmentScoreGuard';
 import { SlotCanvas } from './SlotCanvas';
+
+// ASG-1 Fix 2: matches plannerUtils.PLANNER_TZ. Used only (a) transiently
+// until organizations.timezone has been fetched for `organizationId`, or
+// (b) permanently when there is genuinely no org in scope.
+const PLANNER_FALLBACK_TZ = 'America/Chicago';
 
 interface Role {
   role_id: number;
@@ -40,27 +47,50 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  // True once the admin has typed a week date themselves, so the async
+  // org-timezone default (below) doesn't clobber it after the fact.
+  const userEditedWeekRef = useRef(false);
 
   useEffect(() => {
     if (!roleFilter) {
       loadRoles();
     }
-    // Set default to next Monday
-    const nextMonday = getNextMonday();
-    setWeekStartDate(nextMonday);
   }, [roleFilter]);
+
+  // ASG-1 Fix 2: default the week-start date from the org's canonical
+  // timezone (matching locationState.assembleWeek's read side), not
+  // hardcoded America/Chicago. Re-runs when `organizationId` resolves from
+  // undefined (still loading) to its real value.
+  useEffect(() => {
+    if (userEditedWeekRef.current) return;
+    let cancelled = false;
+    (async () => {
+      let tz = PLANNER_FALLBACK_TZ;
+      if (organizationId) {
+        const { data } = await supabase
+          .from('organizations')
+          .select('timezone' as 'id')
+          .eq('id', organizationId)
+          .maybeSingle();
+        if (cancelled) return;
+        // organizations.timezone is a recent additive column; generated
+        // types lag until Lovable's next regen, so the row is typed by hand
+        // here (repo convention, see useAuth.tsx pwa_enabled).
+        const row = data as unknown as { timezone: string } | null;
+        tz = row?.timezone || PLANNER_FALLBACK_TZ;
+      }
+      if (cancelled || userEditedWeekRef.current) return;
+      const nextMonday = formatInTimeZone(resolveNextMonday(new Date(), tz), tz, 'yyyy-MM-dd');
+      setWeekStartDate(nextMonday);
+    })();
+    return () => { cancelled = true; };
+  }, [organizationId]);
 
   useEffect(() => {
     if (selectedRole && weekStartDate) {
       loadExistingWeek();
     }
   }, [selectedRole, weekStartDate]);
-
-  // Timezone-safe: was computing "next Monday" from the browser's local
-  // date and then converting to UTC before taking the date portion, which
-  // shifts the result a day early for anyone in a negative-UTC timezone
-  // (Central time). Delegates to the canonical Monday resolver instead.
-  const getNextMonday = () => getNextMondayChicago();
 
   const loadRoles = async () => {
     const { data } = await supabase
@@ -191,7 +221,51 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
 
     setSaving(true);
     try {
-      // First, supersede existing assignments for this week/role
+      // ASG-1 Fix 2 (fold-in): this save is about to supersede EVERY
+      // existing row for this (role, week, org). Before doing that, check
+      // whether any of those rows already has a submitted score. If so,
+      // superseding it would orphan that score. Mirrors the "skippedLocked"
+      // pattern in planner-upsert/sequencer-auto-assign, but here we BLOCK
+      // the whole save rather than partially saving: this surface replaces
+      // ALL slots at once with no per-slot picker, so there is no safe way
+      // to "skip just the locked ones" the way the per-slot planner can.
+      const { data: existingRows, error: existingError } = await supabase
+        .from('weekly_assignments')
+        .select('id, display_order')
+        .eq('role_id', selectedRole)
+        .eq('week_start_date', weekStartDate)
+        .eq('org_id', organizationId)
+        .is('superseded_at', null);
+
+      if (existingError) throw existingError;
+
+      const existingSlots: ExistingAssignmentSlot[] = existingRows ?? [];
+      if (existingSlots.length > 0) {
+        const assignmentIds = existingSlots.map((row) => `assign:${row.id}`);
+        const { data: scoredRows, error: scoredError } = await supabase
+          .from('weekly_scores')
+          .select('assignment_id')
+          .in('assignment_id', assignmentIds);
+
+        if (scoredError) throw scoredError;
+
+        const scoredAssignmentIds = new Set(
+          (scoredRows ?? []).map((r) => r.assignment_id).filter((id): id is string => !!id)
+        );
+        const blockingSlots = findScoredSlotsBlockingSave(existingSlots, scoredAssignmentIds);
+
+        if (blockingSlots.length > 0) {
+          toast({
+            title: "Can't save: slot already has scores",
+            description: `Slot${blockingSlots.length > 1 ? 's' : ''} ${blockingSlots.join(', ')} already ${blockingSlots.length > 1 ? 'have' : 'has'} submitted scores and can't be replaced. Force-unlock the slot first if it truly needs to change.`,
+            variant: "destructive"
+          });
+          setSaving(false);
+          return;
+        }
+      }
+
+      // Supersede existing assignments for this week/role
       const { error: supersededError } = await supabase
         .from('weekly_assignments')
         .update({ superseded_at: new Date().toISOString() })
@@ -270,11 +344,14 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
             )}
             <div>
               <label className="text-sm font-medium">Week Start (Monday)</label>
-              <input 
+              <input
                 type="date"
                 className="w-full mt-1 p-2 border rounded"
                 value={weekStartDate}
-                onChange={(e) => setWeekStartDate(e.target.value)}
+                onChange={(e) => {
+                  userEditedWeekRef.current = true;
+                  setWeekStartDate(e.target.value);
+                }}
               />
             </div>
           </div>

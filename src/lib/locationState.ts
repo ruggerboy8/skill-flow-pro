@@ -1,10 +1,11 @@
 import { getWeekAnchors } from '@/v2/time';
-import { getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
+import { getPolicyOffsetsForLocation, getAssignmentWeekMondayStr } from '@/lib/submissionPolicy';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchOrgProMoveMetaByIds } from '@/lib/proMoves';
 // (backlog helpers removed 2026-07-25 — no missed-assignment workflow; roadmap 2.3)
 import { format } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
+import { computeWeekCycleMath } from '@/lib/weekCycleMath';
+import { computeWeekStateCore, type WeekStateFacts } from '@/lib/weekStateCore';
 
 
 export type WeekState = 'onboarding' | 'missed_checkin' | 'can_checkin' | 'wait_for_thu' | 'can_checkout' | 'done' | 'missed_checkout' | 'no_assignments';
@@ -56,23 +57,20 @@ export async function getLocationWeekContext(locationId: string, now: Date = new
   // Get the Monday of the week containing program start date
   const programStartAnchors = getWeekAnchors(programStartDate, location.timezone, offsets);
   const programStartMonday = new Date(programStartAnchors.mondayZ);
-  
-  // Calculate week index from program start Monday
-  const daysDiff = Math.floor((currentMonday.getTime() - programStartMonday.getTime()) / (1000 * 60 * 60 * 24));
-  let weekIndex = Math.floor(daysDiff / 7);
-  
+
   // Check if we're before the performance deadline (Friday 5pm)
   // If so, we're still working on the previous week's assignments
   const beforePerformanceDeadline = now < anchors.checkout_due;
-  
-  if (beforePerformanceDeadline && weekIndex > 0) {
-    // Subtract 1 to get the active assignment week (previous week)
-    weekIndex = weekIndex - 1;
-  }
-  
-  // Calculate cycle number and week in cycle
-  const cycleNumber = Math.max(1, Math.floor(weekIndex / cycleLength) + 1);
-  const weekInCycle = Math.max(1, (weekIndex % cycleLength) + 1);
+
+  // Week index + legacy cycle number/week-in-cycle math — pure, see
+  // weekCycleMath.ts (TST-3). cycleNumber/weekInCycle are a legacy concept
+  // pending eventual removal; kept here with identical behavior.
+  const { cycleNumber, weekInCycle } = computeWeekCycleMath({
+    cycleLength,
+    currentMonday,
+    programStartMonday,
+    beforePerformanceDeadline,
+  });
 
   return {
     weekInCycle,
@@ -102,7 +100,79 @@ export function getOnboardingWeeksLeft(_staff: { hire_date?: string | null }, _n
 }
 
 /**
- * Assemble weekly assignments for a user based on location context
+ * ASG-1 Fix 2: resolves a practice group's parent organization id. One half
+ * of the location -> group -> org chain every participant surface must use
+ * to find the ONE canonical timezone behind the org-level
+ * `weekly_assignments` week key. Reused by `assembleWeek` below and by
+ * every other participant surface that already has a `group_id` in hand
+ * (via a `locations` join) but not yet an orgId — see
+ * `resolveOrgTimezoneForGroup`.
+ */
+export async function resolveOrgIdForGroup(groupId: string): Promise<string | null> {
+  const { data: pgData, error: pgErr } = await supabase
+    .from('practice_groups')
+    .select('organization_id')
+    .eq('id', groupId)
+    .maybeSingle();
+
+  if (pgErr) {
+    console.warn('[resolveOrgIdForGroup] Failed to resolve organization_id for group=%s: %o', groupId, pgErr);
+  }
+  return pgData?.organization_id ?? null;
+}
+
+/**
+ * ASG-1 Fix 2: resolves `organizations.timezone` for a known org id. Falls
+ * back to 'America/Chicago' on any missing value or error — same fallback
+ * `assembleWeek` always used — so a not-yet-backfilled column or an
+ * out-of-order deploy never throws; it just serves the platform default
+ * until the real value is available.
+ */
+export async function resolveOrgTimezoneById(orgId: string): Promise<string> {
+  const { data: orgData, error: orgErr } = await supabase
+    .from('organizations')
+    // organizations.timezone is a recent additive column; generated types
+    // lag until Lovable's next regen, so the row is typed by hand below
+    // (repo convention, see useAuth.tsx pwa_enabled).
+    .select('timezone' as 'id')
+    .eq('id', orgId)
+    .maybeSingle();
+
+  if (orgErr) {
+    console.warn('[resolveOrgTimezoneById] Failed to fetch organizations.timezone for org=%s, falling back to America/Chicago: %o', orgId, orgErr);
+  }
+  return (orgData as unknown as { timezone: string } | null)?.timezone || 'America/Chicago';
+}
+
+/**
+ * ASG-1 Fix 2: the shared "what org-canonical timezone applies to this
+ * practice group" resolver — composes `resolveOrgIdForGroup` +
+ * `resolveOrgTimezoneById`, the exact chain `assembleWeek` uses. Every
+ * participant surface that already has a location's `group_id` in hand
+ * (e.g. a `staff.locations(...group_id)` join) should call this instead of
+ * re-deriving the location -> group -> org -> timezone chain itself, so
+ * there is one definition of "the org-canonical week" to keep correct.
+ * Falls back to 'America/Chicago' (and `orgId: null`) when `groupId` is
+ * missing or has no resolvable organization, matching `assembleWeek`.
+ */
+export async function resolveOrgTimezoneForGroup(
+  groupId: string | null | undefined
+): Promise<{ orgId: string | null; timezone: string }> {
+  if (!groupId) return { orgId: null, timezone: 'America/Chicago' };
+  const orgId = await resolveOrgIdForGroup(groupId);
+  if (!orgId) return { orgId: null, timezone: 'America/Chicago' };
+  return { orgId, timezone: await resolveOrgTimezoneById(orgId) };
+}
+
+/**
+ * Assemble weekly assignments for a user based on location context.
+ *
+ * Returns the canonical `weekStartDate` ('yyyy-MM-dd', org-tz Monday)
+ * alongside the assignments, so every caller that also needs to key a
+ * "Week of" label or an excused-week lookup off the same week can reuse
+ * this ONE resolution instead of recomputing it (ASG-1 Fix 2). `null` only
+ * when the location or its org could not be resolved at all (in which case
+ * `assignments` is always `[]` too).
  */
 export async function assembleWeek(params: {
   userId: string;
@@ -111,7 +181,7 @@ export async function assembleWeek(params: {
   cycleNumber: number;
   weekInCycle: number;
   simOverrides?: any;
-}): Promise<any[]> {
+}): Promise<{ assignments: any[]; weekStartDate: string | null }> {
   const { userId, roleId, locationId, cycleNumber, weekInCycle } = params;
 
   console.info(`🔎 [assembleWeek] START — userId=${userId} roleId=${roleId} locationId=${locationId} cycle=${cycleNumber} week=${weekInCycle}`);
@@ -125,35 +195,37 @@ export async function assembleWeek(params: {
 
   if (!locationData) {
     console.warn('[assembleWeek] ❌ Location not found for id=%s error=%o', locationId, locErr);
-    return [];
+    return { assignments: [], weekStartDate: null };
   }
 
   console.info('[assembleWeek] Location resolved — group_id=%s tz=%s', locationData.group_id, locationData.timezone);
 
-  const now = params.simOverrides?.enabled && params.simOverrides?.nowISO 
-    ? new Date(params.simOverrides.nowISO) 
+  const now = params.simOverrides?.enabled && params.simOverrides?.nowISO
+    ? new Date(params.simOverrides.nowISO)
     : new Date();
-  const offsets2 = getPolicyOffsetsForLocation(locationData);
-  const anchors = getWeekAnchors(now, locationData.timezone, offsets2);
-  const mondayStr = formatInTimeZone(anchors.mondayZ, locationData.timezone, 'yyyy-MM-dd');
 
-  console.info('[assembleWeek] Computed mondayStr=%s from now=%s tz=%s', mondayStr, now.toISOString(), locationData.timezone);
+  // ASG-1 Fix 2: resolve the org BEFORE computing the assignment-lookup
+  // Monday. weekly_assignments rows are org-level (location_id is null),
+  // so the lookup key must come from the org's ONE canonical timezone, not
+  // this location's own timezone. Per-location timezone/offsets still drive
+  // due-date/deadline display elsewhere (getLocationWeekContext,
+  // computeWeekState below); nothing about that changes here. This also
+  // makes the now-unneeded getWeekAnchors(now, locationData.timezone, ...)
+  // call (previously used only to derive the old location-tz mondayStr)
+  // go away, since its one consumer moved to the org-tz path below.
+  const orgId = await resolveOrgIdForGroup(locationData.group_id);
 
-  // Resolve the location's organization_id
-  const { data: pgData, error: pgErr } = await supabase
-    .from('practice_groups')
-    .select('organization_id')
-    .eq('id', locationData.group_id)
-    .maybeSingle();
+  console.info(`[assembleWeek] Org resolution — group_id=${locationData.group_id} → organization_id=${orgId}`);
 
-  const orgId = pgData?.organization_id;
-
-  console.info(`[assembleWeek] Org resolution — group_id=${locationData.group_id} → organization_id=${orgId} (pgErr=${pgErr?.message ?? 'none'})`);
-  
   if (!orgId) {
     console.warn('[assembleWeek] ❌ No organization_id found for location=%s group_id=%s', locationId, locationData.group_id);
-    return [];
+    return { assignments: [], weekStartDate: null };
   }
+
+  const orgTimezone = await resolveOrgTimezoneById(orgId);
+  const mondayStr = getAssignmentWeekMondayStr(now, orgTimezone);
+
+  console.info('[assembleWeek] Computed mondayStr=%s from now=%s orgTz=%s (org-canonical, not location tz)', mondayStr, now.toISOString(), orgTimezone);
 
   // Query weekly_assignments scoped to the organization (no fallback)
   console.info('[assembleWeek] Querying weekly_assignments — role_id=%d week=%s status=locked org_id=%s', roleId, mondayStr, orgId);
@@ -199,7 +271,7 @@ export async function assembleWeek(params: {
 
     if (enrichErr || !enrichedAssign) {
       console.error('[assembleWeek] Failed to fetch enriched assignments:', enrichErr);
-      return [];
+      return { assignments: [], weekStartDate: mondayStr };
     }
 
     // Resolve org-custom move metadata (rows where org_move_id is set instead of action_id)
@@ -210,7 +282,7 @@ export async function assembleWeek(params: {
       ? await fetchOrgProMoveMetaByIds(orgMoveIds)
       : new Map();
 
-    return enrichedAssign.map((assign: any) => {
+    const assignments = enrichedAssign.map((assign: any) => {
       const om = assign.org_move_id ? orgMeta.get(assign.org_move_id) : undefined;
       return {
         weekly_focus_id: `assign:${assign.id}`,
@@ -228,9 +300,10 @@ export async function assembleWeek(params: {
         weekLabel: `Week of ${mondayStr}`
       };
     });
+    return { assignments, weekStartDate: mondayStr };
   } else {
     console.warn('[assembleWeek] ❌ No weekly_assignments for week=%s role=%d', mondayStr, roleId);
-    return [];
+    return { assignments: [], weekStartDate: mondayStr };
   }
 }
 
@@ -284,9 +357,13 @@ export async function computeWeekState(params: {
     (staff as any).organization_id ||
     (staff.locations as any)?.practice_groups?.organization_id ||
     null;
-  const orgTz = (staff.locations as any)?.timezone || 'America/Chicago';
 
-  // Check eligibility (onboarding status)
+  // Check eligibility (onboarding status). isEligibleForProMoves is pure and
+  // always true today, so this never actually short-circuits in practice —
+  // kept as an early return (matching origin/main exactly) so that if it
+  // ever stops being a stub, an ineligible staff member still skips
+  // assembleWeek()/weekly_scores/excused_* below, same as before this
+  // refactor (TST-3 QA finding: ordering must stay byte-faithful).
   if (!isEligibleForProMoves(staff, now)) {
     const weeksLeft = getOnboardingWeeksLeft(staff, now);
     return {
@@ -298,11 +375,20 @@ export async function computeWeekState(params: {
     };
   }
 
-  // Calculate Monday anchor in org timezone
-  const mondayStr = formatInTimeZone(anchors.mondayZ, orgTz, 'yyyy-MM-dd');
+  // ASG-1 Fix 2 (secondary): the excused_submissions/excused_locations
+  // lookups below key by 'week_of', which must match the same org-canonical
+  // week assembleWeek() now resolves assignments under, not this staff
+  // member's location timezone (the previous computation here, despite
+  // being named "org timezone", actually used staff.locations.timezone).
+  // Org resolution itself (`orgId` above) is unchanged, out of scope here
+  // per ASG-1 Fix 3. The organizations.timezone lookup itself now goes
+  // through the same shared resolver assembleWeek() uses, instead of a
+  // second inlined copy of the same query.
+  const canonicalOrgTz = orgId ? await resolveOrgTimezoneById(orgId) : 'America/Chicago';
+  const mondayStr = getAssignmentWeekMondayStr(now, canonicalOrgTz);
 
   // ----- P0 FIX: Use assembleWeek as single source of truth for IDs -----
-  const assignments = await assembleWeek({
+  const { assignments } = await assembleWeek({
     userId,
     roleId,
     locationId,
@@ -311,110 +397,105 @@ export async function computeWeekState(params: {
     simOverrides,
   });
 
-  if (!assignments || assignments.length === 0) {
-    console.warn('[weekState] ❌ No assignments found for cycle=%d week=%d role=%d', 
+  const hasAssignments = !!(assignments && assignments.length > 0);
+  if (!hasAssignments) {
+    console.warn('[weekState] ❌ No assignments found for cycle=%d week=%d role=%d',
       cycleNumber, weekInCycle, roleId);
-    return {
-      state: 'no_assignments',
-      backlogCount: 0,
-      selectionPending: false,
-    };
   }
 
-  const allIds = assignments.map(a => a.weekly_focus_id);
-  const requiredIds = assignments.filter(a => a.required).map(a => a.weekly_focus_id);
-  const required = requiredIds.length;
+  let confComplete = false;
+  let perfComplete = false;
+  let lastActivity: { kind: 'confidence' | 'performance'; at: Date } | undefined;
 
-  // Derive source + label for display
-  const dataSource = allIds.some(id => {
-    const idStr = String(id);
-    return idStr.startsWith('plan:') || idStr.startsWith('assign:');
-  }) ? 'weekly_plan' : 'weekly_focus';
-  const weekLabel = assignments[0]?.weekLabel || `Cycle ${cycleNumber}, Week ${weekInCycle}`;
+  if (hasAssignments) {
+    const allIds = assignments.map(a => a.weekly_focus_id);
+    const requiredIds = assignments.filter(a => a.required).map(a => a.weekly_focus_id);
+    const required = requiredIds.length;
 
-  // current staff id from userId
-  const staffId = staff.id;
+    // current staff id from userId
+    const staffId = staff.id;
 
-  // Query scores against exactly these IDs (check both assignment_id and weekly_focus_id)
-  const { data: scores, error: scoresError } = await supabase
-    .from('weekly_scores')
-    .select('confidence_score, confidence_date, performance_score, performance_date, weekly_focus_id, assignment_id')
-    .eq('staff_id', staffId)
-    .or(allIds.map(id => `assignment_id.eq.${id},weekly_focus_id.eq.${id}`).join(','));
+    // Query scores against exactly these IDs (check both assignment_id and weekly_focus_id)
+    const { data: scores, error: scoresError } = await supabase
+      .from('weekly_scores')
+      .select('confidence_score, confidence_date, performance_score, performance_date, weekly_focus_id, assignment_id')
+      .eq('staff_id', staffId)
+      .or(allIds.map(id => `assignment_id.eq.${id},weekly_focus_id.eq.${id}`).join(','));
 
-  // P2 FIX: Check completion per required slot, not by totals
-  const byId = new Map(allIds.map(id => [id, { conf: false, perf: false }]));
-  for (const s of (scores ?? [])) {
-    // Match by either assignment_id or weekly_focus_id
-    const matchingId = allIds.find(id => id === s.assignment_id || id === s.weekly_focus_id);
-    const row = matchingId ? byId.get(matchingId) : null;
-    if (!row) continue;
-    if (s.confidence_score != null) row.conf = true;
-    if (s.performance_score != null) row.perf = true;
-  }
-
-  let confComplete = requiredIds.every(id => byId.get(id)?.conf);
-  let perfComplete = requiredIds.every(id => byId.get(id)?.perf);
-
-  // Check for individual excused submissions - treat excused metrics as complete
-  const { data: excusedSubmissions } = await supabase
-    .from('excused_submissions')
-    .select('metric')
-    .eq('staff_id', staffId)
-    .eq('week_of', mondayStr);
-
-  const excusedMetrics = new Set(
-    (excusedSubmissions ?? []).map(e => e.metric)
-  );
-
-  // Also check for location-level excuses (excused_locations table)
-  const { data: locationExcuses } = await supabase
-    .from('excused_locations')
-    .select('metric')
-    .eq('location_id', locationId)
-    .eq('week_of', mondayStr);
-
-  // Merge location excuses into the set
-  (locationExcuses ?? []).forEach(e => excusedMetrics.add(e.metric));
-
-  // If a metric is excused (individually OR at location level), treat it as complete so the CTA skips it
-  if (excusedMetrics.has('confidence')) {
-    confComplete = true;
-    console.log('[weekState] Confidence excused for week', mondayStr, '(individual or location-level)');
-  }
-  if (excusedMetrics.has('performance')) {
-    perfComplete = true;
-    console.log('[weekState] Performance excused for week', mondayStr, '(individual or location-level)');
-  }
-
-  console.log('[weekState] Confidence complete:', confComplete, '(required slots:', required, ')');
-  console.log('[weekState] Performance complete:', perfComplete, '(required slots:', required, ')');
-
-  // Apply simulation overrides for confidence/performance status
-  if (simOverrides?.enabled) {
-    if (simOverrides.forceHasConfidence !== null && simOverrides.forceHasConfidence !== undefined) {
-      confComplete = simOverrides.forceHasConfidence;
+    // P2 FIX: Check completion per required slot, not by totals
+    const byId = new Map(allIds.map(id => [id, { conf: false, perf: false }]));
+    for (const s of (scores ?? [])) {
+      // Match by either assignment_id or weekly_focus_id
+      const matchingId = allIds.find(id => id === s.assignment_id || id === s.weekly_focus_id);
+      const row = matchingId ? byId.get(matchingId) : null;
+      if (!row) continue;
+      if (s.confidence_score != null) row.conf = true;
+      if (s.performance_score != null) row.perf = true;
     }
-    if (simOverrides.forceHasPerformance !== null && simOverrides.forceHasPerformance !== undefined) {
-      perfComplete = simOverrides.forceHasPerformance;
+
+    confComplete = requiredIds.every(id => byId.get(id)?.conf);
+    perfComplete = requiredIds.every(id => byId.get(id)?.perf);
+
+    // Check for individual excused submissions - treat excused metrics as complete
+    const { data: excusedSubmissions } = await supabase
+      .from('excused_submissions')
+      .select('metric')
+      .eq('staff_id', staffId)
+      .eq('week_of', mondayStr);
+
+    const excusedMetrics = new Set(
+      (excusedSubmissions ?? []).map(e => e.metric)
+    );
+
+    // Also check for location-level excuses (excused_locations table)
+    const { data: locationExcuses } = await supabase
+      .from('excused_locations')
+      .select('metric')
+      .eq('location_id', locationId)
+      .eq('week_of', mondayStr);
+
+    // Merge location excuses into the set
+    (locationExcuses ?? []).forEach(e => excusedMetrics.add(e.metric));
+
+    // If a metric is excused (individually OR at location level), treat it as complete so the CTA skips it
+    if (excusedMetrics.has('confidence')) {
+      confComplete = true;
+      console.log('[weekState] Confidence excused for week', mondayStr, '(individual or location-level)');
     }
+    if (excusedMetrics.has('performance')) {
+      perfComplete = true;
+      console.log('[weekState] Performance excused for week', mondayStr, '(individual or location-level)');
+    }
+
+    console.log('[weekState] Confidence complete:', confComplete, '(required slots:', required, ')');
+    console.log('[weekState] Performance complete:', perfComplete, '(required slots:', required, ')');
+
+    // Apply simulation overrides for confidence/performance status
+    if (simOverrides?.enabled) {
+      if (simOverrides.forceHasConfidence !== null && simOverrides.forceHasConfidence !== undefined) {
+        confComplete = simOverrides.forceHasConfidence;
+      }
+      if (simOverrides.forceHasPerformance !== null && simOverrides.forceHasPerformance !== undefined) {
+        perfComplete = simOverrides.forceHasPerformance;
+      }
+    }
+
+    // lastActivity
+    const latestConf = (scores ?? [])
+      .filter(s => s.confidence_date)
+      .map(s => ({ kind: 'confidence' as const, at: new Date(s.confidence_date as string) }))
+      .sort((a,b) => b.at.getTime() - a.at.getTime())[0];
+
+    const latestPerf = (scores ?? [])
+      .filter(s => s.performance_date)
+      .map(s => ({ kind: 'performance' as const, at: new Date(s.performance_date as string) }))
+      .sort((a,b) => b.at.getTime() - a.at.getTime())[0];
+
+    lastActivity =
+      latestConf && latestPerf
+        ? (latestConf.at > latestPerf.at ? latestConf : latestPerf)
+        : (latestConf ?? latestPerf);
   }
-
-  // lastActivity
-  const latestConf = (scores ?? [])
-    .filter(s => s.confidence_date)
-    .map(s => ({ kind: 'confidence' as const, at: new Date(s.confidence_date as string) }))
-    .sort((a,b) => b.at.getTime() - a.at.getTime())[0];
-
-  const latestPerf = (scores ?? [])
-    .filter(s => s.performance_date)
-    .map(s => ({ kind: 'performance' as const, at: new Date(s.performance_date as string) }))
-    .sort((a,b) => b.at.getTime() - a.at.getTime())[0];
-
-  const lastActivity =
-    latestConf && latestPerf
-      ? (latestConf.at > latestPerf.at ? latestConf : latestPerf)
-      : (latestConf ?? latestPerf);
 
   // Backlog retired (2026-07-25): no missed-assignment workflow, count is always 0.
   const backlogCount = 0;
@@ -424,114 +505,21 @@ export async function computeWeekState(params: {
 
   // Performance time gate is always enforced — Thursday 00:01 local tz
 
-  // State machine (no ISO, only tz-anchors):
-
-  // Fully complete
-  if (confComplete && perfComplete) {
-    return {
-      state: 'done',
-      backlogCount,
-      selectionPending,
-      lastActivity,
-    };
-  }
-
-  // Before/at Tue noon: confidence window
-  if (now <= checkin_due) {
-    if (!confComplete) {
-      return {
-        state: 'can_checkin',
-        nextAction: 'Submit confidence',
-        deadlineAt: checkin_due,
-        backlogCount,
-        selectionPending,
-        lastActivity,
-      };
-    }
-    // Conf is in, waiting for Thu to open performance
-    // Conf is in, just waiting for Thu to open performance
-    return {
-      state: 'wait_for_thu',
-      nextAction: 'Performance opens Thursday',
-      backlogCount,
-      selectionPending,
-      lastActivity,
-    };
-  }
-
-  // After Tue noon: confidence late if missing
-  if (!confComplete && now > checkin_due && now < checkout_open) {
-    // Don't populate backlog until Sunday night (week officially over)
-    // Backlog v2 should only be populated at the END of the week, not mid-week
-    
-    return {
-      state: 'missed_checkin',
-      nextAction: 'Submit confidence (late)',
-      backlogCount,
-      selectionPending,
-      lastActivity,
-    };
-  }
-
-  // Thu -> Fri window: performance period
-  if (now >= checkout_open && now <= checkout_due) {
-    // During performance window, confidence must be complete first
-    if (!confComplete) {
-      return {
-        state: 'missed_checkin',
-        nextAction: 'Submit confidence (late)',
-        deadlineAt: checkout_due,
-        backlogCount,
-        selectionPending,
-        lastActivity,
-      };
-    }
-    if (!perfComplete) {
-      return {
-        state: 'can_checkout',
-        nextAction: 'Submit performance',
-        deadlineAt: checkout_due,
-        backlogCount,
-        selectionPending,
-        lastActivity,
-      };
-    }
-    // Performance already in, but week not marked done => (shouldn't happen unless data skew)
-    return {
-      state: 'done',
-      backlogCount,
-      selectionPending,
-      lastActivity,
-    };
-  }
-
-  // After Fri due: if performance missing -> missed_checkout
-  if (now > checkout_due && !perfComplete) {
-    return {
-      state: 'missed_checkout',
-      nextAction: 'Submit performance (late)',
-      backlogCount,
-      selectionPending,
-      lastActivity,
-    };
-  }
-
-  // Fallback: if we've submitted confidence before Thu, wait for performance window
-  if (confComplete && now < checkout_open) {
-    return {
-      state: 'wait_for_thu',
-      nextAction: 'Performance opens Thursday',
-      backlogCount,
-      selectionPending,
-      lastActivity,
-    };
-  }
-
-  // Absolute fallback
-  return {
-    state: 'no_assignments',
+  // Delegate the actual state decision to the pure core (TST-3). Same
+  // branch order and same returned StaffStatus shapes as the inline state
+  // machine this replaced. eligible is always true here — the ineligible
+  // case already returned above, matching origin/main's ordering.
+  const facts: WeekStateFacts = {
+    now,
+    anchors: { checkin_due, checkout_open, checkout_due },
+    eligible: true,
+    hasAssignments,
+    confComplete,
+    perfComplete,
     backlogCount,
     selectionPending,
     lastActivity,
   };
+
+  return computeWeekStateCore(facts);
 }

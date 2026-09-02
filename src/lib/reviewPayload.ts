@@ -4,6 +4,8 @@
  * This file does NOT compute or persist the payload.
  */
 
+import { getDomainOrderIndex } from './domainUtils';
+
 export interface ReviewPayloadItem {
   competency_id: number;
   competency_name: string;
@@ -66,10 +68,24 @@ export interface ReviewPayload {
 export const CURRENT_PAYLOAD_VERSION = 4;
 
 /**
+ * Sort any domain-bearing list into the canonical domain order (Clinical,
+ * Clerical, Cultural, Case Acceptance) from `DOMAIN_ORDER` in domainUtils.
+ * Returns a new array; does not mutate the input. Unknown domain names sort
+ * to the end, stable relative to each other.
+ */
+export function sortByDomainOrder<T extends { domain_name: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => getDomainOrderIndex(a.domain_name) - getDomainOrderIndex(b.domain_name));
+}
+
+/**
  * Parse and validate a review payload from the stored JSONB.
  * Accepts v2 and v3 (v3 adds observer_glow/observer_grow per item; on a v2
  * payload those are simply absent and the UI falls back to observer_note).
  * Returns null if the payload is missing or malformed.
+ *
+ * `domain_summaries` and `domain_breakdown` come from the RPC in whatever
+ * order the query happened to return them, so they're re-sorted here into
+ * the canonical domain order before either review wizard ever sees them.
  */
 export function parseReviewPayload(raw: unknown): ReviewPayload | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -82,8 +98,8 @@ export function parseReviewPayload(raw: unknown): ReviewPayload | null {
     version: (p.version as number) ?? CURRENT_PAYLOAD_VERSION,
     computed_at: (p.computed_at as string) ?? '',
     sparse: (p.sparse as boolean) ?? false,
-    domain_summaries: (p.domain_summaries as DomainSummary[]) ?? [],
-    domain_breakdown: (p.domain_breakdown as ReviewDomainBreakdown[]) ?? [],
+    domain_summaries: sortByDomainOrder((p.domain_summaries as DomainSummary[]) ?? []),
+    domain_breakdown: sortByDomainOrder((p.domain_breakdown as ReviewDomainBreakdown[]) ?? []),
     top_candidates: (p.top_candidates as ReviewPayloadItem[]) ?? [],
     bottom_candidates: (p.bottom_candidates as ReviewPayloadItem[]) ?? [],
     top_used_fallback: (p.top_used_fallback as boolean) ?? false,

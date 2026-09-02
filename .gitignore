@@ -30,5 +30,21 @@ supabase/.temp/
 # DEMO-1a seed script secrets (service role key + demo login passwords)
 scripts/demo-seed/.env
 
+# DEMO-1b capture harness: local secrets, live login sessions, and raw
+# recorded footage. Never commit any of these.
+demo-capture/.env
+demo-capture/.auth/
+demo-capture/recordings/
+demo-capture/test-results/
+demo-capture/playwright-report/
+
+# PRF-3a shell-persistence tripwire (reuses demo-capture/.auth/ above for
+# its login sessions -- these are just its own Playwright run artifacts).
+e2e/test-results/
+e2e/playwright-report/
+
 # Claude Code local worktree copies (large, machine-local; not for git)
 .claude/worktrees/
+promoves-brand/exports/*.otf
+scripts/basecamp-corpus/.env
+scripts/basecamp-corpus/.mirror_watermark.json

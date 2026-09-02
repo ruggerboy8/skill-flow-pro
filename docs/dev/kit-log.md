@@ -96,6 +96,49 @@ at Todo despite both being merged; both were closed. The phase 4 ticket was
 relabelled through `stage:backlog` to `stage:spec-approved` as the gate was
 passed, which was the first real exercise of the label-driven pipeline.
 
+## DOC-2: settling the `db push` question (2026-08-19)
+
+Investigated whether `supabase db push` actually works here, per the finding
+logged above. Two things came out of it, one confirming the stale-reason
+theory and one contradicting the conclusion people might draw from it.
+
+**Confirmed stale: the hyphen/underscore filename reason.** 621 migration
+files exist locally; only 17 use Lovable's old hyphenated naming
+(`<timestamp>-<uuid>.sql`), and all 17 are from 2025-07-28, day one of the
+project. Every file since 2025-07-30 uses the underscore naming the CLI
+requires. GOV-1 (merged, PR #16) also backfilled the 13 migrations that were
+live in production with no file in the repo. So the specific reason CLAUDE.md
+gave is out of date.
+
+**New finding: `db push` still is not provably safe, for a bigger reason.** A
+read-only check, `npx supabase migration list --linked` (no writes; it queries
+the remote migration-history table and diffs it against local files), showed
+the remote history and the local files barely correspond by timestamp. Of 621
+remote history entries and 604 validly-named local files, only 19 timestamps
+match on both sides. 585 local files have no matching remote entry and 602
+remote entries have no matching local file. A timing check says these are very
+likely the same migrations recorded under different version stamps (every one
+of the 585 "local-only" files has a remote entry within 24 hours, most within
+a minute) rather than 585 genuinely unapplied migrations, but the CLI's
+version comparison cannot tell the difference: it would treat all 585 as new
+and try to apply them. Roughly half the migration files in the repo (320 of
+621) contain no `IF NOT EXISTS` / `CREATE OR REPLACE` guard anywhere, so a bulk
+push today would likely fail partway through, or partially succeed and leave
+the history table harder to reconcile than it is now.
+
+`db push`, `db reset`, and `migration repair` against the linked project were
+not run; none of them are safe to run unsupervised against production with no
+staging environment. CLAUDE.md's "Applying migrations" section carries the
+full writeup and points back here. The supervised test procedure that could
+actually settle this (dry run, spot-check idempotency of the pending list,
+abort criteria) was handed to John directly rather than written into a doc,
+since it is a live procedure to run once, not a standing instruction.
+
+**Could not update CLAUDE.md directly.** The phase 1 guard hook (see above)
+blocks AI edits to CLAUDE.md by design. The corrected "Applying migrations"
+text was drafted and given to John to paste in himself; `docs/README.md`'s
+summary of CLAUDE.md was updated to match in the meantime.
+
 ## Phase 5: the pilot
 
 Not started. Alcan Way Gallery 1 through the full kit, per

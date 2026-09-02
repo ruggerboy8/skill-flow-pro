@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { EvalFilters } from '@/types/analytics';
 import { startOfQuarter, endOfQuarter, subQuarters, format } from 'date-fns';
+import { fetchQuarterAccountability, quarterCompletionRates } from '@/lib/quarterAccountability';
 
 interface OrgAccountabilityResult {
   completionRate: number | null;
@@ -81,71 +82,15 @@ export function useOrgAccountability(filters: EvalFilters): OrgAccountabilityRes
       const staffIds = (staffResult.data || []).map(s => s.id);
       
       if (staffIds.length === 0) return null;
-      
-      // Use the same RPC as OnTimeRateWidget for each staff member
-      // This properly tracks each individual assignment slot (3 conf + 3 perf = 6 per week)
-      let totalExpected = 0;
-      let totalCompleted = 0;
-      let totalOnTime = 0;
-      
-      // Process in batches to avoid overwhelming the API
-      const batchSize = 20;
-      for (let i = 0; i < staffIds.length; i += batchSize) {
-        const batch = staffIds.slice(i, i + batchSize);
-        
-        const results = await Promise.all(batch.map(async (staffId) => {
-          try {
-            const { data, error } = await supabase.rpc('get_staff_submission_windows', {
-              p_staff_id: staffId,
-              p_since: startStr,
-            });
-            
-            if (error || !data) return { expected: 0, completed: 0, onTime: 0 };
-            
-            // Filter to previous quarter end date and past due only
-            // Compare week_of as strings to avoid timezone issues
-            const endDateStr = format(range.end, 'yyyy-MM-dd');
-            const pastDueInQuarter = data.filter((w: any) => {
-              const dueAt = new Date(w.due_at);
-              return dueAt <= new Date() && w.week_of <= endDateStr;
-            });
-            
-            // Count each assignment slot individually (matches OnTimeRateWidget logic)
-            let expected = 0;
-            let completed = 0;
-            let onTime = 0;
-            
-            for (const row of pastDueInQuarter) {
-              expected++;
-              if (row.status === 'submitted') {
-                completed++;
-                if (row.on_time === true) {
-                  onTime++;
-                }
-              }
-            }
-            
-            return { expected, completed, onTime };
-          } catch {
-            return { expected: 0, completed: 0, onTime: 0 };
-          }
-        }));
-        
-        for (const r of results) {
-          totalExpected += r.expected;
-          totalCompleted += r.completed;
-          totalOnTime += r.onTime;
-        }
-      }
-      
-      const completionRate = totalExpected > 0 
-        ? Math.round((totalCompleted / totalExpected) * 100) 
-        : null;
-      
-      const onTimeRate = totalExpected > 0
-        ? Math.round((totalOnTime / totalExpected) * 100)
-        : null;
-      
+
+      // Use the same RPC as OnTimeRateWidget for each staff member.
+      // This properly tracks each individual assignment slot (3 conf + 3 perf = 6 per week).
+      // See src/lib/quarterAccountability.ts (PRF-1) for why this couldn't be
+      // collapsed into a single batched query under this ticket's constraints.
+      const endDateStr = format(range.end, 'yyyy-MM-dd');
+      const tally = await fetchQuarterAccountability(staffIds, startStr, endDateStr);
+      const { completionRate, onTimeRate } = quarterCompletionRates(tally);
+
       return {
         completionRate,
         onTimeRate,

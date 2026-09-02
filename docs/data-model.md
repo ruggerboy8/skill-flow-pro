@@ -1,138 +1,205 @@
-# Skill Flow Pro — Data Model (Current State)
+# Skill Flow Pro: Data Model (Current State)
 
-*This describes the database as it **actually exists today**, verified against the live Supabase
-project (`yeypngaufuualdfzcjpk`) on **2026-06-22**. Row counts are point-in-time and only
-indicate relative scale. For the **proposed/intended** multi-tenant design, see
+*Rewritten 2026-08-19 (DOC-3) to replace the archived version, which listed five
+tables dropped on 2026-07-25 as live. Verified against `supabase/migrations/`
+(628+ files) and grep against `src/` and `supabase/functions/` for what actually
+gets queried today. This pass did not have live database access (see CLAUDE.md,
+"Supabase connection": the sandbox this was written in cannot reach Supabase's
+management API), so row counts below are a mix of the 2026-08-18 live-verified
+assessment pass (marked) and June 2026 figures carried over from the prior
+version of this doc (marked, and may have drifted). Treat every count as
+"relative scale," not a live number. For the proposed/intended multi-tenant
+design (partly superseded by what actually shipped), see
 [enterprise-architecture.md](enterprise-architecture.md).*
 
-> **RLS is enabled on every table.** Access is enforced in the database, not just the app.
-> Exact columns, foreign keys, and policies live in `supabase/migrations/` (462 migrations).
-> When in doubt, treat the migrations + `npx supabase db diff` as the source of truth and this
-> doc as the map.
+> **RLS is enabled on every table.** Access is enforced in the database, not
+> just the app. Exact columns, foreign keys, and policies live in
+> `supabase/migrations/`. When in doubt, treat the migrations plus
+> `npx supabase db diff` as the source of truth and this doc as the map.
 
-> **Legacy cluster (do not build on):** `weekly_focus`, `weekly_self_select`, the `self_select`
-> column, the cycles-1–3 rollover path, and the whole **cycle/week-in-cycle** concept are a
-> connected set of early-legacy features (from the old fixed 18-week onboarding curriculum).
-> Current functionality runs on `weekly_plan` / `weekly_assignments`. See
-> [improvement-backlog.md](improvement-backlog.md) for the retirement plan.
+> **"Cycle" is a legacy concept, not a current one.** The old system had a fixed
+> 18-week onboarding curriculum every new hire progressed through in lockstep,
+> numbered in "cycles" of a few weeks each. That is gone. A new staff member
+> today simply joins the globally-assigned Pro Moves already running for their
+> role. There is no onboarding period and nothing to count cycles from. The
+> cycle/week-in-cycle **calculation** is still present in code
+> (`src/lib/locationState.ts`, `cycleNumber`/`weekInCycle`) and several RPCs
+> still take cycle/week parameters, so it has not been deleted, but it should
+> not be treated as a live domain concept when reasoning about the product. See
+> [glossary.md](glossary.md) for the full legacy-cluster breakdown.
 
 ---
 
 ## 1. Org hierarchy & identity
 
-| Table | ~Rows | Purpose |
-|---|---|---|
-| `organizations` | 4 | **Tenant** — top-level contracting entity. The data-isolation boundary. |
-| `practice_groups` | 10 | **Group** — sub-grouping of locations. FK `organization_id → organizations.id`. |
-| `locations` | 17 | **Location** — individual practice. Owns `program_start_date`, `cycle_length_weeks`, `timezone`, and per-step deadlines (`conf_due_day/time`, `perf_due_day/time`). FK `group_id → practice_groups.id`. |
-| `staff` | 102 | **Staff** — all users. Linked to Supabase Auth via `user_id`. Holds legacy `is_*` role flags, `role_id`, `primary_location_id`, `hire_date`, pause fields. |
-| `organization_role_names` | 17 | Per-organization display labels for roles. |
+| Table | Purpose |
+|---|---|
+| `organizations` | **Tenant.** Top-level contracting entity, the data-isolation boundary. Has `practice_type` (singular; this column stayed singular, it did not become an array like `pro_moves.practice_types` did). **Correction (2026-08-19):** the earlier version of this doc wrongly said the values were `pediatric` \| `general` \| `all`. The same migration that converted `pro_moves.practice_type` to an array (`20260311220946`) also renamed the organization-level values to `pediatric_us` and `general_us`, added `general_uk`, and installed constraint `chk_org_practice_type CHECK (practice_type IN ('pediatric_us', 'general_us', 'general_uk'))`. `'all'` was never a legal value for `organizations.practice_type`; that value only ever existed on `pro_moves`. |
+| `practice_groups` | **Group.** Sub-grouping of locations. FK `organization_id → organizations.id` (added 2026-03-06, migration `20260306190002`). |
+| `locations` | **Location.** Individual practice. Owns `program_start_date`, `cycle_length_weeks` (legacy, still read by the cycle calculation above), `timezone`, and per-step deadlines (`conf_due_day/time`, `perf_due_day/time`). FK `group_id → practice_groups.id`. |
+| `staff` | **Staff.** All users, linked to Supabase Auth via `user_id`. Holds legacy `is_*` role flags, `role_id`, `primary_location_id`, `hire_date`, pause fields. ~113 rows (2026-08-18 live count), 79 active participants. |
+| `organization_role_names` | Per-organization display labels for roles. |
 
 **The org chain** (used by RLS and `current_user_org_id()`):
 `staff → locations → practice_groups → organizations`.
 
 ## 2. Permissions
 
-| Table | ~Rows | Purpose |
-|---|---|---|
-| `user_capabilities` | 53 | **Newer** capability-toggle model (`can_view_submissions`, `can_manage_users`, `is_org_admin`, `is_platform_admin`, …). One row per staff. |
-| `coach_scopes` | 46 | Which orgs/locations a non-participant can see. `scope_type` = `'org'` \| `'location'`. |
-| `roles` | 14 | Job functions (DFI, RDA, Office Manager, …). |
+| Table | Purpose |
+|---|---|
+| `user_capabilities` | **The active permission source.** Capability-toggle model (`can_view_submissions`, `can_manage_users`, `is_org_admin`, `is_platform_admin`, etc). One row per staff. |
+| `coach_scopes` | Which locations/groups a non-participant can see. `scope_type` = `'org'` \| `'location'`. **Naming trap:** despite the name, a `'org'` row's `scope_id` is a `practice_groups.id`, not an `organizations.id` (see the correction below the table). |
+| `roles` | Job functions (DFI, RDA, Office Manager, etc). |
 
-> ⚠️ **Two permission systems coexist today.** Old boolean flags on `staff` (`is_coach`,
-> `is_org_admin`, `is_super_admin`, `is_doctor`, …) are still what `useUserRole` reads, while
-> `user_capabilities` is the migration target. Don't assume one or the other — check both.
-> This is tracked under the permissions refactor in [roadmap.md](roadmap.md).
+> ✅ **`user_capabilities` is the single source of truth for permissions**,
+> confirmed in `src/hooks/deriveUserRole.ts` (comment: "CAPS-ONLY since
+> 2026-07-25 ... The legacy staff.is_\* flags are no longer read here"). The
+> derived `isSuperAdmin`, `isOrgAdmin`, and `isParticipant` all come from
+> `user_capabilities` alone, and that function feeds `useUserRole`, which is
+> what route guards like `RequireAccess` and every permission check in the
+> app actually call. **Historical note:** the legacy boolean columns
+> (`staff.is_super_admin`, `staff.is_org_admin`, `staff.is_coach`, etc.) still
+> exist on `staff` and are still read/written by some admin UI (creating or
+> editing a user) and by a few SQL RPCs (e.g. `get_staff_weekly_scores` still
+> OR's in `s.is_coach` / `s.is_super_admin` alongside the capability columns),
+> so they are not fully dead, but they are not where the app decides what a
+> user can do.
+>
+> **Persona attributes are a separate, still-legacy-sourced thing.**
+> `is_office_manager`, `is_doctor`, `is_clinical_director`, and `is_lead` are
+> read straight off `staff` in `deriveUserRole.ts` and describe *who someone
+> is*, not *what they're allowed to do*. They have not been migrated into
+> `user_capabilities` and there is no indication they will be.
+
+> ⚠️ **`coach_scopes.scope_type = 'org'` is a legacy name for a group scope,
+> not an organization scope.** Migration `20260725100000` says so directly:
+> "coach_scopes.scope_type = 'org' actually references practice_groups.id
+> (legacy naming, 'org' was the old term for group)." That migration also
+> backfills a `'org'`-typed scope row for every active lead/OM, using
+> `locations.group_id`, i.e. a `practice_groups.id`. Every consumer that reads
+> `scope_id` for a `'org'`-typed row (`deriveUserRole.ts`'s `managedOrgIds`,
+> the `get_staff_weekly_scores` RPC) treats it as a `practice_groups.id`.
+> Putting an actual `organizations.id` in that column would match nothing and
+> silently grant the row's owner visibility into zero staff.
 
 ## 3. Competency framework (content)
 
-| Table | ~Rows | Purpose |
-|---|---|---|
-| `domains` | 4 | Top-level skill areas. |
-| `competencies` | 126 | Specific skills within a domain. |
-| `pro_moves` | 332 | The atomic unit: observable behaviors. Has `practice_type` (`pediatric`/`general`/`all`). |
-| `pro_move_resources` | 320 | Videos/docs attached to Pro Moves. |
-| `organization_pro_moves` | 1 | Per-org library entries (org copy of the platform library). |
-| `organization_pro_move_overrides` | 3 | Per-org **visibility** (show/hide) of Pro Moves. |
-| `organization_pro_move_content_overrides` | 1 | Per-org **wording** overrides (future content-customization layer). |
-| `framework_history` | ~800 | **Append-only version history** of `pro_moves` + `pro_move_resources` (added 2026-07-30). Fed by DB triggers on every insert/update/delete; jsonb old/new snapshots, author, reason. Hard DELETE of platform pro_moves is blocked by trigger; retire instead. |
-| `framework_releases` | 9 | Named immutable snapshots of one role's framework (e.g. `doctor-2026.07`, retro `doctor-2026.02-seed`). Create via `create_framework_release()`. |
-| `framework_release_items` | ~700 | Release membership: exact `framework_history` version per member move/resource. Diff two releases with `framework_release_diff(a, b)`; point-in-time state via `framework_as_of(role_id, ts)`. |
+| Table | Purpose |
+|---|---|
+| `domains` | Top-level skill areas (4). |
+| `competencies` | Specific skills within a domain (~126, 2026-08-18 live count). |
+| `pro_moves` | The atomic unit: observable behaviors (~332, 2026-08-18 live count). **`practice_types` is a `text[]` array**, not a single value. It was converted from a singular `practice_type TEXT` column on 2026-03-11 (migration `20260311220946_...`). Anything that still says "practice_type" (singular) for `pro_moves` specifically is describing the pre-March design. |
+| `pro_move_resources` | Videos/docs attached to Pro Moves. |
+| `organization_pro_moves` | Per-org library entries (org copy of the platform library). |
+| `organization_pro_move_overrides` | Per-org **visibility** (show/hide) of Pro Moves. |
+| `organization_pro_move_content_overrides` | Per-org **wording** overrides. |
+| `framework_history` | **Append-only version history** of `pro_moves` and `pro_move_resources` (added 2026-07-30). Fed by DB triggers; jsonb old/new snapshots, author, `change_reason`. Hard `DELETE` of platform pro_moves (`owner_org_id is null`) is blocked by trigger; retire instead (`active = false`). See CLAUDE.md, "Framework content is versioned." |
+| `framework_releases` / `framework_release_items` | Named immutable snapshots of one role's framework, created via `create_framework_release()`. |
 
 ## 4. Weekly loop (assignments & scores)
 
-| Table | ~Rows | Purpose |
-|---|---|---|
-| `weekly_assignments` | 1,363 | **Canonical** per-staff weekly Pro Move assignments. |
-| `weekly_scores` | 5,642 | Confidence + performance scores. The biggest functional table. |
-| `weekly_plan` | 6 | Sequenced Pro Move plan per role/cycle/week (**cycles 4+**). |
-| `weekly_focus` | 108 | **DEPRECATED** legacy assignment source (cycles 1–3). Kept for history only. |
-| `weekly_self_select` | 0 | Self-selected Pro Moves mode (unused so far). |
-| `staff_quarter_focus` | 27 | Quarterly focus selections per staff. |
-| `site_cycle_state` | 1 | Global cycle/week state. |
+| Table | Purpose |
+|---|---|
+| `weekly_assignments` | **The only live assignment source, but it is not per-staff.** ~1,414 rows (2026-08-18 live count). **Correction (2026-08-19):** this table has no `staff_id` column at all. A row is scoped by `role_id` + `week_start_date` + `org_id` (or a null `org_id` for the global/platform-wide default) + optional `location_id`, and is shared by every staff member who matches that role/week/org scope; `useWeeklyAssignments.tsx` queries it with `.eq('role_id', ...).eq('week_start_date', ...)` and an `org_id` filter, never a staff filter. Per-staff data (who actually got which assignment, and their scores) lives on `weekly_scores` below, which does have `staff_id`. Note: `weekly_assignments.location_id` has no FK and 108 orphaned rows already exist (tracked as COR-3, not this ticket's concern). |
+| `weekly_scores` | Confidence + performance scores. ~6,248 rows (2026-08-18 live count), the biggest functional table. Still has a `weekly_focus_id` column (kept for ID-format compatibility with old assignment IDs, matched via `assignment_id.eq.X,weekly_focus_id.eq.X` in query code). That is a **column name**, not a reference to the retired `weekly_focus` table. |
+| `staff_quarter_focus` | Quarterly focus selections per staff (made after receiving an evaluation, not tied to a calendar quarter). |
 
 **Sequencing & recommendation:**
 
-| Table | ~Rows | Purpose |
-|---|---|---|
-| `sequencer_runs` | 26 | Log of sequencer executions. |
-| `user_backlog_v2` | 1,265 | Active per-user backlog of uncovered Pro Moves (recommender). |
-| `user_backlog` | 0 | Legacy backlog (superseded by v2). |
+| Table | Purpose |
+|---|---|
+| `sequencer_runs` | Log of sequencer executions. |
+
+**No longer live** (renamed, not dropped, so data is preserved; see the Archived
+section below): `weekly_plan`, `weekly_focus`, `site_cycle_state`. **Dropped
+outright** on 2026-07-25: `weekly_self_select`, `user_backlog`,
+`user_backlog_v2`, `manager_priorities`, `resource_events`. Nothing in `src/`
+or `supabase/functions/` queries any of these six names today (verified by
+grep against both directories as part of this pass); `weekly_assignments` and
+`weekly_scores` are the entire live weekly-loop path. The old two-hop fallback
+(`weekly_assignments` to `weekly_plan` to `weekly_focus`) was removed from
+`ConfidenceWizard.tsx` / `PerformanceWizard.tsx` in the same 2026-07-25 pass
+(roadmap 2.4 slice B).
 
 ## 5. Accountability / excusals
 
-| Table | ~Rows | Purpose |
-|---|---|---|
-| `excused_submissions` | 397 | Individual submissions exempted from "required". |
-| `excused_locations` | 37 | Locations exempted (e.g. closures). |
-| `excused_weeks` | 2 | Whole weeks exempted for a staff member. |
-| `manager_priorities` | 0 | Manager-set priorities (unused so far). |
+| Table | Purpose |
+|---|---|
+| `excused_submissions` | Individual submissions exempted from "required." |
+| `excused_locations` | Locations exempted (e.g. closures). |
+| `excused_weeks` | Whole weeks exempted for a staff member. |
 
 ## 6. Evaluations & assessments
 
-| Table | ~Rows | Purpose |
-|---|---|---|
-| `evaluations` | 106 | Coach evaluation headers. |
-| `evaluation_items` | 1,696 | Per-evaluation line items. |
-| `staging_prompts` | 32 | Prompt content used in the evaluation/AI flow *(purpose inferred from name — confirm in code before relying on it)*. |
-| `coach_baseline_assessments` | 3 | **Doctor-track**: the clinical director's *observed* baseline of a doctor (`doctor_staff_id` + `coach_staff_id`). Active and load-bearing (verified 2026-07-24); the counterpart to the doctor's self-baseline below. An earlier description of this as a practice-onboarding feature was wrong. |
-| `coach_baseline_items` | 159 | Coach baseline line items (53 per assessment). |
-| `coach_baseline_audit` | 219 | Change log for coach baselines. |
-| `doctor_baseline_assessments` | 5 | Doctor baseline headers. |
-| `doctor_baseline_items` | 265 | Doctor baseline line items. |
+| Table | Purpose |
+|---|---|
+| `evaluations` | Coach evaluation headers. |
+| `evaluation_items` | Per-evaluation line items. ~1,696 rows (2026-08-18 live count). |
+| `staging_prompts` | Prompt content used in the evaluation/AI flow *(purpose inferred from name; confirm in code before relying on it)*. |
+| `coach_baseline_assessments`, `coach_baseline_items`, `coach_baseline_audit` | **Doctor-track.** The clinical director's *observed* baseline of a doctor. Alcan-specific; a candidate for removal or Alcan-only gating (see [glossary.md](glossary.md)). |
+| `doctor_baseline_assessments`, `doctor_baseline_items` | Doctor's own self-baseline. Distinct from the coach baseline above; do not conflate. |
 
 ## 7. Doctor / clinical track
 
-| Table | ~Rows | Purpose |
-|---|---|---|
-| `coaching_sessions` | 3 | Clinical-director ↔ doctor sessions. |
-| `coaching_session_selections` | 2 | Items selected for a session. |
-| `coaching_meeting_records` | 0 | Recorded meeting outputs (unused so far). |
-| `coaching_agenda_templates` | 1 | Reusable agenda templates. |
+| Table | Purpose |
+|---|---|
+| `coaching_sessions` / `coaching_session_selections` | Clinical-director-to-doctor sessions and what was selected for them. |
+| `coaching_meeting_records` | Recorded meeting outputs, now including raw transcript (migration `20260811150000`). |
+| `coaching_agenda_templates` | Reusable agenda templates. |
+| `doctor_coach_assignments` | Which clinical director coaches which doctor (added 2026-08-06). |
+| `doctor_focus_items` | Doctor-track focus items (added 2026-08-11). |
+| `coach_session_reflections` | Post-session reflections (added 2026-08-11). |
 
 ## 8. Reminders & notifications
 
-| Table | ~Rows | Purpose |
-|---|---|---|
-| `reminder_templates` | 3 | Templated reminder content. |
-| `reminder_log` | 610 | History of reminders sent. |
+| Table | Purpose |
+|---|---|
+| `reminder_templates` | Templated reminder content. |
+| `reminder_log` | History of reminders sent. |
 
-## 9. Integrations (Deputy — workforce/scheduling)
+## 9. Integrations (Deputy, workforce/scheduling)
 
-| Table | ~Rows | Purpose |
-|---|---|---|
-| `deputy_employee_mappings` | 115 | Maps Deputy employees ↔ `staff`. |
-| `deputy_sync_runs` | 8 | Sync execution log. |
-| `deputy_connections` | 1 | Connection/credentials config. |
+| Table | Purpose |
+|---|---|
+| `deputy_employee_mappings` | Maps Deputy employees to `staff`. |
+| `deputy_sync_runs` | Sync execution log. |
+| `deputy_connections` | Connection/credentials config. |
 
 ## 10. Audit & infrastructure
 
-| Table | ~Rows | Purpose |
-|---|---|---|
-| `admin_audit` | 143 | Administrative actions on staff records. |
-| `staff_audit` | 44 | Changes to staff records. |
-| `app_kv` | 7 | App-level key/value config/state. |
-| `resource_events` | 0 | Resource interaction events (unused so far). |
+| Table | Purpose |
+|---|---|
+| `admin_audit` | Administrative actions on staff records. |
+| `staff_audit` | Changes to staff records. |
+| `app_kv` | App-level key/value config/state. |
+
+---
+
+## Archived (renamed, data preserved, not queried by any live code)
+
+Migration `20260724210000_slice_d_archive_cycle_era.sql` renamed these
+in place rather than dropping them, specifically so the data survives:
+
+| Old name | Archived as |
+|---|---|
+| `weekly_focus` | `zzz_archived_weekly_focus` |
+| `weekly_plan` | `zzz_archived_weekly_plan` |
+| `site_cycle_state` | `zzz_archived_site_cycle_state` |
+
+The `zzz_` prefix is deliberate. It sorts these to the bottom of any table
+listing and out of the way. If you see one of the old names in a doc, a code
+comment, or a variable (e.g. `weekly_focus_id`, `focusIds`), it is very likely
+a compatibility name for `weekly_assignments`/`weekly_scores`, not a live query
+against the renamed table. Check the query target, not the identifier name.
+
+## Dropped outright (2026-07-25, migration `20260725120000`)
+
+`weekly_self_select`, `manager_priorities`, `resource_events`, `user_backlog`,
+`user_backlog_v2`. All were verified unused before dropping (no self-select
+feature was ever adopted, no missed-assignment backlog workflow shipped). If a
+doc anywhere calls `user_backlog_v2` "the active recommender backlog," that
+claim has been wrong since 2026-07-25, because there is currently no backlog
+table at all.
 
 ---
 
@@ -143,14 +210,22 @@ organizations
   └─< practice_groups (organization_id)
         └─< locations (group_id)
               └─< staff (primary_location_id, role_id → roles, user_id → auth.users)
-                    ├─< weekly_assignments ─< weekly_scores   (the weekly loop)
+                    ├─< weekly_scores (staff_id)   (per-staff scores; assignment_id
+                    │     is a soft match against weekly_assignments.id, no real FK)
                     ├─< user_capabilities / coach_scopes        (permissions)
                     ├─< evaluations ─< evaluation_items
-                    └─< (doctor/coach baselines, coaching_sessions, backlog, …)
+                    └─< (doctor/coach baselines, coaching_sessions, …)
+
+weekly_assignments (role_id, week_start_date, org_id/location_id scope)
+  -- NOT per-staff: one row is shared by every staff member matching that
+  -- role + week + org scope. The weekly loop is roles/orgs to weekly_assignments,
+  -- crossed with staff to weekly_scores, not a single staff-rooted chain.
 
 roles ─< domains ─< competencies ─< pro_moves ─< pro_move_resources   (content framework)
 pro_moves ─< organization_pro_move_overrides / _content_overrides     (per-tenant library)
 ```
 
-*Tables marked "purpose inferred" or "unused so far" should be confirmed against migrations/code
-before building on them.*
+*Tables marked "purpose inferred" should be confirmed against migrations/code
+before building on them. This doc was not checked against a live database
+connection; if a row count or a table's existence matters for a decision,
+confirm with `npx supabase db diff` or the Supabase dashboard first.*

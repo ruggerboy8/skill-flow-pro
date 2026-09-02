@@ -22,9 +22,17 @@ import { formatInTimeZone } from 'date-fns-tz';
 type ProgressStatus = 'going_well' | 'working_on_it' | 'not_started';
 interface ProgressEntry { title: string; status: ProgressStatus; note: string; }
 
+// DSN-3 slice 3: reuses --status-complete/--status-late, matching the
+// identical going_well/working_on_it/not_started config duplicated in
+// CombinedPrepView.tsx (kept in sync, same as the slice-2 DoctorProMoveDrawer /
+// DoctorMaterialsSheet MATERIAL_SECTIONS duplication).
+// QA fix: -ink, not the vivid base — `color` renders as small button text
+// directly on the default (untinted) button background when not selected,
+// and the vivid tokens fail contrast there too (status-late on white
+// computes to ~1.98:1), not just on their own -bg tint.
 const PROGRESS_OPTIONS: { value: ProgressStatus; label: string; icon: typeof CheckCircle2; color: string }[] = [
-  { value: 'going_well', label: 'Going well', icon: CheckCircle2, color: 'text-emerald-600' },
-  { value: 'working_on_it', label: 'Working on it', icon: Clock, color: 'text-amber-600' },
+  { value: 'going_well', label: 'Going well', icon: CheckCircle2, color: 'text-[hsl(var(--status-complete-ink))]' },
+  { value: 'working_on_it', label: 'Working on it', icon: Clock, color: 'text-[hsl(var(--status-late-ink))]' },
   { value: 'not_started', label: "Haven't started", icon: Circle, color: 'text-muted-foreground' },
 ];
 
@@ -36,11 +44,20 @@ import { MeetingConfirmationCard } from '@/components/doctor/MeetingConfirmation
 
 const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
 
+// DSN-9 QA follow-up (supersedes DSN-3 slice 3's solid vivid fill here):
+// white text on the solid vivid fill fails 4.5:1 for EVERY band, not just
+// the old blue (band 1: 2.85:1, band 2: 1.98:1, band 3 on the new lime:
+// 2.02:1, band 4: 2.59:1) — dark ink text on the same solid fill still
+// fails all four (2.95-3.64:1). Moved to the established ink-on-bg pattern
+// (bg = -bg pastel, text = -ink, border = vivid) already used by
+// RatingBandCollapsible/CoachBaselineWizard/ClinicalBaselineResults, which
+// clears 4.5:1 for all four bands (6.41-7.24:1); the border keeps the
+// badge's circle-of-color visual weight close to the old solid fill.
 const SCORE_COLORS: Record<number, string> = {
-  4: 'bg-emerald-500',
-  3: 'bg-blue-500',
-  2: 'bg-amber-500',
-  1: 'bg-orange-500',
+  4: 'bg-[hsl(var(--score-4-bg))] border border-[hsl(var(--score-4))] text-[hsl(var(--score-4-ink))]',
+  3: 'bg-[hsl(var(--score-3-bg))] border border-[hsl(var(--score-3))] text-[hsl(var(--score-3-ink))]',
+  2: 'bg-[hsl(var(--score-2-bg))] border border-[hsl(var(--score-2))] text-[hsl(var(--score-2-ink))]',
+  1: 'bg-[hsl(var(--score-1-bg))] border border-[hsl(var(--score-1))] text-[hsl(var(--score-1-ink))]',
 };
 
 function ScoreCircle({ score, label }: { score: number | null | undefined; label?: string }) {
@@ -54,7 +71,7 @@ function ScoreCircle({ score, label }: { score: number | null | undefined; label
   return (
     <div className="flex flex-col items-center gap-0.5">
       {label && <span className="text-[9px] text-muted-foreground">{label}</span>}
-      <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold text-white ${SCORE_COLORS[score] || 'bg-muted'}`}>
+      <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold ${SCORE_COLORS[score] || 'bg-muted text-muted-foreground'}`}>
         {score}
       </span>
     </div>
@@ -301,7 +318,7 @@ export default function DoctorReviewPrep() {
       <div className="space-y-6 max-w-2xl mx-auto">
         <div className="flex items-center gap-3">
           <Link to="/doctor">
-            <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" aria-label="Back to Home"><ArrowLeft className="h-4 w-4" /></Button>
           </Link>
           <div>
             <h2 className="text-xl font-bold">Meeting Prep Not Available Yet</h2>
@@ -320,10 +337,13 @@ export default function DoctorReviewPrep() {
       <div className="space-y-6 max-w-2xl mx-auto">
         <div className="flex items-center gap-3">
           <Link to="/doctor">
-            <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" aria-label="Back to Home"><ArrowLeft className="h-4 w-4" /></Button>
           </Link>
           <div>
             <h2 className="text-xl font-bold">Review Meeting Summary</h2>
+            {/* DSN-3 slice 3: no token covers "meeting pending" purple — same
+                gap coachingSessionStatus.ts's meeting_pending status flagged
+                in slice 2; left hardcoded rather than guessed at. */}
             <Badge className="bg-purple-100 text-purple-800 mt-1">Awaiting Your Confirmation</Badge>
           </div>
         </div>
@@ -338,11 +358,11 @@ export default function DoctorReviewPrep() {
       <div className="space-y-6 max-w-2xl mx-auto">
         <div className="flex items-center gap-3">
           <Link to="/doctor">
-            <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" aria-label="Back to Home"><ArrowLeft className="h-4 w-4" /></Button>
           </Link>
           <div>
             <h2 className="text-xl font-bold">Meeting Prep</h2>
-            <Badge className="bg-emerald-100 text-emerald-800 mt-1">✓ Prep Complete</Badge>
+            <Badge className="bg-[hsl(var(--status-complete-bg))] text-[hsl(var(--status-complete-ink))] mt-1">✓ Prep Complete</Badge>
           </div>
         </div>
         <CombinedPrepView
@@ -380,7 +400,7 @@ export default function DoctorReviewPrep() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link to="/doctor">
-          <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" aria-label="Back to Home"><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
         <div>
           <h2 className="text-xl font-bold">Prepare for Your {meetingTypeLabel}</h2>
@@ -398,10 +418,14 @@ export default function DoctorReviewPrep() {
       {/* Step 0: Prior Action Steps Progress (follow-ups only) */}
       {isFollowUp && hasPriorSteps && (
         <>
-          <Card className="border-amber-200 bg-amber-50/30 dark:bg-amber-950/10 dark:border-amber-800/30">
+          {/* QA fix: /0.3 border opacity — the original amber-200 border was
+              a pale tint, not the full-strength amber. */}
+          <Card className="border-[hsl(var(--status-late)_/_0.3)] bg-[hsl(var(--status-late-bg))]">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
-                <div className="flex items-center justify-center h-6 w-6 rounded-full bg-amber-500 text-white text-xs font-bold">✓</div>
+                {/* QA fix: -ink solid fill, not vivid — white "✓" on vivid
+                    status-late computes to ~1.98:1, failing even 3:1. */}
+                <div className="flex items-center justify-center h-6 w-6 rounded-full bg-[hsl(var(--status-late-ink))] text-white text-xs font-bold">✓</div>
                 <CardTitle className="text-base">How are your action steps going?</CardTitle>
               </div>
               <CardDescription>Quick update on the goals from your last session.</CardDescription>
@@ -566,7 +590,7 @@ export default function DoctorReviewPrep() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-sm font-medium leading-snug">{pm?.action_statement || `Action #${item.action_id}`}</p>
                               {isSuggested && (
-                                <Badge className="bg-amber-100 text-amber-800 text-2xs px-1.5 py-0">{coachName}'s pick</Badge>
+                                <Badge className="bg-[hsl(var(--status-late-bg))] text-[hsl(var(--status-late-ink))] text-2xs px-1.5 py-0">{coachName}'s pick</Badge>
                               )}
                             </div>
                             {pm?.competencies?.name && (
@@ -614,6 +638,7 @@ export default function DoctorReviewPrep() {
                       size="icon"
                       className="h-6 w-6 shrink-0"
                       onClick={() => toggleAction(item.action_id)}
+                      aria-label={`Remove ${pm?.action_statement ?? 'Pro Move'} from focus areas`}
                     >
                       <X className="h-3.5 w-3.5" />
                     </Button>
@@ -653,10 +678,12 @@ export default function DoctorReviewPrep() {
       {isSchedulingInviteSent && (
         <>
           <Separator />
-          <Card className="border-blue-200 bg-blue-50/30 dark:bg-blue-950/10 dark:border-blue-800/30">
+          {/* QA fix: /0.3 border opacity — the original blue-200 border was
+              a pale tint, not the full-strength blue. */}
+          <Card className="border-[hsl(var(--status-info)_/_0.3)] bg-[hsl(var(--status-info-bg))]">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-blue-600" />
+                <Calendar className="h-5 w-5 text-[hsl(var(--status-info))]" />
                 <CardTitle className="text-base">Have You Scheduled Your Meeting?</CardTitle>
               </div>
             </CardHeader>

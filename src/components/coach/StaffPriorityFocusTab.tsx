@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { getDomainColorRich, getDomainColorRichRaw } from '@/lib/domainColors';
+import { getDomainColorVar, getDomainColorVarRaw } from '@/lib/domainColors';
+import { scoreBucket, scoreBucketTokens } from '@/lib/confidenceScoreRamp';
 import { format, parseISO, subWeeks } from 'date-fns';
-import { cn } from '@/lib/utils';
 
 interface ScoreRow {
   week_of: string;
@@ -81,8 +81,8 @@ export function StaffPriorityFocusTab({ rawData }: StaffPriorityFocusTabProps) {
         ) : (
           <div className="space-y-3">
             {lowConfidenceScores.map((score, idx) => {
-              const domainColorRich = getDomainColorRich(score.domain_name);
-              const richRaw = getDomainColorRichRaw(score.domain_name);
+              const domainColorRich = getDomainColorVar(score.domain_name);
+              const richRaw = getDomainColorVarRaw(score.domain_name);
               
               return (
                 <div
@@ -113,12 +113,15 @@ export function StaffPriorityFocusTab({ rawData }: StaffPriorityFocusTabProps) {
                     </p>
                     <div className="flex items-center justify-between gap-2 mt-2 text-xs text-muted-foreground">
                       <span>Week of {format(parseISO(score.week_of), 'MMM d')}</span>
-                      <span className={cn(
-                        "font-semibold px-2 py-0.5 rounded-full",
-                        score.confidence_score === 1 
-                          ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" 
-                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                      )}>
+                      <span
+                        className="font-semibold px-2 py-0.5 rounded-full"
+                        style={(() => {
+                          const tokens = scoreBucketTokens(scoreBucket(score.confidence_score ?? NaN));
+                          // ink, not the vivid `text` token, for on-tint text —
+                          // `text` fails contrast at this size in light mode.
+                          return { backgroundColor: tokens.bg, color: tokens.ink };
+                        })()}
+                      >
                         Confidence: {score.confidence_score}/4
                       </span>
                     </div>

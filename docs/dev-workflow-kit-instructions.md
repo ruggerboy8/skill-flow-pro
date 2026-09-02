@@ -144,20 +144,20 @@ session.
 
 Doc-routing table (put it in `.claude/skills/_shared/doc-routing.md`
 and have `/spec` copy the relevant rows into each spec):
-- schema/DB → `docs/data-model.md`, CLAUDE.md "Framework content is
+- schema/DB → `docs/archive/data-model.md`, CLAUDE.md "Framework content is
   versioned" + "DB DDL must lag deploy" memory
 - mobile UI → `docs/features/mobile-design-principles.md`,
   `mobile-build-instructions.md` Ground rules, gating via
   `useMobileShell`
-- Pro Move content → `docs/glossary.md`, framework-history rules
-- evaluations → `docs/features/evaluation-*.md`, hollow-evals guard
+- Pro Move content → `docs/archive/glossary.md`, framework-history rules
+- evaluations → `docs/archive/features/evaluation-*.md`, hollow-evals guard
 - coaching/leads → `docs/management-model.md`
 - anything → `docs/system-overview.md`, no em dashes, token conventions
 
 ## Phase 4: first use = the codebase assessment backlog
 
 Run the kit's first real job on itself: `/spec` an assessment (the
-existing `docs/audits/` are flagged stale in CLAUDE.md). The assessment
+existing `docs/archive/audits/` are flagged stale in CLAUDE.md). The assessment
 agent (Opus-class) sweeps: security/RLS drift, dead code and unused
 branches (125 remote branches, most Lovable `edit/*`), duplicated logic,
 missing tests on load-bearing helpers, dark-mode debt (the static

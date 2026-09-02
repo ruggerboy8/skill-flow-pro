@@ -7,6 +7,11 @@ export default {
 		"./components/**/*.{ts,tsx}",
 		"./app/**/*.{ts,tsx}",
 		"./src/**/*.{ts,tsx}",
+		// ASK-1b: streamdown (AI Elements' markdown renderer, used by
+		// MessageResponse) ships Tailwind utility classes baked into its
+		// compiled JS rather than a stylesheet; Tailwind's JIT scanner needs
+		// this path to generate them.
+		"./node_modules/streamdown/dist/**/*.js",
 	],
 	prefix: "",
 	theme: {
@@ -63,9 +68,19 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				brand: {
-					50: '#fdfefe',
-					600: '#124570',
-					900: '#080809'
+					// DSN-3: removed the legacy numeric scale (50/600/900) that used to
+					// back Button/ProMovesLogo/LandingPage. Those now consume the
+					// `primary` token, which resolves to brand navy (see src/index.css).
+					// Zero remaining consumers as of this migration; re-add if a future
+					// surface needs the raw hex again.
+					// DSN-5a: the six locked brand colors, sourced from
+					// promoves-brand/exports/README.md via the --brand-* CSS vars.
+					navy: 'hsl(var(--brand-navy))',
+					blue: 'hsl(var(--brand-blue))',
+					signal: 'hsl(var(--brand-signal))',
+					bone: 'hsl(var(--brand-bone))',
+					charcoal: 'hsl(var(--brand-charcoal))',
+					gray: 'hsl(var(--brand-gray))'
 				},
 				slatebrand: {
 					400: '#949aa1',
@@ -97,6 +112,13 @@ export default {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
+			},
+			// DSN-5a: brand motion contract (run-once, no bounce). Duration
+			// steps live only as CSS vars for now (--duration-quick/standard/brand
+			// in src/index.css); add a transitionDuration section here if a
+			// later ticket needs them as Tailwind utilities.
+			transitionTimingFunction: {
+				brand: 'var(--ease-brand)'
 			},
 		keyframes: {
 			'accordion-down': {

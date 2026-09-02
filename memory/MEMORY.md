@@ -8,10 +8,12 @@ Multi-tenant SaaS coaching platform for dental practices.
 - No CLAUDE.md exists — docs are in /docs/ folder
 
 ## Key Docs
-- docs/weekly-assignments-migration-summary.md — migration history
-- docs/phase-3-5-implementation-plan.md — roadmap for weekly_assignments transition
-- docs/phase2-qa.md — feature flag QA doc
-- docs/edge-function-deployment.md — edge function deploy notes
+All four below live under docs/archive/ as of 2026-08-19 (DOC-5): they are
+historical records, not descriptions of the system today. Start at docs/README.md.
+- docs/archive/weekly-assignments-migration-summary.md — migration history
+- docs/archive/phase-3-5-implementation-plan.md — roadmap for weekly_assignments transition
+- docs/archive/phase2-qa.md — feature flag QA doc
+- docs/archive/edge-function-deployment.md — edge function deploy notes
 
 ## Architecture
 
@@ -75,8 +77,12 @@ Multi-tenant SaaS coaching platform for dental practices.
 - claude/ecstatic-ptolemy: current working branch
 
 ## Tracking Doc
-- docs/progress.md in the worktree — master reference for status and decisions
-- Update at end of every session
+- docs/archive/progress.md was the master reference for status and decisions. It
+  is archived as of 2026-08-19 (DOC-5): it is five-plus months stale and describes
+  the retired Lovable publish workflow. Do not treat it as current and do not
+  update it.
+- For the present state start at docs/README.md and docs/dev/assessment-2026-08-18.md.
+  Work in flight lives on the Motion dev board and in docs/specs/.
 
 ## Key Decisions (Session 2)
 - Super-admin view: Option A (separate /platform-admin page) — DECIDED

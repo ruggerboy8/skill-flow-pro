@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCoachingWorkspace, fetchIssueEvents } from '@/hooks/useCoachingWorkspace';
+import { useWorkspaceLocations, type WorkspaceLocation } from '@/hooks/useWorkspaceLocations';
 import {
   STAGE_META, STAGE_ORDER, OUTCOME_META, SOURCE_META,
   type CoachingIssue, type IssueStage, type RetireOutcome, type SourceType,
@@ -16,8 +17,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import {
-  Plus, LayoutList, KanbanSquare, MapPin, Archive, Eye, Stethoscope, Users, Activity,
-  Shield, Upload, Loader2, Sparkles, Check,
+  Plus, LayoutList, KanbanSquare, MapPin, Archive, Eye, Stethoscope, Users, Activity, Shield,
 } from 'lucide-react';
 
 // Subtle stage colors (a not-yet-tokenized concept; fine to hardcode for now).
@@ -26,23 +26,12 @@ const STAGE_HEX: Record<IssueStage, string> = {
 };
 const SOURCE_ICON: Record<SourceType, any> = { visit: Eye, doctor: Stethoscope, leads: Users, signal: Activity, management: Shield };
 
-interface Loc { id: string; name: string; group: string }
-
-function useLocations(orgId: string | null) {
-  return useQuery({
-    queryKey: ['workspace-locations', orgId],
-    enabled: !!orgId,
-    queryFn: async (): Promise<Loc[]> => {
-      // Scope to the caller's org (don't lean on RLS, which is permissive for super admins).
-      const { data: groups } = await supabase.from('practice_groups').select('id, name').eq('organization_id', orgId);
-      const groupIds = (groups ?? []).map((g: any) => g.id);
-      if (!groupIds.length) return [];
-      const { data: locs } = await supabase.from('locations').select('id, name, group_id').in('group_id', groupIds).eq('active', true).order('name');
-      const gmap = new Map((groups ?? []).map((g: any) => [g.id, g.name]));
-      return (locs ?? []).map((l: any) => ({ id: l.id, name: l.name, group: gmap.get(l.group_id) ?? '' }));
-    },
-  });
-}
+// Loc kept as a local alias -- unchanged call sites below reference it by this
+// name. Backed by the shared useWorkspaceLocations hook (LRM-1); transcript
+// ingest now lives in the "Meetings and Focus" tab's meeting dialog, which
+// uses the same hook.
+type Loc = WorkspaceLocation;
+const useLocations = useWorkspaceLocations;
 
 function StagePill({ stage }: { stage: IssueStage }) {
   const c = STAGE_HEX[stage];
@@ -74,7 +63,7 @@ function SourceBadges({ sources }: { sources: SourceType[] }) {
         const Icon = SOURCE_ICON[s];
         return <span key={s} title={SOURCE_META[s].label} className="inline-flex items-center rounded-full border bg-muted px-1.5 py-0.5 text-muted-foreground"><Icon className="h-3 w-3" /></span>;
       })}
-      {sources.length >= 2 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">×{sources.length}</span>}
+      {sources.length >= 2 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-2xs font-bold text-primary">×{sources.length}</span>}
     </div>
   );
 }
@@ -88,7 +77,6 @@ export default function TrainingWorkspace() {
   const [drawer, setDrawer] = useState<CoachingIssue | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [histOpen, setHistOpen] = useState(false);
-  const [ingestOpen, setIngestOpen] = useState(false);
   const [retireFor, setRetireFor] = useState<CoachingIssue | null>(null);
 
   // keep the open drawer issue in sync with fresh data
@@ -110,7 +98,6 @@ export default function TrainingWorkspace() {
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => setHistOpen(true)}><Archive className="mr-2 h-4 w-4" />History ({ws.archived.length})</Button>
-          <Button variant="outline" size="sm" onClick={() => setIngestOpen(true)}><Upload className="mr-2 h-4 w-4" />Ingest transcript</Button>
           <Button size="sm" onClick={() => setAddOpen(true)}><Plus className="mr-2 h-4 w-4" />Add issue</Button>
         </div>
       </div>
@@ -148,9 +135,6 @@ export default function TrainingWorkspace() {
         onRetire={(id, outcome, note) => ws.retire.mutate({ id, outcome, note }, { onSuccess: () => { setRetireFor(null); setDrawer(null); toast({ title: 'Retired to history' }); } })} />
       <HistoryDialog open={histOpen} onOpenChange={setHistOpen} archived={ws.archived} locMap={locMap}
         onReopen={(id) => ws.reopen.mutate(id, { onSuccess: () => toast({ title: 'Reopened' }) })} />
-      <IngestDialog open={ingestOpen} onOpenChange={setIngestOpen} locations={locations}
-        onAdd={(input) => ws.createIssue.mutate(input)}
-        onDone={(n) => toast({ title: n === 1 ? 'Added 1 issue' : `Added ${n} issues` })} />
     </div>
   );
 }
@@ -335,7 +319,7 @@ function AddIssueDialog({ open, onOpenChange, locations, onSave }: { open: boole
               <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-lg border p-2">
                 {locations.map((l) => (
                   <button key={l.id} type="button" onClick={() => toggle(locs, l.id, setLocs)}
-                    className={`rounded-full border px-2.5 py-1 text-[12px] font-semibold ${locs.has(l.id) ? 'border-transparent bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{l.name}</button>
+                    className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${locs.has(l.id) ? 'border-transparent bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{l.name}</button>
                 ))}
               </div>
             )}
@@ -411,94 +395,6 @@ function HistoryDialog({ open, onOpenChange, archived, locMap, onReopen }: { ope
             );
           })}
         </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-interface IngestCand { title: string; detail: string; selected: boolean; locationIds: Set<string>; isGlobal: boolean }
-
-function IngestDialog({ open, onOpenChange, locations, onAdd, onDone }: {
-  open: boolean; onOpenChange: (o: boolean) => void; locations: Loc[];
-  onAdd: (input: { title: string; detail?: string; isGlobal: boolean; locationIds: string[]; sources: SourceType[] }) => void;
-  onDone: (n: number) => void;
-}) {
-  const [transcript, setTranscript] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [cands, setCands] = useState<IngestCand[] | null>(null);
-  useEffect(() => { if (open) { setTranscript(''); setCands(null); setLoading(false); } }, [open]);
-  const bump = () => setCands((prev) => (prev ? [...prev] : prev));
-
-  const run = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('coaching-extract-issues', {
-        body: { transcript, locationNames: locations.map((l) => l.name) },
-      });
-      if (error) throw error;
-      const nameToId = new Map(locations.map((l) => [l.name.toLowerCase(), l.id]));
-      const cs: IngestCand[] = (((data as any)?.issues ?? []) as any[]).map((iss) => ({
-        title: iss.title, detail: iss.detail ?? '', selected: true,
-        locationIds: new Set<string>(((iss.suggested_locations ?? []) as string[]).map((n) => nameToId.get(n.toLowerCase())).filter(Boolean) as string[]),
-        isGlobal: false,
-      }));
-      setCands(cs);
-    } catch (e: any) {
-      toast({ title: "Couldn't read that transcript", description: e?.message ?? 'Try again.', variant: 'destructive' });
-    } finally { setLoading(false); }
-  };
-
-  const addSelected = () => {
-    const chosen = (cands ?? []).filter((c) => c.selected && c.title.trim());
-    chosen.forEach((c) => onAdd({ title: c.title.trim(), detail: c.detail || undefined, isGlobal: c.isGlobal, locationIds: c.isGlobal ? [] : Array.from(c.locationIds), sources: ['leads'] }));
-    onOpenChange(false);
-    if (chosen.length) onDone(chosen.length);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
-        <DialogHeader><DialogTitle>Ingest a transcript</DialogTitle></DialogHeader>
-        {!cands ? (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">Paste a lead-meeting or visit transcript. I'll pull out the trackable issues for you to keep or drop.</p>
-            <Textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} rows={7} placeholder="Paste the transcript here…" />
-            <Button disabled={loading || transcript.trim().length < 20} onClick={run}>
-              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Reading…</> : <><Sparkles className="mr-2 h-4 w-4" />Find issues</>}
-            </Button>
-          </div>
-        ) : cands.length === 0 ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">No trackable issues found in that transcript.
-            <div className="mt-3"><Button variant="ghost" size="sm" onClick={() => setCands(null)}>Try another</Button></div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">Found {cands.length}. Keep the ones worth tracking and confirm their locations.</p>
-            {cands.map((c, ix) => (
-              <div key={ix} className={`rounded-lg border p-3 ${c.selected ? 'border-primary/40 bg-primary/5' : ''}`}>
-                <div className="flex items-start gap-2.5">
-                  <button onClick={() => { c.selected = !c.selected; bump(); }} className={`mt-0.5 grid h-[18px] w-[18px] flex-shrink-0 place-items-center rounded border ${c.selected ? 'border-primary bg-primary text-primary-foreground' : 'border-input'}`}>{c.selected && <Check className="h-3 w-3" />}</button>
-                  <div className="min-w-0 flex-1">
-                    <input value={c.title} onChange={(e) => { c.title = e.target.value; bump(); }} className="w-full bg-transparent text-sm font-semibold focus:outline-none" />
-                    {c.detail && <div className="text-xs text-muted-foreground">{c.detail}</div>}
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      <button onClick={() => { c.isGlobal = !c.isGlobal; bump(); }} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${c.isGlobal ? 'border-transparent bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>Global</button>
-                      {!c.isGlobal && locations.map((l) => (
-                        <button key={l.id} onClick={() => { if (c.locationIds.has(l.id)) { c.locationIds.delete(l.id); } else { c.locationIds.add(l.id); } bump(); }} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${c.locationIds.has(l.id) ? 'border-transparent bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{l.name}</button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        {cands && cands.length > 0 && (
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setCands(null)}>Back</Button>
-            <Button disabled={!cands.some((c) => c.selected)} onClick={addSelected}>Add selected</Button>
-          </DialogFooter>
-        )}
       </DialogContent>
     </Dialog>
   );

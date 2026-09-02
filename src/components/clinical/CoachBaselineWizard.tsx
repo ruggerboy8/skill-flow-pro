@@ -15,11 +15,15 @@ import { CheckCircle2, ArrowLeft, Mic, MicOff, Loader2, ChevronDown, RotateCcw, 
 import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
 import { cn } from '@/lib/utils';
 
+// 1-4 rating buttons use the --score-N learning-gradient tokens (same
+// palette as the doctor's self-assessment wizard). text-[...] uses the -ink
+// variant, not the vivid --score-N: the vivid color on -bg fails contrast
+// for this button's small digit label in light mode. border keeps vivid.
 const SCORE_CONFIG = [
-  { value: 1, selected: 'bg-orange-100 border-orange-400 text-orange-800' },
-  { value: 2, selected: 'bg-amber-100 border-amber-400 text-amber-800' },
-  { value: 3, selected: 'bg-blue-100 border-blue-400 text-blue-800' },
-  { value: 4, selected: 'bg-emerald-100 border-emerald-400 text-emerald-800' },
+  { value: 1, selected: 'bg-[hsl(var(--score-1-bg))] border-[hsl(var(--score-1))] text-[hsl(var(--score-1-ink))]' },
+  { value: 2, selected: 'bg-[hsl(var(--score-2-bg))] border-[hsl(var(--score-2))] text-[hsl(var(--score-2-ink))]' },
+  { value: 3, selected: 'bg-[hsl(var(--score-3-bg))] border-[hsl(var(--score-3))] text-[hsl(var(--score-3-ink))]' },
+  { value: 4, selected: 'bg-[hsl(var(--score-4-bg))] border-[hsl(var(--score-4))] text-[hsl(var(--score-4-ink))]' },
 ];
 
 const COACH_BASELINE_INTRO_DISMISSED_KEY = (doctorStaffId: string) =>
@@ -634,7 +638,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
             {isComplete ? 'Review Assessment' : 'Private Assessment'}: {doctorName}
           </h1>
           {isComplete && (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-[hsl(var(--status-complete))] bg-[hsl(var(--status-complete-bg))] px-2 py-0.5 rounded-full">
               <CheckCircle2 className="h-3 w-3" /> Complete
             </span>
           )}
@@ -792,7 +796,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                       if (!isDifferentEditor) return null;
                       return (
                         <span
-                          className="shrink-0 inline-flex items-center gap-1 text-2xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full"
+                          className="shrink-0 inline-flex items-center gap-1 text-2xs font-medium text-[hsl(var(--status-late))] bg-[hsl(var(--status-late-bg))] border border-[hsl(var(--status-late))]/30 px-1.5 py-0.5 rounded-full"
                           title={`Edited by ${ed.name} ${formatDistanceToNow(new Date(ed.at), { addSuffix: true })}`}
                         >
                           Edited by {ed.name.split(' ')[0]}
@@ -932,7 +936,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                 )}
 
                 {mappingJustCompleted && (
-                  <div className="flex items-center gap-2 text-sm text-emerald-600 justify-center py-1">
+                  <div className="flex items-center gap-2 text-sm text-[hsl(var(--status-complete))] justify-center py-1">
                     <CheckCircle2 className="h-4 w-4" />
                     Notes mapped successfully
                     <Button
@@ -1017,8 +1021,8 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
           <div className="flex items-center justify-between max-w-4xl mx-auto">
             <div className="flex items-center gap-3">
               <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive" />
               </span>
               <span className="text-sm font-medium">Recording in progress</span>
             </div>

@@ -207,7 +207,7 @@ export default function EvaluationReviewV2() {
         <Card>
           <CardContent className="py-12 text-center space-y-4">
             <CheckCircle2 className="w-12 h-12 mx-auto" style={{ color: 'hsl(var(--status-complete))' }} />
-            <h2 className="text-xl font-semibold">Review already completed</h2>
+            <h1 className="text-xl font-semibold">Review already completed</h1>
             <p className="text-muted-foreground">You've already reviewed this evaluation.</p>
             <Button onClick={() => navigate('/')}>Back to Home</Button>
           </CardContent>

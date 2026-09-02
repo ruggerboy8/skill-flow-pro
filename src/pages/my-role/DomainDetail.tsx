@@ -8,29 +8,82 @@ import { useDomainDetail, type ProMoveDetail } from '@/hooks/useDomainDetail';
 import { getDomainColorRichRaw } from '@/lib/domainColors';
 import { ROLE_CONTENT, getRoleTypeFromArchetype, type RoleType } from '@/lib/content/roleDefinitions';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { useMobileShell } from '@/hooks/useMobileShell';
 import CompetencyAccordion from '@/components/my-role/CompetencyAccordion';
 import { ProMoveDrawer } from '@/components/my-role/ProMoveDrawer';
-import { cn } from '@/lib/utils';
+import ExploreDomain from '@/pages/my-role/ExploreDomain';
 
-function getAverageBadge(score: number | null) {
+// DSN-4: this is a competency SCORE badge, not a submission/delivery
+// STATUS — reads from the --score-* tokens (same family CompetencyAccordion
+// uses below it on this page) rather than StatusBadge, so the two badges on
+// this screen agree with each other.
+function getAverageBadge(score: number | null): { label: string; icon: typeof TrendingUp; style: React.CSSProperties } {
   if (score === null) {
-    return { label: 'Exploration Mode', icon: TrendingUp, className: 'bg-muted/80 text-muted-foreground' };
+    // The Badge below has no `variant` prop, so it defaults to "default"
+    // (solid bg-primary/brand color) unless we pin the fill and text
+    // explicitly — this must never fall back to that default.
+    return {
+      label: 'Exploration Mode',
+      icon: TrendingUp,
+      // Matches the original bg-muted/80 (80% opacity) with no visible
+      // border (the Badge here has no variant, so its default border is
+      // already transparent unless a color class overrides it — none did).
+      style: {
+        backgroundColor: 'hsl(var(--muted) / 0.8)',
+        color: 'hsl(var(--muted-foreground))',
+        borderColor: 'transparent',
+      },
+    };
   }
+  // DSN-9 QA follow-up (Codex, PR #76): `color` was the vivid --score-N as
+  // text on -bg, the same mistake fixed in CompetencyAccordion.tsx just
+  // above this component on the page — band 3 measured ~1.9:1 under the
+  // new lime, already failing before that (2.89:1 on the old blue). Routed
+  // through -ink for all three bands: 6.47 / 6.41 / 6.96 : 1.
   if (score >= 3.5) {
-    return { label: 'Mastery', icon: Trophy, className: 'bg-amber-100 text-amber-800' };
+    return {
+      label: 'Mastery',
+      icon: Trophy,
+      style: { backgroundColor: 'hsl(var(--score-4-bg))', color: 'hsl(var(--score-4-ink))' },
+    };
   }
   if (score >= 2.5) {
-    return { label: 'Proficient', icon: Sparkles, className: 'bg-blue-100 text-blue-800' };
+    return {
+      label: 'Proficient',
+      icon: Sparkles,
+      style: { backgroundColor: 'hsl(var(--score-3-bg))', color: 'hsl(var(--score-3-ink))' },
+    };
   }
-  return { label: 'Building', icon: TrendingUp, className: 'bg-orange-100 text-orange-800' };
+  return {
+    label: 'Building',
+    icon: TrendingUp,
+    style: { backgroundColor: 'hsl(var(--score-2-bg))', color: 'hsl(var(--score-2-ink))' },
+  };
 }
 
+/**
+ * Route entry for /my-role/domain/:domainSlug. Mobile shell renders the
+ * Explore drill's domain level (ExploreDomain — competency list, hero,
+ * discovery dots) instead of the desktop accordion below. This has to be a
+ * thin wrapper, not an early return inside DomainDetailDesktop: that
+ * component calls useDomainDetail() (a live query) unconditionally, and an
+ * early return before that hook call would violate the rules of hooks /
+ * needlessly fire the desktop-only query on mobile. Splitting into two
+ * components keeps desktop's hook sequence and rendering byte-identical.
+ * See docs/specs/mob-explore-rebuild.md §2 level 2.
+ */
 export default function DomainDetail() {
+  const isMobileShell = useMobileShell();
+  if (isMobileShell) return <ExploreDomain />;
+  return <DomainDetailDesktop />;
+}
+
+function DomainDetailDesktop() {
   const { domainSlug = '' } = useParams<{ domainSlug: string }>();
   const navigate = useNavigate();
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
   const [selectedMove, setSelectedMove] = useState<ProMoveDetail | null>(null);
-  
+
   const { data, isLoading, error } = useDomainDetail(domainSlug);
 
   const archetype = (staffProfile as any)?.roles?.archetype_code ?? null;
@@ -101,7 +154,7 @@ export default function DomainDetail() {
             {/* Score Badge */}
             {!isLoading && data && (
               <div className="flex flex-col items-start md:items-end gap-1.5 mt-2 md:mt-0">
-                <Badge className={cn('px-4 py-2 text-sm font-medium shrink-0', avgBadge.className)}>
+                <Badge className="px-4 py-2 text-sm font-medium shrink-0" style={avgBadge.style}>
                   <BadgeIcon className="w-4 h-4 mr-2" />
                   {avgBadge.label}
                   {typeof data.averageScore === 'number' && (

@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { AlertTriangle } from 'lucide-react';
-import { getDomainColor } from '@/lib/domainColors';
+import { getDomainPastelVar } from '@/lib/domainColors';
 import { DOMAIN_ORDER, getDomainOrderIndex } from '@/lib/domainUtils';
 import type { EvalFilters } from '@/types/analytics';
 import { getPeriodLabel } from '@/types/analytics';
@@ -186,7 +186,7 @@ export function StaffDetailDrawerV2({
                       <Card 
                         key={domain.domain_id}
                         className="border-l-4"
-                        style={{ borderLeftColor: getDomainColor(domain.domain_name) }}
+                        style={{ borderLeftColor: getDomainPastelVar(domain.domain_name) }}
                       >
                         <CardContent className="pt-3 pb-3">
                           <div className="flex items-center justify-between mb-2">
@@ -220,7 +220,7 @@ export function StaffDetailDrawerV2({
                       <div className="flex items-center gap-2 mb-2">
                         <span 
                           className="inline-block w-3 h-3 rounded-sm"
-                          style={{ backgroundColor: getDomainColor(domainName) }}
+                          style={{ backgroundColor: getDomainPastelVar(domainName) }}
                         />
                         <span className="font-medium text-sm">{domainName}</span>
                       </div>
@@ -278,7 +278,7 @@ export function StaffDetailDrawerV2({
                             <li key={d.domain_id} className="flex items-center gap-2">
                               <span 
                                 className="inline-block w-2 h-2 rounded-full"
-                                style={{ backgroundColor: getDomainColor(d.domain_name) }}
+                                style={{ backgroundColor: getDomainPastelVar(d.domain_name) }}
                               />
                               <span>
                                 {d.domain_name}: {gap < 0 ? 'Over-confident' : 'Under-confident'} by {Math.abs(gap).toFixed(1)}

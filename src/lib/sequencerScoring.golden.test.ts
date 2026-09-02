@@ -14,6 +14,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  classifyConfidence,
   compareScoredMoves,
   scoreCandidate,
   scoreCandidateWithAdvancedState,
@@ -214,12 +215,24 @@ const originalScoreWithAdvanced = (
 // Tests
 // ---------------------------------------------------------------------------
 
+/**
+ * COR-6 added `confEB` to the returned score. It is a newly EXPOSED value (the
+ * `smoothedConf` the pre-extraction code already computed internally), not a
+ * new input to any formula, so it is dropped before comparing against the
+ * pre-extraction reference implementation. Every scoring number below is still
+ * compared field for field.
+ */
+function withoutConfEB<T extends { confEB?: number }>(score: T) {
+  const { confEB: _confEB, ...rest } = score;
+  return rest;
+}
+
 describe('sequencer scoring: golden fixture (pre- vs post-extraction)', () => {
   it('produces identical per-move scores for every candidate', () => {
     for (const move of FIXTURE_MOVES) {
       const before = originalScoreCandidate(move, REFERENCE_DATE);
       const after = scoreCandidate(move, REFERENCE_DATE, FIXTURE_INPUTS);
-      expect(after, `move ${move.id}`).toEqual(before);
+      expect(withoutConfEB(after), `move ${move.id}`).toEqual(before);
     }
   });
 
@@ -232,7 +245,7 @@ describe('sequencer scoring: golden fixture (pre- vs post-extraction)', () => {
       .sort(compareScoredMoves);
 
     expect(after.map(m => m.id)).toEqual(before.map(m => m.id));
-    expect(after).toEqual(before);
+    expect(after.map(withoutConfEB)).toEqual(before);
   });
 
   it('produces identical preview-week scores with advanced last-selected state', () => {
@@ -256,7 +269,7 @@ describe('sequencer scoring: golden fixture (pre- vs post-extraction)', () => {
         advancedLastSelected,
         FIXTURE_INPUTS
       );
-      expect(after, `preview move ${move.id}`).toEqual(before);
+      expect(withoutConfEB(after), `preview move ${move.id}`).toEqual(before);
     }
   });
 
@@ -290,5 +303,85 @@ describe('sequencer scoring: golden fixture (pre- vs post-extraction)', () => {
       { id: 107, score: 31, final: 0.311429, reason: 'STALE' },
       { id: 103, score: 17, final: 0.17438, reason: 'TIE' },
     ]);
+  });
+});
+
+/**
+ * COR-6 characterization of the confidence badge the edge function puts on
+ * every response row. `formatRow` in supabase/functions/sequencer-rank/index.ts
+ * builds `status` exactly this way, so this test is the closest thing to an
+ * end-to-end pin on what a coach sees.
+ *
+ * The "before (wrong)" column is what the deployed function returns today,
+ * captured on this fixture before the fix. It classified on `C` (collective
+ * weakness, HIGH is bad) through a function that expects EB confidence (LOW is
+ * bad), so the badge was inverted.
+ */
+describe('COR-6: response-row confidence status for the golden fixture', () => {
+  const statusFor = (moveId: number, value: number) =>
+    classifyConfidence(
+      value,
+      FIXTURE_CONFIDENCE_HISTORY.filter(h => h.proMoveId === moveId)
+    ).status;
+
+  it('pins the corrected status for every fixture move', () => {
+    const rows = FIXTURE_MOVES.map(move => {
+      const scored = scoreCandidate(move, REFERENCE_DATE, FIXTURE_INPUTS);
+      return { id: move.id, status: statusFor(move.id, scored.confEB) };
+    });
+
+    // after (correct): classified on confEB
+    expect(rows).toEqual([
+      { id: 101, status: 'ok' },      // before (wrong): ok
+      { id: 102, status: 'ok' },      // before (wrong): ok
+      { id: 103, status: 'ok' },      // before (wrong): watch   <- FLIPPED
+      { id: 104, status: 'ok' },      // before (wrong): ok
+      { id: 105, status: 'ok' },      // before (wrong): ok
+      { id: 106, status: 'ok' },      // before (wrong): ok
+      { id: 107, status: 'ok' },      // before (wrong): critical <- FLIPPED
+      { id: 108, status: 'watch' },   // before (wrong): watch
+      { id: 109, status: 'ok' },      // before (wrong): ok
+      { id: 110, status: 'ok' },      // before (wrong): ok
+    ]);
+  });
+
+  it('reproduces the old inverted statuses when C is passed instead', () => {
+    // Guard against a silent regression to the old wiring: if someone puts
+    // `m.C` back, these are the badges that come out, and the pin above fails.
+    const rows = FIXTURE_MOVES.map(move => {
+      const scored = scoreCandidate(move, REFERENCE_DATE, FIXTURE_INPUTS);
+      return { id: move.id, status: statusFor(move.id, scored.C) };
+    });
+
+    expect(rows).toEqual([
+      { id: 101, status: 'ok' },
+      { id: 102, status: 'ok' },
+      { id: 103, status: 'watch' },
+      { id: 104, status: 'ok' },
+      { id: 105, status: 'ok' },
+      { id: 106, status: 'ok' },
+      { id: 107, status: 'critical' },
+      { id: 108, status: 'watch' },
+      { id: 109, status: 'ok' },
+      { id: 110, status: 'ok' },
+    ]);
+  });
+
+  it('shows the flip on the two moves that changed', () => {
+    // 107: weekly confidence averages of 0.90 and 1.00 (near 4 of 4) with 15
+    // responses across the last two weeks. The team understands this one, and
+    // it was the loudest CRITICAL on the board.
+    const m107 = scoreCandidate(FIXTURE_MOVES[6], REFERENCE_DATE, FIXTURE_INPUTS);
+    expect(FIXTURE_MOVES[6].id).toBe(107);
+    expect(m107.confEB).toBeGreaterThan(0.30);
+    expect(statusFor(107, m107.C)).toBe('critical');
+    expect(statusFor(107, m107.confEB)).toBe('ok');
+
+    // 103: also high confidence (confEB ~0.76), previously badged Watch.
+    const m103 = scoreCandidate(FIXTURE_MOVES[2], REFERENCE_DATE, FIXTURE_INPUTS);
+    expect(FIXTURE_MOVES[2].id).toBe(103);
+    expect(m103.confEB).toBeGreaterThan(0.30);
+    expect(statusFor(103, m103.C)).toBe('watch');
+    expect(statusFor(103, m103.confEB)).toBe('ok');
   });
 });

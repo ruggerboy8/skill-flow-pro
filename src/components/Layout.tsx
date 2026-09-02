@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
-import alcanLogo from '@/assets/alcan-logo.png';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
@@ -18,9 +17,12 @@ import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOp
 import { Skeleton } from '@/components/ui/skeleton';
 import { PendingSurveysCard } from '@/components/home/PendingSurveysCard';
 import { ProMovesLogo } from '@/components/ProMovesLogo';
+import { OrgMark } from '@/components/OrgMark';
 import { ALCAN_ORG_ID } from '@/lib/askAlcanAccess';
 import { useMobileShell } from '@/hooks/useMobileShell';
 import { MobileTabBar } from '@/components/mobile/MobileTabBar';
+import { AvatarMenu } from '@/components/mobile/AvatarMenu';
+import { RouteLoadingFallback } from '@/components/RouteLoadingFallback';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
@@ -38,11 +40,11 @@ export default function Layout() {
     organizationId,
     isLoading: roleInfoLoading,
     isCoach,
+    isLead,
     isSuperAdmin,
     isOrgAdmin,
     isRegional,
     isParticipant,
-    isLead,
     isOfficeManager,
     isDoctor,
     isClinicalDirector,
@@ -80,6 +82,13 @@ export default function Layout() {
       });
   }, [organizationId]);
   
+  // Org mark pending state (QA fix): organizationId arrives asynchronously
+  // via useUserRole, so the org half of the header's marquee slot has
+  // nothing to show for a beat on first load. OrgMark uses this to render
+  // an invisible placeholder instead of resolving to its fallback branch
+  // early, then eases the real mark in once it resolves.
+  const orgMarkPending = !organizationId;
+
   const location = useLocation();
   const { toast } = useToast();
 
@@ -113,7 +122,14 @@ export default function Layout() {
   const canAccessAdmin = isSuperAdmin || isOrgAdmin;
 
   // Tab visibility derived from role flags + capability toggles (all from useUserRole).
-  const showCoachTabs = isCoach || isOrgAdmin || isLead || canViewSubmissions || canSubmitEvals;
+  // isLead dropped (MOB-ADJUST-1 item 6): a pure lead (is_lead but not is_coach) no
+  // longer gets the old Coach dashboard link — they use /team instead. Real coaches
+  // (isCoach), org admins, and evaluators (canViewSubmissions/canSubmitEvals) keep it.
+  // showCoachTabs gates only the "Coach" nav entry below (checked repo-wide); it isn't
+  // used for route access — /coach's own guard (allowCoachSurface) still includes
+  // isLead, so a pure lead could still reach /coach by typed URL even with the link
+  // gone. That route-level change wasn't in scope for this ticket.
+  const showCoachTabs = isCoach || isOrgAdmin || canViewSubmissions || canSubmitEvals;
   // Facilitate is for the people who run check-in/check-out meetings (directors /
   // regionals / admins) — leads and OMs keep Coach but not Facilitate. Participants
   // are excluded even when they hold org-wide scopes (several lead RDAs do, which
@@ -180,6 +196,13 @@ export default function Layout() {
     // Doctor portal — for admins/coaches who are also doctors
     ...(isDoctor ? [
       { name: 'Doctor', href: '/doctor', icon: Stethoscope },
+    ] : []),
+    // Lead RDAs get a Team link (their team surface), on every layout — desktop
+    // sidebar and the mobile avatar menu — replacing the old Coach page they lost
+    // when isLead was dropped from showCoachTabs. On mobile Home there is also a
+    // "My Team" button; this keeps a route for desktop / unflagged-browser leads.
+    ...(isLead ? [
+      { name: 'Team', href: '/team', icon: Users },
     ] : []),
     ...(showCoachTabs ? [
       { name: 'Coach', href: '/coach', icon: Users },
@@ -257,17 +280,39 @@ export default function Layout() {
     return (
       <div className="h-screen supports-[height:100dvh]:h-[100dvh] bg-background flex flex-col">
         <header className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-card flex-none">
-          <img src={alcanLogo} alt="Alcan" className="h-6 object-contain dark:invert" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            Pro Moves
-          </span>
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Org logo + product wordmark side by side (the sister-brand
+                pairing from the brand brief). Org half is the same cascade
+                the desktop header uses (org logo_url, then Alcan's mark for
+                the Alcan org only, then org name text, then nothing here —
+                DSN-8) so a future non-Alcan org never sees Alcan's mark.
+                min-w-0 on the parent lets the wordmark shrink on narrow
+                phones. */}
+            <OrgMark
+              orgLogoUrl={orgLogoUrl}
+              organizationId={organizationId}
+              orgName={orgName}
+              pending={orgMarkPending}
+              imgClassName="h-6 object-contain dark:invert flex-none"
+            />
+            <ProMovesLogo className="text-sm shrink min-w-0" />
+          </div>
+          {/* Former "More" tab's contents (Profile, Sign out, My evaluations,
+              Practice log, lead Team) plus a role-aware management section for
+              flagged non-participants — MOB-1. */}
+          <AvatarMenu name={staffProfile?.name} navigation={navigation} />
         </header>
 
         <main ref={mobileMainRef} className="flex-1 overflow-y-auto overflow-x-hidden w-full p-4">
           <div className="mb-4 empty:mb-0">
             <PendingSurveysCard />
           </div>
-          <Outlet />
+          {/* PRF-3: Suspense boundary lives here, around the Outlet, not up
+              in App.tsx -- so a lazy route suspending only replaces this
+              content area. The header and (below) the tab bar stay mounted. */}
+          <Suspense fallback={<RouteLoadingFallback fullScreen={false} />}>
+            <Outlet context={{ navigation }} />
+          </Suspense>
         </main>
 
         {!isRitualRoute && <MobileTabBar />}
@@ -287,21 +332,17 @@ export default function Layout() {
               <SidebarTrigger />
               
               {/* Org logo — custom logo, else Alcan's mark for Alcan, else a
-                  neutral text wordmark so other orgs never see Alcan branding. */}
+                  neutral text wordmark so other orgs never see Alcan branding.
+                  This is the app's one marquee slot and stays org-first,
+                  unchanged in priority — DSN-8. */}
               <div className="absolute left-1/2 -translate-x-1/2">
-                {orgLogoUrl ? (
-                  <img
-                    src={orgLogoUrl}
-                    alt={orgName ?? 'ProMoves'}
-                    className="h-6 object-contain dark:invert"
-                  />
-                ) : organizationId === ALCAN_ORG_ID ? (
-                  <img src={alcanLogo} alt="Alcan" className="h-6 object-contain dark:invert" />
-                ) : orgName ? (
-                  <span className="text-sm font-semibold text-foreground">{orgName}</span>
-                ) : (
-                  <ProMovesLogo className="text-base" />
-                )}
+                <OrgMark
+                  orgLogoUrl={orgLogoUrl}
+                  organizationId={organizationId}
+                  orgName={orgName}
+                  pending={orgMarkPending}
+                  fallback={<ProMovesLogo className="text-base" />}
+                />
               </div>
               
               <div className="flex-1" />
@@ -315,6 +356,9 @@ export default function Layout() {
                   </Button>
                 )}
 
+                {/* DSN-8a: the secondary header wordmark that used to sit
+                    here (DSN-8) was removed — the sidebar's own brand mark
+                    (AppSidebar) is now the app's non-org logo placement. */}
                 <NavLink to="/profile" aria-label="Profile">
                   <Button variant="outline" size="icon">
                     <User className="w-4 h-4" />
@@ -329,7 +373,12 @@ export default function Layout() {
               <div className="mb-4 empty:mb-0">
                 <PendingSurveysCard />
               </div>
-              <Outlet />
+              {/* PRF-3: same boundary placement as the mobile shell above --
+                  the sidebar/header stay mounted, only this content area
+                  shows the loader while a lazy route's chunk fetches. */}
+              <Suspense fallback={<RouteLoadingFallback fullScreen={false} />}>
+                <Outlet context={{ navigation }} />
+              </Suspense>
             </main>
           </div>
         </div>

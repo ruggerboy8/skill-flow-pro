@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { applyFilters, getBadges, formatPrimaryReason, FilterState } from './recommenderUtils';
+import { describe, it, expect, vi } from 'vitest';
+import { applyFilters, getBadges, formatPrimaryReason, formatLastPracticed, FilterState } from './recommenderUtils';
 
 // A "move" here is a ranked Pro Move recommendation as the sequencer panel
 // renders it: a candidate for "what should this location practice this
@@ -82,16 +82,35 @@ describe('formatPrimaryReason', () => {
     expect(text).toBe('Not practiced in 10 weeks');
   });
 
-  it('falls back to a generic staleness message when weeks is the "never" sentinel (999)', () => {
+  it('surfaces a conflicting-data message and warns when a STALE reason is paired with the "never" sentinel (999)', () => {
     // A STALE reason paired with the 999 "never practiced" sentinel is a
-    // contradiction the type system does not prevent (see PR notes).
+    // contradiction the type system does not prevent. Rather than quietly
+    // falling back to a vague message, this should be loud: an explicit
+    // "conflicting data" message plus a console.warn so the bad upstream
+    // data gets noticed. See COR-5.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const text = formatPrimaryReason({
       primaryReasonCode: 'STALE',
       primaryReasonValue: null,
       lowConfShare: null,
       lastPracticedWeeks: 999,
     });
-    expect(text).toBe('Not practiced recently');
+    expect(text).toBe('Conflicting data: marked stale but never practiced');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
+  });
+
+  it('still detects the conflict when lastPracticedWeeks arrives as the string "999" (a JSON-boundary shape the type does not admit)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const text = formatPrimaryReason({
+      primaryReasonCode: 'STALE',
+      primaryReasonValue: null,
+      lowConfShare: null,
+      lastPracticedWeeks: '999' as unknown as number,
+    });
+    expect(text).toBe('Conflicting data: marked stale but never practiced');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
   });
 
   it('explains a tie reason as high overall need', () => {
@@ -201,6 +220,17 @@ describe('getBadges', () => {
       });
       expect(badges.map((b) => b.label)).not.toContain('New');
     });
+
+    it('still labels the move New, not Stale, when lastPracticedWeeks arrives as the string "999" (a JSON-boundary shape the type does not admit)', () => {
+      const badges = getBadges({
+        lowConfShare: null,
+        retestDue: false,
+        lastPracticedWeeks: '999' as unknown as number,
+        primaryReasonCode: 'NEVER',
+      });
+      expect(badges.map((b) => b.label)).toContain('New');
+      expect(badges.map((b) => b.label)).not.toContain('Stale');
+    });
   });
 
   describe('Stale badge (>= 8 weeks, not retest, not never)', () => {
@@ -248,9 +278,9 @@ describe('getBadges', () => {
   it('caps display at two badges, keeping the two highest-priority ones', () => {
     // Low Conf, Retest and New can all technically fire together even
     // though this combination is a strange real-world state (never
-    // practiced but a retest is due). getBadges does not guard against it,
-    // so the truncation to 2 quietly drops "New" here. Flagged in the PR,
-    // not fixed.
+    // practiced but a retest is due). "New" is the highest-signal fact here
+    // (see BADGE_PRIORITY in recommenderUtils.ts), so it must survive the
+    // 2-badge cap instead of being silently dropped. See COR-5.
     const badges = getBadges({
       lowConfShare: 0.5,
       retestDue: true,
@@ -258,7 +288,54 @@ describe('getBadges', () => {
       primaryReasonCode: 'LOW_CONF',
     });
     expect(badges).toHaveLength(2);
+    expect(badges.map((b) => b.label)).toEqual(['New', 'Low Conf']);
+  });
+
+  it('keeps "New" even when all four signal conditions fire at once', () => {
+    const badges = getBadges({
+      lowConfShare: 0.5,
+      retestDue: true,
+      lastPracticedWeeks: 999,
+      primaryReasonCode: 'LOW_CONF',
+    });
+    expect(badges.map((b) => b.label)).toContain('New');
+  });
+
+  it('orders badges by priority (New > Low Conf > Retest > Stale) regardless of which two survive the cap', () => {
+    // Low Conf + Retest, no New in play: order should still follow priority.
+    const badges = getBadges({
+      lowConfShare: 0.5,
+      retestDue: true,
+      lastPracticedWeeks: 3,
+      primaryReasonCode: 'LOW_CONF',
+    });
     expect(badges.map((b) => b.label)).toEqual(['Low Conf', 'Retest']);
+  });
+
+  it('orders New before Low Conf when only those two fire (nothing is dropped by the cap)', () => {
+    // Before COR-5's priority reordering this pushed in insertion order
+    // (Low Conf, New); the new deliberate order puts New first. Pinning it
+    // here even though both badges display either way, since the order is
+    // now an intentional choice, not an accident of insertion.
+    const badges = getBadges({
+      lowConfShare: 0.5,
+      retestDue: false,
+      lastPracticedWeeks: 999,
+      primaryReasonCode: 'LOW_CONF',
+    });
+    expect(badges.map((b) => b.label)).toEqual(['New', 'Low Conf']);
+  });
+
+  it('orders New before Retest when only those two fire (nothing is dropped by the cap)', () => {
+    // Same as above: was insertion order (Retest, New), now deliberately New
+    // first.
+    const badges = getBadges({
+      lowConfShare: null,
+      retestDue: true,
+      lastPracticedWeeks: 999,
+      primaryReasonCode: 'RETEST',
+    });
+    expect(badges.map((b) => b.label)).toEqual(['New', 'Retest']);
   });
 });
 
@@ -503,5 +580,55 @@ describe('applyFilters - "domain" sort', () => {
     const lowerNeed = move({ proMoveId: 2, domainName: 'Clinical', finalScore: 10 });
     const result = applyFilters([lowerNeed, higherNeed], NO_FILTERS, 'domain');
     expect(result.map((m) => m.proMoveId)).toEqual([1, 2]);
+  });
+});
+
+describe('lastPracticedWeeks sentinel normalization (string "999" vs numeric 999)', () => {
+  // lastPracticedWeeks can cross the JSON boundary from the sequencer-rank
+  // edge function as the string "999" instead of the number 999, even though
+  // every type in recommenderUtils.ts says number. Every function that reads
+  // it funnels through one normalizeWeeks() helper, so the string sentinel
+  // must behave identically to the numeric one everywhere: the badge, the
+  // conflict-message path, the "never" filter, the "stale" filter, and
+  // formatLastPracticed. See COR-5.
+  const stringSentinel = '999' as unknown as number;
+
+  it('labels the move New (not Stale) in getBadges', () => {
+    const badges = getBadges({
+      lowConfShare: null,
+      retestDue: false,
+      lastPracticedWeeks: stringSentinel,
+      primaryReasonCode: 'NEVER',
+    });
+    expect(badges.map((b) => b.label)).toContain('New');
+    expect(badges.map((b) => b.label)).not.toContain('Stale');
+  });
+
+  it('surfaces the conflicting-data message when paired with a STALE reason code', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const text = formatPrimaryReason({
+      primaryReasonCode: 'STALE',
+      primaryReasonValue: null,
+      lowConfShare: null,
+      lastPracticedWeeks: stringSentinel,
+    });
+    expect(text).toBe('Conflicting data: marked stale but never practiced');
+    warnSpy.mockRestore();
+  });
+
+  it('is included by the "never" signal filter', () => {
+    const neverAsString = move({ proMoveId: 1, lastPracticedWeeks: stringSentinel });
+    const result = applyFilters([neverAsString], { signals: ['never'], domains: [] }, 'need');
+    expect(result.map((m) => m.proMoveId)).toEqual([1]);
+  });
+
+  it('is excluded by the "stale" signal filter even though 999 >= 8', () => {
+    const neverAsString = move({ proMoveId: 1, lastPracticedWeeks: stringSentinel });
+    const result = applyFilters([neverAsString], { signals: ['stale'], domains: [] }, 'need');
+    expect(result).toEqual([]);
+  });
+
+  it('formats as "Never" in formatLastPracticed', () => {
+    expect(formatLastPracticed(stringSentinel)).toBe('Never');
   });
 });

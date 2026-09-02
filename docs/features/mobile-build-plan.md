@@ -4,7 +4,7 @@
 prototype into shipped product. Sources: `pwa-push-notifications.md`
 (infrastructure, rollout, funnel), `mobile-design-principles.md`
 (usage model, principles, five addenda of decisions), and the clickable
-prototype at `docs/prototypes/mobile-shell-prototype.html`.
+prototype at `docs/archive/prototypes/mobile-shell-prototype.html`.
 
 **Where things stand.** PWA Phase 1 is built and committed (`ff86312b`):
 manifest, app-shell service worker, per-user activation gating via

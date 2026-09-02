@@ -219,7 +219,7 @@ export default function EvaluationReview() {
         <Card>
           <CardContent className="py-12 text-center space-y-4">
             <CheckCircle2 className="w-12 h-12 mx-auto text-green-600" />
-            <h2 className="text-xl font-semibold">Review Already Completed</h2>
+            <h1 className="text-xl font-semibold">Review Already Completed</h1>
             <p className="text-muted-foreground">You've already reviewed this evaluation.</p>
             <div className="flex gap-3 justify-center">
               <Button variant="outline" onClick={() => navigate(`/evaluation/${evalId}`)}>

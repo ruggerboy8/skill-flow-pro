@@ -313,7 +313,15 @@ export default function ScoreHistoryV2() {
                                         <Badge variant="default" className="text-2xs h-5 px-1.5">Current</Badge>
                                       )}
                                       {isExempt && (
-                                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-2xs h-5 px-1.5">Exempt</Badge>
+                                        <Badge
+                                          className="text-2xs h-5 px-1.5"
+                                          style={{
+                                            backgroundColor: 'hsl(var(--status-excused-bg))',
+                                            color: 'hsl(var(--status-excused))',
+                                          }}
+                                        >
+                                          Exempt
+                                        </Badge>
                                       )}
                                     </div>
                                     {isSuperAdmin && scores.length > 0 && (

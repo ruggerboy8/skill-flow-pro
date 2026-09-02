@@ -1,17 +1,30 @@
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, TrendingDown, Brain, Calendar } from 'lucide-react';
-import { cn } from '@/lib/utils';
+
+export type SignalSeverity = 'watch' | 'red';
 
 export interface Signal {
   type: 'participation_drop' | 'domain_gap' | 'cross_location_gap' | 'eval_cadence';
   message: string;
   locationName?: string;
+  /**
+   * 'red' only for genuinely missed locations (past deadline, below the red
+   * threshold). Everything else, including pre-deadline pending states,
+   * is 'watch' (amber) at most. Defaults to 'watch' when omitted.
+   */
+  severity?: SignalSeverity;
 }
 
 interface SignalsBannerProps {
   signals: Signal[];
+  /** Moment-specific strip title, e.g. "Needs a nudge" or "Missed this week".
+   * Falls back to the original generic copy when omitted. */
+  title?: string;
+  /** Moment-specific empty-state line, e.g. "All locations submitted" for
+   * wrap-up or "No flags this week" for mid-week. Falls back to the
+   * original generic copy when omitted. */
+  emptyStateMessage?: string;
 }
 
 const SIGNAL_ICON = {
@@ -21,47 +34,67 @@ const SIGNAL_ICON = {
   eval_cadence: Calendar,
 };
 
-export function SignalsBanner({ signals }: SignalsBannerProps) {
+const TONE_TOKENS = {
+  red: {
+    text: 'hsl(var(--status-missing))',
+    bg: 'hsl(var(--status-missing-bg))',
+    border: 'hsl(var(--status-missing) / 0.3)',
+  },
+  watch: {
+    text: 'hsl(var(--status-late))',
+    bg: 'hsl(var(--status-late-bg))',
+    border: 'hsl(var(--status-late) / 0.3)',
+  },
+} as const;
+
+export function SignalsBanner({ signals, title, emptyStateMessage }: SignalsBannerProps) {
   const [expanded, setExpanded] = useState(true);
 
   if (signals.length === 0) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">
-        <CheckCircle2 className="h-4 w-4 shrink-0" />
-        <span>No flags this week — all locations on track.</span>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground py-1">
+        <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: 'hsl(var(--status-complete))' }} />
+        <span>{emptyStateMessage ?? 'No flags this week, all locations on track.'}</span>
       </div>
     );
   }
 
+  // The banner's overall tone follows the worst signal in it, so it never
+  // disagrees with the individual entries (or the location cards).
+  const tone = signals.some(s => s.severity === 'red') ? TONE_TOKENS.red : TONE_TOKENS.watch;
+
   return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+    <div className="rounded-lg border" style={{ borderColor: tone.border, backgroundColor: tone.bg }}>
       <button
         className="flex items-center justify-between w-full px-4 py-3 text-left"
         onClick={() => setExpanded(v => !v)}
       >
         <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-          <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-            {signals.length} signal{signals.length !== 1 ? 's' : ''} this week
+          <AlertTriangle className="h-4 w-4 shrink-0" style={{ color: tone.text }} />
+          <span className="text-sm font-semibold" style={{ color: tone.text }}>
+            {title
+              ? `${title} · ${signals.length} location${signals.length !== 1 ? 's' : ''}`
+              : `${signals.length} signal${signals.length !== 1 ? 's' : ''} this week`}
           </span>
-          <Badge variant="secondary" className="bg-amber-200/60 text-amber-800 dark:bg-amber-800/40 dark:text-amber-300 text-xs">
+          <Badge variant="secondary" className="text-xs" style={{ backgroundColor: tone.bg, color: tone.text }}>
             Needs attention
           </Badge>
         </div>
         {expanded ? (
-          <ChevronUp className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <ChevronUp className="h-4 w-4" style={{ color: tone.text }} />
         ) : (
-          <ChevronDown className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <ChevronDown className="h-4 w-4" style={{ color: tone.text }} />
         )}
       </button>
 
       {expanded && (
-        <div className="border-t border-amber-200 dark:border-amber-800 px-4 py-3 space-y-2">
+        <div className="border-t px-4 py-3 space-y-2" style={{ borderColor: tone.border }}>
           {signals.map((signal, idx) => {
             const Icon = SIGNAL_ICON[signal.type];
+            const itemTone = signal.severity === 'red' ? TONE_TOKENS.red : TONE_TOKENS.watch;
             return (
-              <div key={idx} className="flex items-start gap-2 text-sm text-amber-800 dark:text-amber-200">
-                <Icon className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <div key={idx} className="flex items-start gap-2 text-sm" style={{ color: itemTone.text }}>
+                <Icon className="h-4 w-4 mt-0.5 shrink-0" style={{ color: itemTone.text }} />
                 <span>{signal.message}</span>
               </div>
             );

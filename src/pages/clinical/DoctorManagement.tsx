@@ -5,17 +5,34 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { UserPlus, Mail, MoreHorizontal, Users, ClipboardCheck, Clock, ArrowRight, BookOpen } from 'lucide-react';
+import { UserPlus, Mail, MoreHorizontal, Users, ClipboardCheck, Clock, ArrowRight, BookOpen, UserCheck, UserMinus, Unlock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useUrlState } from '@/hooks/useUrlState';
 import { InviteDoctorDialog } from '@/components/clinical/InviteDoctorDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { drName } from '@/lib/doctorDisplayName';
 import { useUserRole } from '@/hooks/useUserRole';
 import { buildOrganizationStaffScopeFilter } from '@/lib/clinicalDoctorScope';
 import { useDoctorMenteeIds } from '@/hooks/useDoctorMenteeIds';
+import {
+  filterDoctorsForRosterView,
+  getEnrollmentConfirmCopy,
+  canReleaseBaseline,
+  getBaselineReleaseConfirmCopy,
+  type RosterViewMode,
+} from '@/lib/doctorCoachingEnrollment';
 
 
 import { getDoctorJourneyStatus, type DoctorJourneyStatus } from '@/lib/doctorStatus';
@@ -31,6 +48,8 @@ interface DoctorRow {
   created_at: string;
   journeyStatus: DoctorJourneyStatus;
   lastSessionAt: string | null;
+  coaching_enrolled_at: string | null;
+  baseline_released_at: string | null;
 }
 
 type FilterValue = 'all' | 'needs_my_action' | 'waiting_on_doctor';
@@ -40,6 +59,11 @@ export default function DoctorManagement() {
   const queryClient = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [filter, setFilter] = useUrlState<FilterValue>('status', 'all');
+  const [viewMode, setViewMode] = useUrlState<RosterViewMode>('view', 'enrolled');
+  const [enrollmentTarget, setEnrollmentTarget] = useState<{ id: string; name: string; action: 'enroll' | 'unenroll' } | null>(null);
+  const [enrollmentSubmitting, setEnrollmentSubmitting] = useState(false);
+  const [releaseTarget, setReleaseTarget] = useState<{ id: string; name: string } | null>(null);
+  const [releaseSubmitting, setReleaseSubmitting] = useState(false);
   const navigate = useNavigate();
   const { organizationId, isSuperAdmin, isClinicalDirector, staffId } = useUserRole();
 
@@ -97,7 +121,7 @@ export default function DoctorManagement() {
       const doctorIds = staffData?.map(d => d.id) || [];
       if (doctorIds.length === 0) return [];
       
-      const [baselinesRes, coachBaselinesRes, sessionsRes] = await Promise.all([
+      const [baselinesRes, coachBaselinesRes, sessionsRes, enrollmentRes] = await Promise.all([
         supabase
           .from('doctor_baseline_assessments')
           .select('doctor_staff_id, status, completed_at')
@@ -111,14 +135,25 @@ export default function DoctorManagement() {
           .select('id, doctor_staff_id, session_type, sequence_number, status, scheduled_at')
           .in('doctor_staff_id', doctorIds)
           .order('sequence_number', { ascending: false }),
+        // DR-1: coaching_enrolled_at/by are new additive columns; types.ts is
+        // not regenerated per repo convention, so this row is hand-typed
+        // below, mirroring how useAuth.tsx hand-types pwa_enabled.
+        supabase
+          .from('staff')
+          .select('id, coaching_enrolled_at, coaching_enrolled_by' as 'id')
+          .in('id', doctorIds),
       ]);
 
       if (baselinesRes.error) throw baselinesRes.error;
       if (coachBaselinesRes.error) throw coachBaselinesRes.error;
       if (sessionsRes.error) throw sessionsRes.error;
+      if (enrollmentRes.error) throw enrollmentRes.error;
 
       const baselineMap = new Map(baselinesRes.data?.map(b => [b.doctor_staff_id, b]) || []);
       const coachBaselineMap = new Map(coachBaselinesRes.data?.map(b => [b.doctor_staff_id, b]) || []);
+      const enrollmentRows = (enrollmentRes.data ?? []) as unknown as
+        { id: string; coaching_enrolled_at: string | null; coaching_enrolled_by: string | null }[];
+      const enrollmentMap = new Map(enrollmentRows.map(r => [r.id, r.coaching_enrolled_at]));
 
       const sessionsMap = new Map<string, typeof sessionsRes.data>();
       for (const s of sessionsRes.data || []) {
@@ -169,6 +204,8 @@ export default function DoctorManagement() {
           created_at: s.created_at || '',
           journeyStatus,
           lastSessionAt: lastSessionMap.get(s.id) || null,
+          coaching_enrolled_at: enrollmentMap.get(s.id) ?? null,
+          baseline_released_at: (s as any).baseline_released_at ?? null,
         };
       });
     },
@@ -195,16 +232,74 @@ export default function DoctorManagement() {
 
   const isLoading = menteesLoading || doctorsLoading;
 
-  // Compute stats from doctors data
+  // DR-1: the CD/super-admin org-wide roster defaults to enrolled doctors
+  // only; menteesOnly coaches always see their full assigned list regardless
+  // of view mode (see filterDoctorsForRosterView).
+  const doctorsInView = doctors ? filterDoctorsForRosterView(doctors, viewMode, menteesOnly) : undefined;
 
-  const stats = doctors ? {
-    total: doctors.length,
-    completed: doctors.filter(d => ['baseline_submitted', 'coach_baseline_pending', 'ready_for_prep', 'prep_complete', 'scheduling_invite_sent', 'meeting_ready', 'meeting_pending', 'doctor_confirmed', 'followup_scheduled', 'followup_completed'].includes(d.journeyStatus.stage)).length,
-    inProgress: doctors.filter(d => d.journeyStatus.stage === 'baseline_in_progress').length,
-    invited: doctors.filter(d => ['invited', 'baseline_released'].includes(d.journeyStatus.stage)).length,
+  async function handleEnrollmentConfirm() {
+    if (!enrollmentTarget) return;
+    setEnrollmentSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: {
+          action: 'set_coaching_enrollment',
+          staff_id: enrollmentTarget.id,
+          enrolled: enrollmentTarget.action === 'enroll',
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: enrollmentTarget.action === 'enroll' ? 'Enrolled' : 'Removed from coaching',
+        description: enrollmentTarget.action === 'enroll'
+          ? `${enrollmentTarget.name} is now on the coaching roster.`
+          : `${enrollmentTarget.name} is no longer on the coaching roster.`,
+      });
+      await refetch();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to update coaching enrollment', variant: 'destructive' });
+    } finally {
+      setEnrollmentSubmitting(false);
+      setEnrollmentTarget(null);
+    }
+  }
+
+  async function handleReleaseConfirm() {
+    if (!releaseTarget) return;
+    setReleaseSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: {
+          action: 'release_baseline',
+          staff_id: releaseTarget.id,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: 'Baseline released',
+        description: `${releaseTarget.name} can now start their self-assessment.`,
+      });
+      await refetch();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to release baseline', variant: 'destructive' });
+    } finally {
+      setReleaseSubmitting(false);
+      setReleaseTarget(null);
+    }
+  }
+
+  // Compute stats from the currently viewed doctors
+
+  const stats = doctorsInView ? {
+    total: doctorsInView.length,
+    completed: doctorsInView.filter(d => ['baseline_submitted', 'coach_baseline_pending', 'ready_for_prep', 'prep_complete', 'scheduling_invite_sent', 'meeting_ready', 'meeting_pending', 'doctor_confirmed', 'followup_scheduled', 'followup_completed'].includes(d.journeyStatus.stage)).length,
+    inProgress: doctorsInView.filter(d => d.journeyStatus.stage === 'baseline_in_progress').length,
+    invited: doctorsInView.filter(d => ['invited', 'baseline_released'].includes(d.journeyStatus.stage)).length,
   } : null;
 
-  const filteredDoctors = doctors?.filter(d => {
+  const filteredDoctors = doctorsInView?.filter(d => {
     if (filter === 'all') return true;
     if (filter === 'needs_my_action') {
       return ['baseline_submitted', 'coach_baseline_pending', 'ready_for_prep', 'prep_complete', 'doctor_confirmed', 'followup_completed'].includes(d.journeyStatus.stage);
@@ -288,14 +383,25 @@ export default function DoctorManagement() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
-            <CardTitle>All Doctors</CardTitle>
+            <CardTitle>{menteesOnly ? 'All Doctors' : viewMode === 'enrolled' ? 'Enrolled Doctors' : 'All Doctors'}</CardTitle>
             {filter !== 'all' && !isLoading && (
               <p className="text-xs text-muted-foreground mt-1">
-                Showing {filteredDoctors?.length ?? 0} of {doctors?.length ?? 0}
+                Showing {filteredDoctors?.length ?? 0} of {doctorsInView?.length ?? 0}
               </p>
             )}
           </div>
           <div className="flex items-center gap-2">
+            {!menteesOnly && (
+              <Select value={viewMode} onValueChange={(v) => setViewMode(v as RosterViewMode)}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="enrolled">Enrolled</SelectItem>
+                  <SelectItem value="all">All doctors</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
             {filter !== 'all' && (
               <Button variant="ghost" size="sm" onClick={() => setFilter('all')}>
                 Show all
@@ -322,7 +428,7 @@ export default function DoctorManagement() {
             </div>
           ) : filteredDoctors?.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              {(doctors?.length ?? 0) > 0 && filter !== 'all' ? (
+              {(doctorsInView?.length ?? 0) > 0 && filter !== 'all' ? (
                 <>
                   <p>No doctors match this filter.</p>
                   <Button className="mt-4" variant="outline" onClick={() => setFilter('all')}>
@@ -331,6 +437,13 @@ export default function DoctorManagement() {
                 </>
               ) : menteesOnly ? (
                 <p>No doctors are assigned to you yet.</p>
+              ) : viewMode === 'enrolled' && (doctors?.length ?? 0) > 0 ? (
+                <>
+                  <p>No doctors are enrolled in coaching yet.</p>
+                  <Button className="mt-4" variant="outline" onClick={() => setViewMode('all')}>
+                    Show all doctors
+                  </Button>
+                </>
               ) : (
                 <>
                   <p>No doctors found.</p>
@@ -417,6 +530,43 @@ export default function DoctorManagement() {
                               Resend Invite
                             </DropdownMenuItem>
                           )}
+                          {/* Coaching enrollment is a CD/super-admin roster
+                              decision (DR-1); gate on the actual privilege,
+                              not on menteesOnly, so a coach whose mentee list
+                              is empty never sees roster-management actions. */}
+                          {(isClinicalDirector || isSuperAdmin) && (
+                            doctor.coaching_enrolled_at == null ? (
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                setEnrollmentTarget({ id: doctor.id, name: drName(doctor.name), action: 'enroll' });
+                              }}>
+                                <UserCheck className="h-4 w-4 mr-2" />
+                                Enroll in coaching
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                setEnrollmentTarget({ id: doctor.id, name: drName(doctor.name), action: 'unenroll' });
+                              }}>
+                                <UserMinus className="h-4 w-4 mr-2" />
+                                Remove from coaching
+                              </DropdownMenuItem>
+                            )
+                          )}
+                          {/* DR-2: baseline release is its own action, separate
+                              from invite. Only offered for doctors who are
+                              enrolled and not yet released; once released the
+                              journey status pill already reflects it, so there
+                              is nothing more to show here. */}
+                          {(isClinicalDirector || isSuperAdmin) && canReleaseBaseline(doctor) && (
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              setReleaseTarget({ id: doctor.id, name: drName(doctor.name) });
+                            }}>
+                              <Unlock className="h-4 w-4 mr-2" />
+                              Release baseline
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -428,11 +578,55 @@ export default function DoctorManagement() {
         </CardContent>
       </Card>
 
-      <InviteDoctorDialog 
-        open={inviteOpen} 
-        onOpenChange={setInviteOpen} 
+      <InviteDoctorDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
         onSuccess={() => refetch()}
       />
+
+      <AlertDialog open={enrollmentTarget !== null} onOpenChange={(open) => { if (!open) setEnrollmentTarget(null); }}>
+        <AlertDialogContent>
+          {enrollmentTarget && (() => {
+            const copy = getEnrollmentConfirmCopy(enrollmentTarget.name, enrollmentTarget.action);
+            return (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{copy.title}</AlertDialogTitle>
+                  <AlertDialogDescription>{copy.description}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction disabled={enrollmentSubmitting} onClick={() => handleEnrollmentConfirm()}>
+                    {copy.confirmLabel}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            );
+          })()}
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={releaseTarget !== null} onOpenChange={(open) => { if (!open) setReleaseTarget(null); }}>
+        <AlertDialogContent>
+          {releaseTarget && (() => {
+            const copy = getBaselineReleaseConfirmCopy(releaseTarget.name);
+            return (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{copy.title}</AlertDialogTitle>
+                  <AlertDialogDescription>{copy.description}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction disabled={releaseSubmitting} onClick={() => handleReleaseConfirm()}>
+                    {copy.confirmLabel}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            );
+          })()}
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

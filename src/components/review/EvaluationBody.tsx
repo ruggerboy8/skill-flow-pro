@@ -8,7 +8,7 @@ import type { ReviewDomainBreakdown } from '@/lib/reviewPayload';
  * each domain with its score shown next to the Glow/Grow story, and a neutral
  * "Did not observe" state. Extracted from EvaluationReviewV2 so the same body
  * can back the staff wizard, a role-aware read view, and the evaluator
- * pre-submit review (see docs/features/evaluation-view-surfaces.md).
+ * pre-submit review (see docs/archive/features/evaluation-view-surfaces.md).
  *
  * Presentational only: it takes the v4 payload's domain_breakdown and renders.
  */

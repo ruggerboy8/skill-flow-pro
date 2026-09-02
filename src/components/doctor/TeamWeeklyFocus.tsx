@@ -1,14 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
+import { getDomainPastelVar, getDomainInk } from '@/lib/domainColors';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, GraduationCap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { LearnerLearnDrawer } from '@/components/learner/LearnerLearnDrawer';
 import { useUserRole } from '@/hooks/useUserRole';
-import { getChicagoMonday } from '@/lib/plannerUtils';
+import { resolveOrgTimezoneById } from '@/lib/locationState';
+import { getAssignmentWeekMondayStr } from '@/lib/submissionPolicy';
 
 const ROLES = [
   { id: 1, label: 'DFI' },
@@ -24,16 +25,26 @@ interface SimpleAssignment {
   display_order: number;
 }
 
-// Timezone-safe: was computing "this Monday" from the browser's local date
-// and then converting to UTC before taking the date portion, which shifts
-// the result a day early for anyone in a negative-UTC timezone (Central
-// time). Delegates to the canonical Monday resolver instead.
-function getThisMonday(): string {
-  return getChicagoMonday();
+// ASG-1 Fix 2 (Codex P2): the query below reads org-scoped
+// weekly_assignments, an org-level table, so its week key must be the same
+// org-canonical Monday locationState.assembleWeek uses — not a hardcoded
+// Chicago Monday, which disagrees with the data for a non-Central org
+// during the Sunday-night rollover window. Falls back to 'America/Chicago'
+// while `orgId` is still resolving (or has none), matching assembleWeek.
+function useOrgCanonicalMonday(orgId: string | undefined) {
+  return useQuery({
+    queryKey: ['org-canonical-monday', orgId],
+    queryFn: async (): Promise<string> => {
+      const tz = orgId ? await resolveOrgTimezoneById(orgId) : 'America/Chicago';
+      return getAssignmentWeekMondayStr(new Date(), tz);
+    },
+    staleTime: 2 * 60 * 1000,
+  });
 }
 
-function WeekOfHeader() {
-  const monday = new Date(getThisMonday() + 'T12:00:00');
+function WeekOfHeader({ mondayStr }: { mondayStr: string | undefined }) {
+  if (!mondayStr) return null;
+  const monday = new Date(mondayStr + 'T12:00:00');
   const formatted = monday.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   return <p className="text-sm text-muted-foreground mb-4">Week of {formatted}</p>;
 }
@@ -42,14 +53,14 @@ function WeekOfHeader() {
  * Fetch global weekly_assignments using flat (non-nested) queries to avoid PGRST200.
  * Filters out self_select assignments. Fetches all 3 roles in one batch.
  */
-function useAllRoleAssignments(orgId: string | undefined) {
+function useAllRoleAssignments(orgId: string | undefined, mondayStr: string | undefined) {
   return useQuery({
-    queryKey: ['team-weekly-all-roles', orgId],
+    queryKey: ['team-weekly-all-roles', orgId, mondayStr],
+    enabled: !!mondayStr,
     queryFn: async (): Promise<Record<number, SimpleAssignment[]>> => {
-      const mondayStr = getThisMonday();
       const result: Record<number, SimpleAssignment[]> = { 1: [], 2: [], 3: [] };
 
-      if (!orgId) return result;
+      if (!orgId || !mondayStr) return result;
 
       // 1. Get locked org-scoped assignments for all 3 roles, exclude self_select
       const q = supabase
@@ -150,8 +161,8 @@ function RoleSection({ roleId, label, assignments, isLoading, onOpenDrawer }: { 
 
 function AssignmentCard({ assignment, onOpenDrawer }: { assignment: SimpleAssignment; onOpenDrawer: () => void }) {
   const domainName = assignment.domain_name;
-  const domainColor = domainName ? getDomainColor(domainName) : 'hsl(var(--primary))';
-  const domainColorRich = domainName ? `hsl(${getDomainColorRichRaw(domainName)})` : 'hsl(var(--primary))';
+  const domainColor = domainName ? getDomainPastelVar(domainName) : 'hsl(var(--primary))';
+  const domainInk = domainName ? getDomainInk(domainName) : 'hsl(var(--primary-foreground))';
 
   return (
     <div className="flex bg-card rounded-xl overflow-hidden border border-border/50 shadow-sm">
@@ -161,7 +172,7 @@ function AssignmentCard({ assignment, onOpenDrawer }: { assignment: SimpleAssign
       >
         <span
           className="text-2xs font-bold tracking-widest uppercase"
-          style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainColorRich }}
+          style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainInk }}
         >
           {domainName}
         </span>
@@ -184,12 +195,13 @@ function AssignmentCard({ assignment, onOpenDrawer }: { assignment: SimpleAssign
 
 export default function TeamWeeklyFocus() {
   const { organizationId } = useUserRole();
-  const { data: assignmentsByRole, isLoading } = useAllRoleAssignments(organizationId);
+  const { data: weekStartDate } = useOrgCanonicalMonday(organizationId);
+  const { data: assignmentsByRole, isLoading } = useAllRoleAssignments(organizationId, weekStartDate);
   const [drawerItem, setDrawerItem] = useState<SimpleAssignment | null>(null);
 
   return (
     <div className="space-y-2 mt-4">
-      <WeekOfHeader />
+      <WeekOfHeader mondayStr={weekStartDate} />
       {ROLES.map((r) => (
         <RoleSection
           key={r.id}

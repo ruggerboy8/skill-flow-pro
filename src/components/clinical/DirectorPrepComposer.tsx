@@ -14,8 +14,7 @@ import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { format } from 'date-fns';
 import { getDomainColor, getDomainColorRaw, getDomainColorRichRaw } from '@/lib/domainColors';
 import { SchedulingInviteComposer } from '@/components/clinical/SchedulingInviteComposer';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import DOMPurify from 'dompurify';
 
 interface Props {
@@ -30,11 +29,20 @@ interface Props {
 
 const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
 
+// DSN-9 QA follow-up: this was a solid vivid fill with white text (entry 3
+// hardcoded blue, now the token). White-on-fill fails 4.5:1 for EVERY band,
+// not just the old blue (band 1: 2.85:1, band 2: 1.98:1, band 3 on the new
+// lime: 2.02:1, band 4: 2.59:1) — dark ink text on the same solid fill still
+// fails all four (2.95-3.64:1). Moved to the established ink-on-bg pattern
+// (bg = -bg pastel, text = -ink, border = vivid) already used by
+// RatingBandCollapsible/CoachBaselineWizard/ClinicalBaselineResults, which
+// clears 4.5:1 for all four bands (6.41-7.24:1); the border keeps the
+// badge's circle-of-color visual weight close to the old solid fill.
 const SCORE_COLORS: Record<number, string> = {
-  4: 'bg-emerald-500',
-  3: 'bg-blue-500',
-  2: 'bg-amber-500',
-  1: 'bg-orange-500',
+  4: 'bg-[hsl(var(--score-4-bg))] border border-[hsl(var(--score-4))] text-[hsl(var(--score-4-ink))]',
+  3: 'bg-[hsl(var(--score-3-bg))] border border-[hsl(var(--score-3))] text-[hsl(var(--score-3-ink))]',
+  2: 'bg-[hsl(var(--score-2-bg))] border border-[hsl(var(--score-2))] text-[hsl(var(--score-2-ink))]',
+  1: 'bg-[hsl(var(--score-1-bg))] border border-[hsl(var(--score-1))] text-[hsl(var(--score-1-ink))]',
 };
 
 function ScoreCircle({ score, label }: { score: number | null | undefined; label: string }) {
@@ -50,7 +58,7 @@ function ScoreCircle({ score, label }: { score: number | null | undefined; label
   return (
     <div className="flex items-center gap-1">
       <span className="text-2xs text-muted-foreground">{label}</span>
-      <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold text-white ${SCORE_COLORS[score] || 'bg-muted'}`}>
+      <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold ${SCORE_COLORS[score] || 'bg-muted text-muted-foreground'}`}>
         {score}
       </span>
     </div>
@@ -727,7 +735,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack}>
+        <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
@@ -825,18 +833,31 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                   {exp.description && <p className="text-xs text-muted-foreground">{exp.description}</p>}
                   <div className="flex gap-1.5">
                     {([
-                      { key: 'addressed' as const, label: '✓ Addressed', variant: 'default' },
-                      { key: 'continuing' as const, label: '→ Continuing', variant: 'secondary' },
-                      { key: 'dropped' as const, label: '✗ Dropped', variant: 'outline' },
+                      { key: 'addressed' as const, label: '✓ Addressed', srLabel: 'Addressed', variant: 'default' },
+                      { key: 'continuing' as const, label: '→ Continuing', srLabel: 'Continuing', variant: 'secondary' },
+                      { key: 'dropped' as const, label: '✗ Dropped', srLabel: 'Dropped', variant: 'outline' },
                     ] as const).map(opt => (
                       <Badge
                         key={opt.key}
+                        role="button"
+                        tabIndex={0}
                         variant={status === opt.key ? 'default' : 'outline'}
                         className={`cursor-pointer text-xs ${status === opt.key ? '' : 'opacity-60 hover:opacity-100'}`}
                         onClick={() => setPriorActionStatuses(prev => ({
                           ...prev,
                           [i]: prev[i] === opt.key ? undefined! : opt.key,
                         }))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setPriorActionStatuses(prev => ({
+                              ...prev,
+                              [i]: prev[i] === opt.key ? undefined! : opt.key,
+                            }));
+                          }
+                        }}
+                        aria-label={`Mark "${exp.title}" as ${opt.srLabel}`}
+                        aria-pressed={status === opt.key}
                       >
                         {opt.label}
                       </Badge>
@@ -899,34 +920,46 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
 
               {/* Filter Bar */}
               <div className="flex flex-wrap items-center gap-1.5">
-                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                <Filter className="h-4 w-4 text-muted-foreground" />
                 <Badge
+                  role="button"
+                  tabIndex={0}
                   variant={filterLowSelf ? 'default' : 'outline'}
                   className="cursor-pointer text-xs"
                   onClick={() => setFilterLowSelf(v => !v)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilterLowSelf(v => !v); } }}
                 >
                   Low Self (1–2)
                 </Badge>
                 {isBaselineReview && (
                   <>
                     <Badge
+                      role="button"
+                      tabIndex={0}
                       variant={filterLowCoach ? 'default' : 'outline'}
                       className="cursor-pointer text-xs"
                       onClick={() => setFilterLowCoach(v => !v)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilterLowCoach(v => !v); } }}
                     >
                       Low Coach (1–2)
                     </Badge>
                     <Badge
+                      role="button"
+                      tabIndex={0}
                       variant={filterGap === 'gap1' ? 'default' : 'outline'}
                       className="cursor-pointer text-xs"
                       onClick={() => setFilterGap(v => v === 'gap1' ? 'none' : 'gap1')}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilterGap(v => v === 'gap1' ? 'none' : 'gap1'); } }}
                     >
                       Gap ≥1
                     </Badge>
                     <Badge
+                      role="button"
+                      tabIndex={0}
                       variant={filterGap === 'gap2' ? 'default' : 'outline'}
                       className="cursor-pointer text-xs"
                       onClick={() => setFilterGap(v => v === 'gap2' ? 'none' : 'gap2')}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilterGap(v => v === 'gap2' ? 'none' : 'gap2'); } }}
                     >
                       Gap ≥2
                     </Badge>
@@ -1041,8 +1074,9 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                       size="icon"
                       className="h-6 w-6 shrink-0"
                       onClick={() => toggleAction(item.action_id)}
+                      aria-label={`Remove ${pm?.action_statement ?? 'Pro Move'} from agenda`}
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <X className="h-5 w-5" />
                     </Button>
                   </div>
                 );
@@ -1070,7 +1104,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 onClick={handleLoadTemplate}
                 title={savedTemplate ? 'Load your saved template' : orgDefaultTemplate ? 'Load the org default template' : 'No saved template'}
               >
-                <FileDown className="h-3.5 w-3.5" />
+                <FileDown className="h-4 w-4" />
                 Load
               </Button>
               <Button
@@ -1080,7 +1114,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 onClick={handleSaveTemplate}
                 title="Save this agenda as your personal template"
               >
-                <Save className="h-3.5 w-3.5" />
+                <Save className="h-4 w-4" />
                 Save
               </Button>
               {myStaff?.is_super_admin && (
@@ -1091,7 +1125,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                   onClick={handleSaveOrgDefault}
                   title="Make this the default agenda that auto-loads for all coaches"
                 >
-                  <Save className="h-3.5 w-3.5" />
+                  <Save className="h-4 w-4" />
                   Set as default
                 </Button>
               )}
@@ -1103,14 +1137,14 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 onClick={handleMagicFormat}
                 disabled={isFormatting}
               >
-                <Sparkles className="h-3.5 w-3.5" />
+                <Sparkles className="h-4 w-4" />
                 {isFormatting ? 'Formatting...' : 'Magic Format'}
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <ReactQuill
+          <RichTextEditor
             value={coachNote}
             onChange={setCoachNote}
             modules={quillModules}

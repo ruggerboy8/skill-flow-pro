@@ -92,6 +92,24 @@ export type PrimaryReasonCode = 'LOW_CONF' | 'RETEST' | 'NEVER' | 'STALE' | 'TIE
 
 export interface CandidateScore {
   C: number;
+  /**
+   * The Empirical-Bayes smoothed confidence mean, on the SAME 0..1 scale
+   * `classifyConfidence` expects: 0 = nobody is confident, 1 = everybody is.
+   *
+   * Scale derivation: sequencer-rank normalizes each raw 1-4 confidence rating
+   * with `(score - 1) / 3`, so 1 -> 0.00, 2 -> 0.33, 3 -> 0.67, 4 -> 1.00.
+   * Weekly `ConfidencePoint.avg` values are means of those normalized ratings,
+   * `sampleMean` is the trimmed mean of those weekly averages, and `confEB`
+   * shrinks that toward `config.ebPrior` (default 0.70) by `config.ebK`.
+   * So the classifier's cutoffs read as raw ratings of roughly 1.6 (critical,
+   * confEB <= 0.20) and 1.9 (watch, confEB <= 0.30) - i.e. LOW is bad here.
+   *
+   * With no confidence history at all this stays at `config.ebPrior`, which is
+   * the intended "no evidence of a problem" default.
+   *
+   * NOT to be confused with `C` (Collective Weakness), where HIGH is bad.
+   */
+  confEB: number;
   R: number;
   E: number;
   D: number;
@@ -298,7 +316,7 @@ export function scoreCandidate(
   const { final, drivers } = combineComponents({ C, R, D, B, eContrib, T }, weights);
 
   return {
-    C, R, E: E_raw, D, B, eContrib, final, drivers, weeksSince, T,
+    C, confEB: smoothedConf, R, E: E_raw, D, B, eContrib, final, drivers, weeksSince, T,
     lowConfShare, avgConfLast, retestDue,
     primaryReasonCode, primaryReasonValue,
   };

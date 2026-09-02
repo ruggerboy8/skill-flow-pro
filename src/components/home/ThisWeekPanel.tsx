@@ -10,9 +10,8 @@ import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getWeekAnchors } from '@/v2/time';
 import { useNow } from '@/providers/NowProvider';
-import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
+import { getDomainPastelVar, getDomainColorVar, getDomainInk } from '@/lib/domainColors';
 import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
 import { computeWeekState, StaffStatus, getLocationWeekContext, LocationWeekContext } from '@/lib/locationState';
 import { useSim } from '@/devtools/SimProvider';
@@ -118,7 +117,7 @@ export default function ThisWeekPanel() {
         roleId: staff.role_id,
         locationId: staff.primary_location_id,
       });
-      const { assignments, cycleNumber, weekInCycle } = await assembleCurrentWeek(
+      const { assignments, cycleNumber, weekInCycle, weekStartDate } = await assembleCurrentWeek(
         user.id,
         {
           id: staff.id,
@@ -171,21 +170,33 @@ export default function ThisWeekPanel() {
         setResourceCounts(countMap);
       }
 
-      // Get location-specific time anchors for state computation
+      // Get location-specific time anchors for state computation. This
+      // still drives due-date/deadline display (banner, checkin/checkout
+      // times) — only the WEEK KEY below moved off it.
       const locationTimeContext = await getLocationWeekContext(staff.primary_location_id!, effectiveNow);
       setLocationWeekContext({ ...locationTimeContext, cycleNumber, weekInCycle });
-      
-      // Calculate week of date using location timezone
-      const locationAnchors = await getWeekAnchors(effectiveNow, locationTimeContext.timezone);
-      const mondayStr = formatInTimeZone(locationAnchors.mondayZ, locationTimeContext.timezone, 'yyyy-MM-dd');
-      setWeekOfDate(formatInTimeZone(locationAnchors.mondayZ, locationTimeContext.timezone, 'MMM d, yyyy'));
+
+      // ASG-1 Fix 2: the "Week of" label and the excused_weeks lookup must
+      // key on the SAME org-canonical Monday assembleCurrentWeek() just
+      // loaded the assignments under, not this location's own timezone —
+      // otherwise a Denver/New York Alcan location can show a label or an
+      // exemption that disagrees with the assignments actually on screen
+      // during the Sunday-night rollover window. weekStartDate is a bare
+      // 'yyyy-MM-dd' calendar date, so it's formatted here against UTC
+      // rather than any local timezone, to avoid re-introducing exactly
+      // that kind of off-by-one-day drift.
+      if (weekStartDate) {
+        setWeekOfDate(formatInTimeZone(new Date(`${weekStartDate}T00:00:00Z`), 'UTC', 'MMM d, yyyy'));
+      }
 
       // Check if this week is exempt
-      const { data: excused } = await supabase
-        .from('excused_weeks')
-        .select('reason')
-        .eq('week_start_date', mondayStr)
-        .maybeSingle();
+      const { data: excused } = weekStartDate
+        ? await supabase
+            .from('excused_weeks')
+            .select('reason')
+            .eq('week_start_date', weekStartDate)
+            .maybeSingle()
+        : { data: null };
 
       setIsExempt(!!excused);
       
@@ -452,8 +463,8 @@ export default function ThisWeekPanel() {
         {/* Pro Moves list - Spine Layout */}
         {displayAssignments.map((assignment) => {
           const domainName = assignment.domain_name;
-          const domainColor = domainName ? getDomainColor(domainName) : 'hsl(var(--primary))';
-          const domainColorRich = domainName ? `hsl(${getDomainColorRichRaw(domainName)})` : 'hsl(var(--primary))';
+          const domainColor = domainName ? getDomainPastelVar(domainName) : 'hsl(var(--primary))';
+          const domainInk = domainName ? getDomainInk(domainName) : 'hsl(var(--primary-foreground))';
           
           const scores = weeklyScores.find(s => 
             s.assignment_id === assignment.weekly_focus_id || s.weekly_focus_id === assignment.weekly_focus_id
@@ -494,7 +505,7 @@ export default function ThisWeekPanel() {
                 {/* Vertical domain text */}
                 <span 
                   className="text-2xs font-bold tracking-widest uppercase"
-                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainColorRich }}
+                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainInk }}
                 >
                   {domainName}
                 </span>
@@ -563,8 +574,8 @@ export default function ThisWeekPanel() {
             </p>
             {parentWeekAssignments.map((assignment) => {
               const domainName = assignment.domain_name;
-              const domainColor = domainName ? getDomainColor(domainName) : 'hsl(var(--primary))';
-              const domainColorRich = domainName ? `hsl(${getDomainColorRichRaw(domainName)})` : 'hsl(var(--primary))';
+              const domainColor = domainName ? getDomainPastelVar(domainName) : 'hsl(var(--primary))';
+              const domainInk = domainName ? getDomainInk(domainName) : 'hsl(var(--primary-foreground))';
               const scores = weeklyScores.find(s =>
                 s.assignment_id === assignment.weekly_focus_id || s.weekly_focus_id === assignment.weekly_focus_id
               );
@@ -601,7 +612,7 @@ export default function ThisWeekPanel() {
                   tabIndex={resourceCount > 0 ? 0 : undefined}
                 >
                   <div className="w-8 shrink-0 flex flex-col items-center justify-center" style={{ backgroundColor: domainColor }}>
-                    <span className="text-2xs font-bold tracking-widest uppercase" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainColorRich }}>
+                    <span className="text-2xs font-bold tracking-widest uppercase" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainInk }}>
                       {domainName}
                     </span>
                   </div>
@@ -699,7 +710,7 @@ function MobileMovesAndBanner({
     <>
       {shown.map((assignment) => {
         const domainName = assignment.domain_name;
-        const domainColorRich = domainName ? `hsl(${getDomainColorRichRaw(domainName)})` : 'hsl(var(--primary))';
+        const domainColorRich = domainName ? getDomainColorVar(domainName) : 'hsl(var(--primary))';
         const scores = weeklyScores.find(
           (s) => s.assignment_id === assignment.weekly_focus_id || s.weekly_focus_id === assignment.weekly_focus_id
         );

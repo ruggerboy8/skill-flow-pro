@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => ({
       // activates. docs/features/pwa-push-notifications.md
       injectRegister: null,
       registerType: 'prompt',
-      includeAssets: ['apple-touch-icon.png', 'brand/alcan-icon.svg'],
+      includeAssets: ['apple-touch-icon.png', 'favicon-32.png', 'brand/promoves-p-icon.svg', 'brand/promoves-wordmark.svg'],
       manifest: {
         name: 'Pro Moves',
         short_name: 'Pro Moves',
@@ -47,8 +47,11 @@ export default defineConfig(({ mode }) => ({
         navigateFallbackDenylist: [/^\/auth\//, /^\/sedation/],
         cleanupOutdatedCaches: true,
         runtimeCaching: [],
-        // Main bundle is ~3.4 MB; raise the precache ceiling so the app
-        // shell (including the main chunk) is actually precached.
+        // PRF-3 split the single ~3.4 MB bundle into a smaller eager main
+        // chunk plus many route-level lazy chunks (see App.tsx), but the
+        // installed PWA still precaches the whole app for instant offline
+        // opens, so the ceiling stays generous -- comfortably above the
+        // largest chunk emitted today (~0.6 MB).
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),

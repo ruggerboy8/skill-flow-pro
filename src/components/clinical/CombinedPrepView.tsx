@@ -40,9 +40,15 @@ interface Props {
   doctorName?: string;
 }
 
+// DSN-3 slice 3: reuses --status-complete/--status-late, kept in sync with
+// the identical PROGRESS_OPTIONS config in DoctorReviewPrep.tsx.
+// QA fix: -ink, not the vivid base — even for this small (h-4 w-4) icon,
+// the vivid tokens fail WCAG 1.4.11's 3:1 non-text-contrast bar against the
+// plain bg-muted/40 card background (status-late computes to ~1.98:1 on
+// plain white/near-white).
 const STATUS_CONFIG: Record<string, { label: string; icon: typeof CheckCircle2; colorClass: string }> = {
-  going_well: { label: 'Going well', icon: CheckCircle2, colorClass: 'text-emerald-600' },
-  working_on_it: { label: 'Working on it', icon: Clock, colorClass: 'text-amber-600' },
+  going_well: { label: 'Going well', icon: CheckCircle2, colorClass: 'text-[hsl(var(--status-complete-ink))]' },
+  working_on_it: { label: 'Working on it', icon: Clock, colorClass: 'text-[hsl(var(--status-late-ink))]' },
   not_started: { label: "Haven't started", icon: Circle, colorClass: 'text-muted-foreground' },
 };
 

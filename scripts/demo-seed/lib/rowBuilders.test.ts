@@ -18,19 +18,23 @@ describe('buildDemoAssignmentDraft', () => {
     self_select: false,
   };
 
-  it('points at the demo org and location, keeping the role/week/slot structure', () => {
-    const draft = buildDemoAssignmentDraft(source, 'org-bluebird', 'loc-bluebird-1');
+  it('points at the demo org with no location, keeping the role/week/slot structure', () => {
+    const draft = buildDemoAssignmentDraft(source, 'org-bluebird');
     expect(draft.org_id).toBe('org-bluebird');
-    expect(draft.location_id).toBe('loc-bluebird-1');
+    // Org-level rows MUST have location_id null: weekly_assignments_check
+    // requires it for source='org', and consumers scope by org+role+week.
+    expect(draft.location_id).toBeNull();
     expect(draft.role_id).toBe(3);
     expect(draft.week_start_date).toBe('2026-08-10');
     expect(draft.display_order).toBe(1);
     expect(draft.action_id).toBe(501);
   });
 
-  it('always stamps source as demo-seed, regardless of the original source value', () => {
-    const draft = buildDemoAssignmentDraft(source, 'org-bluebird', 'loc-bluebird-1');
-    expect(draft.source).toBe('demo-seed');
+  it("always stamps source as 'org', the only schema-permitted value for org-level rows", () => {
+    // weekly_assignments_source_check permits only onboarding/global/org;
+    // the original 'demo-seed' stamp could never insert (Codex P1, PR #105).
+    const draft = buildDemoAssignmentDraft(source, 'org-bluebird');
+    expect(draft.source).toBe('org');
   });
 
   it('always forces status to locked, since SourceAssignmentRow does not even carry a status field', () => {
@@ -41,22 +45,14 @@ describe('buildDemoAssignmentDraft', () => {
     // on status = 'locked': locationState.ts, useWeeklyAssignments,
     // ConfidenceWizard, PerformanceWizard, MonthView,
     // GlobalAssignmentBuilder, TeamWeeklyFocus).
-    const draft = buildDemoAssignmentDraft(source, 'org-bluebird', 'loc-bluebird-1');
+    const draft = buildDemoAssignmentDraft(source, 'org-bluebird');
     expect(draft.status).toBe('locked');
   });
 
-  it('forces status locked for every demo location the source row is replicated to', () => {
-    const a = buildDemoAssignmentDraft(source, 'org-bluebird', 'loc-1');
-    const b = buildDemoAssignmentDraft(source, 'org-bluebird', 'loc-2');
-    const c = buildDemoAssignmentDraft(source, 'org-bluebird', 'loc-3');
-    expect([a.status, b.status, c.status]).toEqual(['locked', 'locked', 'locked']);
-  });
-
-  it('produces one independent draft per demo location for the same source row', () => {
-    const a = buildDemoAssignmentDraft(source, 'org-bluebird', 'loc-1');
-    const b = buildDemoAssignmentDraft(source, 'org-bluebird', 'loc-2');
-    expect(a.location_id).not.toBe(b.location_id);
-    expect(a.action_id).toBe(b.action_id); // same Pro Move, replicated
+  it('is deterministic: the same source row always builds the same draft', () => {
+    const a = buildDemoAssignmentDraft(source, 'org-bluebird');
+    const b = buildDemoAssignmentDraft(source, 'org-bluebird');
+    expect(a).toEqual(b);
   });
 });
 

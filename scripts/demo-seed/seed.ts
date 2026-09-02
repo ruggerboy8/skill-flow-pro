@@ -98,6 +98,7 @@ interface CliArgs {
   participantName: string | null;
   coachName: string | null;
   adminName: string | null;
+  excludeNames: string[];
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -107,6 +108,7 @@ function parseArgs(argv: string[]): CliArgs {
   let participantName: string | null = null;
   let coachName: string | null = null;
   let adminName: string | null = null;
+  const excludeNames: string[] = [];
 
   for (const arg of argv) {
     if (arg === '--dry-run') dryRun = true;
@@ -122,6 +124,15 @@ function parseArgs(argv: string[]): CliArgs {
       coachName = arg.slice('--coach='.length);
     } else if (arg.startsWith('--admin=')) {
       adminName = arg.slice('--admin='.length);
+    } else if (arg.startsWith('--exclude=')) {
+      // Repeatable, and each occurrence may be comma-separated.
+      excludeNames.push(
+        ...arg
+          .slice('--exclude='.length)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      );
     } else {
       console.error(`Unrecognized argument: ${arg}`);
       printHelp();
@@ -129,7 +140,7 @@ function parseArgs(argv: string[]): CliArgs {
     }
   }
 
-  return { sourceLocationId, dryRun, refresh, participantName, coachName, adminName };
+  return { sourceLocationId, dryRun, refresh, participantName, coachName, adminName, excludeNames };
 }
 
 function printHelp(): void {
@@ -146,6 +157,11 @@ Usage: npx tsx scripts/demo-seed/seed.ts --source-location=<uuid> [--dry-run] [-
   --admin=<name>            by (case-insensitive) real name or email.
                              Any not given falls back to the automatic
                              suitability pick. First seed only.
+  --exclude=<name>          Leave a source staff member (and their history)
+                             out of the copy entirely. Same name/email
+                             matching as the persona flags; repeatable, or
+                             comma-separate several. First seed only --
+                             e.g. a test account sitting in a real roster.
   --dry-run                 Print what would be written without writing.
   --refresh                 If the demo org already exists, re-point its
                              copied weeks so the "current week" lands on
@@ -249,7 +265,7 @@ async function main(): Promise<void> {
       // duplicating anything already written.
       console.log(
         `Demo org looks incomplete (staff=${completeness.staffCount}, ` +
-          `assignments=${completeness.assignmentCount}) -- resuming the copy.`,
+          `assignments=${completeness.assignmentCount}, scores=${completeness.scoreCount}) -- resuming the copy.`,
       );
       if (!args.sourceLocationId) {
         console.error(
@@ -295,16 +311,18 @@ async function main(): Promise<void> {
 async function assessOrgCompleteness(
   supabase: SupabaseClient,
   demoOrgId: string,
-): Promise<{ complete: boolean; staffCount: number; assignmentCount: number }> {
+): Promise<{ complete: boolean; staffCount: number; assignmentCount: number; scoreCount: number }> {
   const locationIds = await demoLocationIds(supabase, demoOrgId);
   let staffCount = 0;
+  let staffIds: string[] = [];
   if (locationIds.length > 0) {
-    const { count, error } = await supabase
+    const { data: staffRows, error } = await supabase
       .from('staff')
-      .select('id', { count: 'exact', head: true })
+      .select('id')
       .in('primary_location_id', locationIds);
     if (error) throw error;
-    staffCount = count ?? 0;
+    staffIds = (staffRows ?? []).map((s) => s.id);
+    staffCount = staffIds.length;
   }
 
   const { count: assignmentCount, error: assignErr } = await supabase
@@ -314,10 +332,30 @@ async function assessOrgCompleteness(
     .is('superseded_at', null);
   if (assignErr) throw assignErr;
 
+  // Codex P1 (PR #105): the original predicate (3 locations, 3 staff, 1
+  // assignment) marked a run that died before or during the score inserts
+  // as "complete", permanently taking the "Nothing to do" path with no
+  // history. Scores are the LAST thing a fresh seed writes, so requiring
+  // at least one is the cheapest reliable "the copy got to the end"
+  // signal. A crash mid-score-batch can still slip through (batches of
+  // 500), which is why the runbook says to eyeball the final printed
+  // counts against the dry run before recording.
+  let scoreCount = 0;
+  if (staffIds.length > 0) {
+    const { count, error } = await supabase
+      .from('weekly_scores')
+      .select('id', { count: 'exact', head: true })
+      .in('staff_id', staffIds);
+    if (error) throw error;
+    scoreCount = count ?? 0;
+  }
+
   return {
-    complete: locationIds.length >= DEMO_LOCATIONS.length && staffCount >= 3 && (assignmentCount ?? 0) > 0,
+    complete:
+      locationIds.length >= DEMO_LOCATIONS.length && staffCount >= 3 && (assignmentCount ?? 0) > 0 && scoreCount > 0,
     staffCount,
     assignmentCount: assignmentCount ?? 0,
+    scoreCount,
   };
 }
 
@@ -329,7 +367,7 @@ async function freshSeed(
   supabase: SupabaseClient,
   sourceLocationId: string,
   dryRun: boolean,
-  personaArgs: Pick<CliArgs, 'participantName' | 'coachName' | 'adminName'>,
+  personaArgs: Pick<CliArgs, 'participantName' | 'coachName' | 'adminName' | 'excludeNames'>,
 ): Promise<void> {
   // --- 1. Read every source row we need, up front ---------------------------
   const { data: sourceLocation, error: locErr } = await supabase
@@ -365,7 +403,23 @@ async function freshSeed(
     )
     .eq('primary_location_id', sourceLocationId);
   if (staffErr) throw staffErr;
-  const sourceStaff = (sourceStaffRaw ?? []) as SourceStaffRow[];
+  let sourceStaff = (sourceStaffRaw ?? []) as SourceStaffRow[];
+
+  // --exclude: drop named source staff (and, by extension, their scores --
+  // everything downstream keys off this roster) before anything else looks
+  // at the roster. Resolved with the same matcher as the persona flags, so
+  // a typo or ambiguous name stops the run with the roster printed instead
+  // of silently copying someone that was meant to stay out.
+  if (personaArgs.excludeNames.length > 0) {
+    const excludedIds = new Set(
+      personaArgs.excludeNames.map((name) => resolveStaffOverride(sourceStaff, name, '--exclude')!),
+    );
+    const excluded = sourceStaff.filter((s) => excludedIds.has(s.id));
+    sourceStaff = sourceStaff.filter((s) => !excludedIds.has(s.id));
+    for (const s of excluded) {
+      console.log(`Excluding from the copy: ${s.name} (${s.email})`);
+    }
+  }
 
   if (sourceStaff.length === 0) {
     console.error(`Location ${sourceLocationId} has no staff. Pick a location with an active roster.`);
@@ -494,7 +548,8 @@ async function freshSeed(
         `(${dryRunMerge.droppedFuture} future row(s) dropped, ${dryRunMerge.droppedOverlap} org-level row(s) dropped where the location era already covers that role+week).`,
     );
     console.log(`Would create org "${DEMO_ORG.name}" (${DEMO_ORG.slug}), 1 group, 3 locations.`);
-    console.log(`Would copy ${sourceAssignments.length} weekly_assignments x 3 locations = ${sourceAssignments.length * 3} demo assignment rows, all status=locked.`);
+    console.log(`Would copy ${sourceAssignments.length} weekly_assignments as org-level rows (location_id null, source='org',`);
+    console.log('shared by all 3 demo locations -- the shape the live app writes), all status=locked.');
     console.log(`Would copy ${sourceScores.length} weekly_scores rows (reshaped for variance).`);
     console.log('Would create 3 auth users with known passwords (demo-staff / demo-coach / demo-admin)');
     console.log(`and ${sourceStaff.length - 3 >= 0 ? sourceStaff.length - 3 : sourceStaff.length} more auth users with random, unused passwords.`);
@@ -507,7 +562,7 @@ async function freshSeed(
   }
 
   // --- 3. Org / group / locations (get-or-create, never clobber an existing row) ---
-  const demoOrg = await getOrCreateOrg(supabase, sourceOrg?.practice_type ?? 'pediatric');
+  const demoOrg = await getOrCreateOrg(supabase, sourceOrg?.practice_type ?? 'pediatric_us');
   const demoGroupId = await getOrCreateGroup(supabase, demoOrg.id);
 
   // Issue 2 (resumability): anchor every date computation below on the demo
@@ -654,59 +709,62 @@ async function freshSeed(
   let assignmentsCreated = 0;
   let assignmentsReused = 0;
 
-  for (const demoLocationId of demoLocationIdList) {
-    for (const src of sourceAssignments) {
-      const draft = buildDemoAssignmentDraft(
-        { ...src, week_start_date: shiftDateString(src.week_start_date, shiftDays) },
-        demoOrg.id,
-        demoLocationId,
-      );
+  // One org-level row per merged source assignment -- NOT one per demo
+  // location. The live schema forbids the per-location shape
+  // (weekly_assignments_check: source='org' requires location_id NULL) and
+  // consumers scope by org + role + week anyway, so per-location copies
+  // would have tripled every staff member's visible Pro Moves. See the
+  // buildDemoAssignmentDraft doc comment (Codex P1s, PR #105).
+  for (const src of sourceAssignments) {
+    const draft = buildDemoAssignmentDraft(
+      { ...src, week_start_date: shiftDateString(src.week_start_date, shiftDays) },
+      demoOrg.id,
+    );
 
-      const { data: existingAssignment, error: existingAssignErr } = await supabase
-        .from('weekly_assignments')
-        .select('id, status')
-        .eq('org_id', demoOrg.id)
-        .eq('location_id', demoLocationId)
-        .eq('role_id', draft.role_id)
-        .eq('week_start_date', draft.week_start_date)
-        .eq('display_order', draft.display_order)
-        .is('superseded_at', null)
-        .maybeSingle();
-      if (existingAssignErr) throw existingAssignErr;
+    const { data: existingAssignment, error: existingAssignErr } = await supabase
+      .from('weekly_assignments')
+      .select('id, status')
+      .eq('org_id', demoOrg.id)
+      .is('location_id', null)
+      .eq('role_id', draft.role_id)
+      .eq('week_start_date', draft.week_start_date)
+      .eq('display_order', draft.display_order)
+      .is('superseded_at', null)
+      .maybeSingle();
+    if (existingAssignErr) throw existingAssignErr;
 
-      let assignmentId: string;
-      if (existingAssignment) {
-        assignmentId = existingAssignment.id;
-        assignmentsReused++;
-        // Issue 1 defense-in-depth: if a row already occupies this natural
-        // key with a non-locked status (should not happen for a demo-seed
-        // row, since buildDemoAssignmentDraft always forces 'locked' --
-        // but this key could in principle already be occupied by
-        // something else), force it locked rather than trusting it.
-        if (existingAssignment.status !== 'locked') {
-          const { error: fixErr } = await supabase
-            .from('weekly_assignments')
-            .update({ status: 'locked' })
-            .eq('id', assignmentId);
-          if (fixErr) throw fixErr;
-        }
-      } else {
-        const { data: inserted, error: insertErr } = await supabase
+    let assignmentId: string;
+    if (existingAssignment) {
+      assignmentId = existingAssignment.id;
+      assignmentsReused++;
+      // Issue 1 defense-in-depth: if a row already occupies this natural
+      // key with a non-locked status (should not happen for a seed-authored
+      // row, since buildDemoAssignmentDraft always forces 'locked' --
+      // but this key could in principle already be occupied by
+      // something else), force it locked rather than trusting it.
+      if (existingAssignment.status !== 'locked') {
+        const { error: fixErr } = await supabase
           .from('weekly_assignments')
-          .insert(draft)
-          .select('id')
-          .single();
-        if (insertErr) throw insertErr;
-        assignmentId = inserted.id;
-        assignmentsCreated++;
+          .update({ status: 'locked' })
+          .eq('id', assignmentId);
+        if (fixErr) throw fixErr;
       }
-
-      const key = demoAssignmentKey(demoLocationId, draft.role_id, draft.week_start_date, draft.display_order);
-      demoAssignmentIdByKey.set(key, assignmentId);
-      domainByAssignmentKey.set(key, resolveDomainId(src));
+    } else {
+      const { data: inserted, error: insertErr } = await supabase
+        .from('weekly_assignments')
+        .insert(draft)
+        .select('id')
+        .single();
+      if (insertErr) throw insertErr;
+      assignmentId = inserted.id;
+      assignmentsCreated++;
     }
+
+    const key = demoAssignmentKey('org', draft.role_id, draft.week_start_date, draft.display_order);
+    demoAssignmentIdByKey.set(key, assignmentId);
+    domainByAssignmentKey.set(key, resolveDomainId(src));
   }
-  console.log(`Assignments: ${assignmentsCreated} created, ${assignmentsReused} already existed and were reused (all locked).`);
+  console.log(`Assignments: ${assignmentsCreated} created, ${assignmentsReused} already existed and were reused (all locked, org-level).`);
 
   // Also index source assignments by their original id, to resolve each
   // weekly_scores row's assignment_id back to (role_id, week_start_date, display_order).
@@ -749,7 +807,7 @@ async function freshSeed(
     }
     const demoLocationId = locationForSource.get(score.staff_id)!;
     const shiftedWeek = shiftDateString(sourceAssignment.week_start_date, shiftDays);
-    const key = demoAssignmentKey(demoLocationId, sourceAssignment.role_id, shiftedWeek, sourceAssignment.display_order);
+    const key = demoAssignmentKey('org', sourceAssignment.role_id, shiftedWeek, sourceAssignment.display_order);
     const demoAssignmentId = demoAssignmentIdByKey.get(key);
     if (!demoAssignmentId) {
       skipped++;
@@ -810,7 +868,6 @@ async function freshSeed(
   }
 
   const demoStaffId = demoStaffIdBySourceId.get(staffLogin.sourceId)!;
-  const demoLocationId = locationForSource.get(staffLogin.sourceId)!;
   const currentWeek = shiftDateString(sourceMaxWeek, shiftDays);
   const cleared = clearCurrentWeekScore(demoScoreDrafts, demoStaffId, currentWeek);
   cleared.forEach((c, i) => {
@@ -824,22 +881,22 @@ async function freshSeed(
 
   const staffRoleId = demoRoleIdByStaffId.get(demoStaffId);
   // display_order isn't known here (a staff member's role can have slots
-  // 1-3), so search all keys for this location/role/week rather than
-  // guessing the slot.
+  // 1-3), so search all keys for this role/week rather than guessing the
+  // slot. Assignments are org-level, so no location dimension to match.
   const currentWeekAssignmentStatus =
     staffRoleId != null
       ? [...demoAssignmentIdByKey.keys()]
           .filter((k) => {
-            const [locId, roleIdStr, week] = k.split('|');
-            return locId === demoLocationId && week === currentWeek && Number(roleIdStr) === staffRoleId;
+            const [, roleIdStr, week] = k.split('|');
+            return week === currentWeek && Number(roleIdStr) === staffRoleId;
           })
           .map((k) => ({ key: k, id: demoAssignmentIdByKey.get(k)! }))
       : [];
 
   if (currentWeekAssignmentStatus.length === 0) {
     throw new Error(
-      `Could not create/find a ${currentWeek} weekly_assignments row (status=locked) for demo-staff's ` +
-        `role (${staffRoleId}) at location ${demoLocationId}. Clip 1 (staff self-eval) would have ` +
+      `Could not create/find a ${currentWeek} weekly_assignments row (status=locked, org-level) for ` +
+        `demo-staff's role (${staffRoleId}). Clip 1 (staff self-eval) would have ` +
         `nothing to rate. This is a hard failure, not a warning: pick a different --source-location, ` +
         `or check that the source location actually has current-week assignments for this role. ` +
         `The demo org's staff/assignments/scores written so far are safe to leave in place -- ` +
@@ -1118,13 +1175,18 @@ async function getOrCreateOrg(supabase: SupabaseClient, practiceType: string): P
   if (existingErr) throw existingErr;
   if (existing) return { id: existing.id, createdAt: existing.created_at };
 
+  // chk_org_practice_type only permits these three values (Codex P1,
+  // PR #105 -- the old 'general'/'pediatric' mapping used retired values
+  // that could never insert). The source org's own value is already valid;
+  // pass it through, falling back to pediatric_us for anything unexpected.
+  const VALID_PRACTICE_TYPES = ['pediatric_us', 'general_us', 'general_uk'];
   const { data, error } = await supabase
     .from('organizations')
     .insert({
       name: DEMO_ORG.name,
       slug: DEMO_ORG.slug,
       app_display_name: DEMO_ORG.appDisplayName,
-      practice_type: practiceType === 'general' ? 'general' : 'pediatric',
+      practice_type: VALID_PRACTICE_TYPES.includes(practiceType) ? practiceType : 'pediatric_us',
     })
     .select('id, created_at')
     .single();

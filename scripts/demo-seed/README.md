@@ -96,7 +96,11 @@ npx tsx scripts/demo-seed/seed.ts --source-location=<alcan-location-uuid>
 ```
 
 On startup, the script checks whether the existing demo org looks complete
-(at least 3 locations, at least 3 staff, at least 1 weekly_assignments row).
+(at least 3 locations, at least 3 staff, at least 1 weekly_assignments row,
+at least 1 weekly_scores row -- scores are the last thing a fresh seed
+writes, so their presence is the "the copy reached the end" signal; a crash
+mid-score-batch can still slip past this, so compare the final printed
+counts against the dry run before trusting a resumed org).
 If not, it logs "looks incomplete -- resuming the copy" and runs the same
 copy logic again, except every step is get-or-create instead of
 insert-only:
@@ -274,10 +278,26 @@ Both writes are idempotent upserts, safe on resume and re-run.
   says "copies one Alcan location's staff roster... into the demo org" but
   Clip 3 needs "3 locations... visible highs and lows." Splitting the one
   copied roster round-robin across the 3 demo locations is what makes that
-  possible without inventing people. `weekly_assignments` are replicated
-  identically to all 3 locations (same Pro Move picks, same weeks) --
-  what actually varies by location is the reshaped confidence scores, not
-  which Pro Moves are assigned.
+  possible without inventing people. What varies by location is the
+  reshaped confidence scores, not which Pro Moves are assigned.
+- **`weekly_assignments` are written once, at the org level** (`location_id`
+  null, `source = 'org'`) -- the shape the live app has written since Feb
+  2026, automatically shared by all 3 demo locations. This replaced an
+  earlier replicate-per-location design after Codex review of PR #105
+  found (and live-schema checks confirmed) that the old shape could not
+  insert at all: `weekly_assignments_source_check` rejects any made-up
+  source value, and `weekly_assignments_check` requires `source='org'`
+  rows to have no `location_id`. It was also semantically wrong --
+  consumers (`assembleWeek` in `src/lib/locationState.ts`,
+  `useWeeklyAssignments`) scope assignments by org + role + week, never by
+  location, so three per-location copies would have shown every staff
+  member nine Pro Moves instead of three.
+- **`--exclude=<name>` leaves a source staff member out of the copy
+  entirely** (repeatable, or comma-separated; same name/email matching as
+  the persona flags, same hard-stop on a typo). Built for test accounts
+  sitting in real rosters -- Buda's "Testing Testers" was the motivating
+  case. Their scores never enter the copy either: everything downstream
+  keys off the filtered roster.
 - **`confidence_source` / `performance_source` are always
   `'backfill_historical'`**, the enum value that exists specifically to
   mark data that was never entered live (distinct from `'live'` and from a

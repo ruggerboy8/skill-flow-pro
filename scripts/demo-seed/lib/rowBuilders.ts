@@ -26,7 +26,7 @@ export interface SourceAssignmentRow {
 
 export interface DemoAssignmentDraft {
   org_id: string;
-  location_id: string;
+  location_id: null;
   role_id: number;
   week_start_date: string;
   display_order: number;
@@ -38,16 +38,26 @@ export interface DemoAssignmentDraft {
 }
 
 /**
- * One demo weekly_assignments row for one demo location, copied from one
- * source row. The seed script calls this once per (source assignment,
- * demo location) pair -- the source location's assignment structure is
- * replicated identically to every demo location (the org-wide variance
- * Clip 3 needs comes from the weekly_scores shaping pass, not from giving
- * different locations different Pro Moves).
+ * One demo weekly_assignments row, copied from one source row, written at
+ * the ORG level: `location_id` null, `source` 'org' -- exactly the shape
+ * the live app has written since Feb 2026. Two things force this (both
+ * Codex-flagged on PR #105, both verified against the live schema):
  *
- * `source` is always overwritten to `'demo-seed'` regardless of what the
- * original row said (e.g. `'sequencer'`, `'onboarding'`), so demo rows are
- * always identifiable as seed-authored if inspected directly.
+ * - `weekly_assignments_source_check` only permits 'onboarding' / 'global'
+ *   / 'org'; the original 'demo-seed' stamp could never insert.
+ * - `weekly_assignments_check` requires source='org' rows to have
+ *   location_id NULL (and org_id set), so the original plan of replicating
+ *   one row per demo location could not insert either -- and would have
+ *   been wrong anyway: every consumer (assembleWeek in
+ *   src/lib/locationState.ts, useWeeklyAssignments) scopes assignments by
+ *   org + role + week, never by location, so three per-location copies
+ *   would have rendered as nine Pro Moves per staff member instead of
+ *   three.
+ *
+ * One org-level row is automatically shared by all three demo locations;
+ * the per-location texture Clip 3 needs comes from the weekly_scores
+ * variance pass, not from giving locations different Pro Moves. Demo rows
+ * remain identifiable as seed-authored via the demo org's own org_id.
  *
  * `status` is always forced to `'locked'`, regardless of what the source
  * row's status was. Decision (QA-flagged, DEMO-1a follow-up): every read
@@ -64,22 +74,18 @@ export interface DemoAssignmentDraft {
  * camera. `status` is therefore not in WEEKLY_ASSIGNMENTS_COPY_ALLOWLIST --
  * it is never read from the source row at all.
  */
-export function buildDemoAssignmentDraft(
-  source: SourceAssignmentRow,
-  demoOrgId: string,
-  demoLocationId: string,
-): DemoAssignmentDraft {
+export function buildDemoAssignmentDraft(source: SourceAssignmentRow, demoOrgId: string): DemoAssignmentDraft {
   const copied = pickAllowedColumns(source, WEEKLY_ASSIGNMENTS_COPY_ALLOWLIST);
   return {
     org_id: demoOrgId,
-    location_id: demoLocationId,
+    location_id: null,
     role_id: copied.role_id ?? source.role_id,
     week_start_date: copied.week_start_date ?? source.week_start_date,
     display_order: copied.display_order ?? source.display_order,
     action_id: copied.action_id ?? null,
     competency_id: copied.competency_id ?? null,
     status: 'locked',
-    source: 'demo-seed',
+    source: 'org',
     self_select: copied.self_select ?? false,
   };
 }

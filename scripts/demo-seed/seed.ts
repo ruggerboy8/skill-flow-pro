@@ -194,6 +194,18 @@ function randomUnusedPassword(): string {
   return randomBytes(24).toString('base64url');
 }
 
+// The participant login's env var is DEMO_STAFF_PASSWORD (matching the
+// demo-staff@ email, .env.example, and the DEMO-1b harness), but the cast
+// tags that role 'participant' -- so the var name cannot be derived from
+// the role string. Found live on the first real seed (2026-09-02): the
+// derived DEMO_PARTICIPANT_PASSWORD lookup hard-stopped the run, a line
+// no dry run ever reaches.
+const LOGIN_PASSWORD_ENV = {
+  participant: 'DEMO_STAFF_PASSWORD',
+  coach: 'DEMO_COACH_PASSWORD',
+  admin: 'DEMO_ADMIN_PASSWORD',
+} as const;
+
 const demoAssignmentKey = (locationId: string, roleId: number, week: string, slot: number): string =>
   `${locationId}|${roleId}|${week}|${slot}`;
 
@@ -626,7 +638,7 @@ async function freshSeed(
       if (updateErr) throw updateErr;
     } else {
       const password = cast.loginRole
-        ? requireEnv(`DEMO_${cast.loginRole.toUpperCase()}_PASSWORD`)
+        ? requireEnv(LOGIN_PASSWORD_ENV[cast.loginRole])
         : randomUnusedPassword();
       const userId = await getOrCreateAuthUserId(supabase, cast.email, password, authIdByEmail);
 
@@ -1087,7 +1099,7 @@ async function refreshExistingOrg(supabase: SupabaseClient, demoOrgId: string, d
 
   for (const role of ['participant', 'coach', 'admin'] as const) {
     const cast = CAST.find((c) => c.loginRole === role)!;
-    const password = requireEnv(`DEMO_${role.toUpperCase()}_PASSWORD`);
+    const password = requireEnv(LOGIN_PASSWORD_ENV[role]);
     const { data: loginStaff } = await supabase.from('staff').select('user_id').eq('email', cast.email).maybeSingle();
     if (loginStaff?.user_id) {
       const { error } = await supabase.auth.admin.updateUserById(loginStaff.user_id, { password });

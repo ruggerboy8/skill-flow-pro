@@ -107,7 +107,7 @@ describe('resolveAssignmentRows', () => {
   });
 });
 
-describe('resolveAssignmentRows — content overrides (PML-2b)', () => {
+describe('resolveAssignmentRows: content overrides (PML-2b)', () => {
   it('shows the org override statement instead of the platform statement when one exists', () => {
     const rows: AssignmentRowForResolve[] = [
       {

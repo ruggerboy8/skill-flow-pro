@@ -7,7 +7,7 @@ describe('computeExcludeActionIds', () => {
     expect(computeExcludeActionIds(slots).sort()).toEqual([101, 205]);
   });
 
-  it('includes a migrated org-custom move — it now has a real action_id like any platform move', () => {
+  it('includes a migrated org-custom move: it now has a real action_id like any platform move', () => {
     // Before PML-2a, an org-custom slot had actionId: null and was only
     // addressable via orgMoveId, so it never showed up here. Post-migration
     // it has a real action_id and must be excluded from re-selection.

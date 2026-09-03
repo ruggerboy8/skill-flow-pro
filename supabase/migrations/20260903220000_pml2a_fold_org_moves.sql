@@ -20,7 +20,7 @@ alter table public.organization_pro_moves
   add column if not exists migrated_action_id bigint references public.pro_moves(action_id) on delete set null;
 
 -- 2) Insert every not-yet-migrated organization_pro_moves row (active AND
---    inactive — deactivated org moves keep their history too) into pro_moves
+--    inactive, since deactivated org moves keep their history too) into pro_moves
 --    as an owned, org_custom row. Looped rather than a single INSERT...SELECT
 --    so each source row can be stamped with the exact new action_id it
 --    produced (live data is ~8 rows; a loop is more than fast enough and
@@ -54,7 +54,7 @@ end $$;
 -- 3) Repoint weekly_assignments rows that reference the old org_move_id to
 --    the new pro_moves.action_id, then null out org_move_id. This does not
 --    touch weekly_assignments_check (the source/org_id/location_id CHECK
---    added in 20260312224749) — that constraint has nothing to do with
+--    added in 20260312224749); that constraint has nothing to do with
 --    action_id/org_move_id, only source/org_id/location_id, so the repoint
 --    below cannot violate it.
 update public.weekly_assignments wa
@@ -68,7 +68,7 @@ where wa.org_move_id = opm.id
 --    (owner_org_id = their org). Platform rows (owner_org_id IS NULL) stay
 --    locked to platform admins via the existing "Platform admins manage
 --    pro_moves" policy from 20260727163955, which this migration leaves
---    untouched — Postgres OR's multiple permissive policies together for the
+--    untouched, and Postgres OR's multiple permissive policies together for the
 --    same command, so this is purely additive. Delete stays blocked for
 --    platform rows by the existing framework_history delete-guard trigger;
 --    org-owned rows (owner_org_id IS NOT NULL) are already exempt there, and
@@ -120,5 +120,5 @@ begin
     raise exception 'PML-2a sanity: % of % organization_pro_moves rows migrated', v_migrated_count, v_source_count;
   end if;
 
-  raise notice 'PML-2a: fold complete — % organization_pro_moves rows migrated, 0 weekly_assignments.org_move_id references remain', v_migrated_count;
+  raise notice 'PML-2a: fold complete, % organization_pro_moves rows migrated, 0 weekly_assignments.org_move_id references remain', v_migrated_count;
 end $$;

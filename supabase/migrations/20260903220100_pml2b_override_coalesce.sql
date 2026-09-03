@@ -1,7 +1,7 @@
 -- PML-2b: participant-facing rewording. Extends the COALESCE sweep pattern of
 -- 20260612170000 so organization_pro_move_content_overrides.custom_statement
 -- (an org's rewording of a platform move) is what participants and coaches
--- actually see at check-in, check-out, and in score history — not just in the
+-- actually see at check-in, check-out, and in score history, not just in the
 -- admin tab and planner picker, which is all it reached before this ticket
 -- (docs/audits/tenant-model-audit-2026-09-03.md finding C).
 --
@@ -25,14 +25,14 @@ select set_config('app.change_reason', 'PML-2b: apply org content overrides in p
 -- Named in the spec's function list, but its SELECT list is
 -- (weekly_score_id, staff_id, weekly_focus_id, confidence_score,
 -- performance_score, created_at, week_of, role_id, primary_location_id,
--- group_id, action_id, competency_id, domain_id, domain_name) — no
+-- group_id, action_id, competency_id, domain_id, domain_name). No
 -- action_statement column exists to override. Nothing to change.
 -- =====================================================
 
 -- =====================================================
 -- SKIPPED: get_calibration, get_performance_trend
 -- "The analytics functions that render statements" from the spec's
--- description — these two return aggregated domain_name/score data only,
+-- description, these two return aggregated domain_name/score data only,
 -- never action_statement. Nothing to change.
 -- =====================================================
 
@@ -191,7 +191,7 @@ $function$;
 -- 2. get_staff_all_weekly_scores
 -- Same pattern: an internal-only org_id CTE column (true_org_id) so the
 -- override lookup uses the real organizations.id, not the CTE's existing
--- `org_id` alias (which is actually locations.group_id here — a pre-existing
+-- `org_id` alias (which is actually locations.group_id here, a pre-existing
 -- naming leftover from before the organizations split, out of scope to
 -- rename in this ticket; current_user_org_id()'s own COALESCE pattern is
 -- reused so the resolution matches the platform standard).
@@ -478,7 +478,7 @@ $function$;
 -- Staff weekly RPC: same three location/org/global branches as before, each
 -- now COALESCEs the staff's own org's content override ahead of the platform
 -- statement. v_true_org_id is a fresh, independent resolution (mirrors
--- current_user_org_id()'s own COALESCE) — it does NOT reuse the existing
+-- current_user_org_id()'s own COALESCE); it does NOT reuse the existing
 -- v_org_id variable in this function, which is actually locations.group_id
 -- (used correctly for its existing purpose, scoping wa.org_id; renaming it
 -- is out of scope here, see the get_staff_all_weekly_scores comment above).

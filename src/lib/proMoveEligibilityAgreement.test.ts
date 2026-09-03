@@ -3,10 +3,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // PML-2c: "one shared eligibility rule" (docs/audits/tenant-model-audit-2026-09-03.md
-// finding D's guard recommendation, narrow version — see the ticket for the
+// finding D's guard recommendation, narrow version; see the ticket for the
 // broader-CI-guard decision left open with John). The real guarantee is
 // structural: every surface that decides "which pro moves can this org see"
-// calls org_visible_pro_moves — either directly (the sequencer and the
+// calls org_visible_pro_moves, either directly (the sequencer and the
 // AI-suggest edge function, which query it themselves) or through the one
 // shared fetchEligibleProMoves helper (the three planner pickers). Because
 // they all resolve to the same RPC call, picker eligibility and sequencer

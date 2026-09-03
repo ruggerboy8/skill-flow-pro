@@ -17,8 +17,8 @@ export interface EligibleProMove {
   competencyId: number | null;
   roleId: number | null;
   practiceTypes: string[];
-  /** Derived from ownerOrgId, not read off the row's own `source` column —
-   *  robust to the pre-2a period where org_custom rows didn't exist yet. */
+  /** Derived from ownerOrgId, not read off the row's own `source` column,
+   *  so it's robust to the pre-2a period where org_custom rows didn't exist yet. */
   source: 'platform' | 'org_custom';
   ownerOrgId: string | null;
 }
@@ -35,7 +35,7 @@ export interface EligibleProMoveRow {
 
 /**
  * Maps one row of the org_visible_pro_moves RPC response into the shape the
- * frontend uses. Pure — no I/O — so it is unit-testable without a live
+ * frontend uses. Pure, no I/O, so it is unit-testable without a live
  * Supabase call.
  */
 export function mapEligibleMoveRow(row: EligibleProMoveRow): EligibleProMove {
@@ -54,7 +54,7 @@ export function mapEligibleMoveRow(row: EligibleProMoveRow): EligibleProMove {
  * Fetches every pro move this org may see for a role (or every role, if
  * roleId is omitted): active platform moves matching the org's practice
  * type, plus the org's own moves, minus the org's hidden list. Calls the
- * org_visible_pro_moves RPC — see the module header for why that, and not a
+ * org_visible_pro_moves RPC; see the module header for why that, and not a
  * fourth ad-hoc query, is the mechanism.
  */
 export async function fetchEligibleProMoves(

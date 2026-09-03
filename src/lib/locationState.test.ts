@@ -259,7 +259,7 @@ describe('assembleWeek — canonical weekStartDate', () => {
 
 // PML-2b: participant-facing rewording. assembleWeek is the "current week"
 // path both wizards go through (via assembleCurrentWeek).
-describe('assembleWeek — content overrides (PML-2b)', () => {
+describe('assembleWeek: content overrides (PML-2b)', () => {
   function queueThroughToAssignments(assignmentRows: unknown[]) {
     queueTable('locations', {
       data: { timezone: 'America/Chicago', group_id: 'group-1' },

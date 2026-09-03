@@ -4,7 +4,7 @@
 // PML-2a, an org-custom slot had `actionId: null` (it was only addressable by
 // `orgMoveId`), so this exclusion silently skipped it. After PML-2a, a
 // migrated org move has a real `action_id` in the slot just like a platform
-// move, so the same exclusion now covers it too — this is a pure extraction
+// move, so the same exclusion now covers it too. This is a pure extraction
 // of that computation so the claim is tested, not assumed.
 
 export interface SlotForExclusion {

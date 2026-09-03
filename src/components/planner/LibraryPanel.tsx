@@ -190,9 +190,9 @@ export function LibraryPanel({
     if (browseMoves.length > 0) return;
     setBrowseLoading(true);
     try {
-      // PML-2c: one shared eligibility rule when an org is known — see
+      // PML-2c: one shared eligibility rule when an org is known; see
       // SmartSlotPicker.loadBrowseMoves for the full rationale. No-org case
-      // (rare — platform testing surfaces) keeps the plain role+active query.
+      // (rare, platform testing surfaces) keeps the plain role+active query.
       const eligiblePromise: Promise<EligibleProMove[] | null> = orgId
         ? fetchEligibleProMoves(orgId, roleId)
         : Promise.resolve(null);

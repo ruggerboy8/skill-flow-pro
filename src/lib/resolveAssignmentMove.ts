@@ -14,7 +14,7 @@ import { resolveStatement } from './contentOverrides';
 // fetchOrgProMoveMetaByIds in src/lib/proMoves.ts) and pass it in here.
 //
 // PML-2b: participant-facing rewording. A platform move's statement is
-// COALESCE(org content override, platform text) — the `overrides` param
+// COALESCE(org content override, platform text); the `overrides` param
 // (action_id -> custom_statement, see src/lib/contentOverrides.ts) applies
 // only on the platform branch (item.action_id set, no org_move_id); org-custom
 // moves are worded directly by the org, not through an override row.
@@ -64,7 +64,7 @@ export interface ResolvedAssignmentMove {
  *
  * `overrides` (default empty) is this org's content-override map, action_id
  * -> custom_statement (fetch it first with fetchContentOverrides). Applies
- * only to the platform branch — see the module header.
+ * only to the platform branch; see the module header.
  */
 export function resolveAssignmentRows(
   rows: AssignmentRowForResolve[],

@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
     const roleName = roleData?.role_name ?? 'Unknown';
 
     // PML-2c: one shared eligibility rule. org_visible_pro_moves is the same
-    // RPC the sequencer and the planner picker call — active platform moves
+    // RPC the sequencer and the planner picker call: active platform moves
     // matching the org's practice type, plus the org's own moves, minus the
     // org's hidden list. Replaces the old ad-hoc query here, which never
     // filtered by practice_type at all (audit finding D) and could never

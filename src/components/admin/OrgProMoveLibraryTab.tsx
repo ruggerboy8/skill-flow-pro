@@ -227,7 +227,7 @@ export function OrgProMoveLibraryTab() {
       setRows(merged);
 
       // 5. Fetch org custom moves. PML-2a: dual-read across pro_moves
-      // (owner_org_id = org — the live write path now) and
+      // (owner_org_id = org, the live write path now) and
       // organization_pro_moves (legacy rows not yet migrated). See
       // fetchOrgCustomMoves' module header for why.
       setCustomMoves(await fetchOrgCustomMoves(organizationId));
@@ -398,7 +398,7 @@ export function OrgProMoveLibraryTab() {
         .maybeSingle();
 
       // PML-2a: new custom moves write into pro_moves (owner_org_id = org,
-      // source = 'org_custom') — the one write path going forward.
+      // source = 'org_custom'), the one write path going forward.
       const { error } = await createOrgCustomMove(organizationId, {
         actionStatement: newMove.action_statement.trim(),
         description: newMove.description.trim() || null,

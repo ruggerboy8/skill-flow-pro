@@ -1,12 +1,12 @@
 -- PML-2c: one shared eligibility rule. org_visible_pro_moves becomes THE
--- rule for "which pro moves may this org see for this role" — the sequencer
+-- rule for "which pro moves may this org see for this role"; the sequencer
 -- already calls it (sequencer-rank/index.ts), and after this migration the
 -- planner picker, AI-suggest, and the org library all call the identical
 -- function instead of re-implementing the practice-type/hidden-list/org-moves
 -- logic three separate ways (docs/audits/tenant-model-audit-2026-09-03.md
 -- finding D).
 --
--- Contract is unchanged (same args, same return columns) — post-PML-2a the
+-- Contract is unchanged (same args, same return columns). Post-PML-2a the
 -- org branch (pm.owner_org_id = p_org_id) finally matches real rows, since
 -- org-custom moves now live in pro_moves instead of the unrelated
 -- organization_pro_moves table.

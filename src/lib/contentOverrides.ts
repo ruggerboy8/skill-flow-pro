@@ -4,13 +4,13 @@ import { supabase } from '@/integrations/supabase/client';
 // client reads pro_moves.action_statement directly: the org's custom
 // statement wins over the platform statement when an override exists.
 // Overrides apply to platform moves only (an org edits its own org_custom
-// moves directly, not through an override row) — see
+// moves directly, not through an override row). See
 // docs/specs/pml-2-tenant-content-unification.md PML-2b.
 
 /**
  * Resolves the statement a member of `orgId` should see for a platform move:
  * the org's custom_statement if one exists, otherwise the platform text.
- * Pure — takes an already-fetched override map, does no I/O — so callers can
+ * Pure: takes an already-fetched override map, does no I/O, so callers can
  * batch-fetch overrides once per screen instead of once per move.
  *
  * `actionId` is nullable because org-custom moves (fetched via

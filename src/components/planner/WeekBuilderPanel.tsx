@@ -1037,7 +1037,7 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
       {/* PML-2a: this used to branch to a ProMovePickerDialog fallback when
           pickerOpen was true but selectedSlot was null. Every call site that
           sets pickerOpen(true) also sets selectedSlot in the same breath, so
-          that branch could never actually render — removed rather than
+          that branch could never actually render, removed rather than
           fixed, per the PML-1 QA follow-up (its onSelect signature also
           didn't match handleSelectProMove's, which would have broken it the
           moment it became reachable). ProMovePickerDialog itself is kept

@@ -99,15 +99,15 @@ export function ProMovePickerDialog({
     // the sequencer uses, so this dialog can never re-diverge into its own
     // ad-hoc practice-type/hidden-list logic. This also fixes the bug the
     // audit flagged (finding D): this dialog used to skip practice_type
-    // filtering entirely whenever orgId was passed — which was every real
-    // caller — so it could leak another practice type's moves into the
+    // filtering entirely whenever orgId was passed, which was every real
+    // caller, so it could leak another practice type's moves into the
     // picker. Org-custom moves come back from the same call (they match on
     // owner_org_id), so there is no separate org-custom query any more.
     if (orgId) {
       const [eligible, hiddenCountForRole, orgMoves] = await Promise.all([
         fetchEligibleProMoves(orgId, roleId),
         fetchHiddenPlatformMoveCount(orgId, roleId),
-        // Dual-read during the PML-2a transition — org-custom rows not yet
+        // Dual-read during the PML-2a transition: org-custom rows not yet
         // folded into pro_moves still live in organization_pro_moves. Once
         // the fold migration runs, every row here has migrated_action_id
         // set and this returns nothing (no duplicate listing), and those
@@ -196,7 +196,7 @@ export function ProMovePickerDialog({
       return;
     }
 
-    // No org context (rare — super-admin/platform testing surfaces): plain
+    // No org context (rare, super-admin/platform testing surfaces): plain
     // practice-type filter, no visibility overrides or org-custom moves
     // apply (there is no org).
     let movesQuery = supabase

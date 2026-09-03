@@ -1801,7 +1801,7 @@ serve(async (req: Request) => {
         // have ON DELETE CASCADE on org_id -> organizations(id), so this is
         // belt-and-braces (matches the pattern the versioning implementation
         // plan used for the delete guard's own exemptions), not a behavior
-        // change — it just makes teardown's intent explicit instead of
+        // change; it just makes teardown's intent explicit instead of
         // relying entirely on the cascade.
         await requireDelete("org custom pro moves (legacy, pre-fold)", admin.from("organization_pro_moves").delete().eq("org_id", organization_id));
         await requireDelete("org pro move content overrides", admin.from("organization_pro_move_content_overrides").delete().eq("org_id", organization_id));

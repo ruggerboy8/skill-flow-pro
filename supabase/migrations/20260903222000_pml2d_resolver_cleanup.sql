@@ -4,7 +4,7 @@
 --
 -- get_user_org_id(uuid) and current_user_org_id() already compute the exact
 -- same COALESCE(staff.organization_id, location-chain) logic as of
--- 20260820023000 (cor2_fix_org_group_id_confusion) — that migration's own
+-- 20260820023000 (cor2_fix_org_group_id_confusion); that migration's own
 -- header comment says as much and lists every RLS policy still calling
 -- get_user_org_id(auth.uid()) directly (confirmed live via pg_policy):
 -- weekly_assignments, practice_groups, locations, weekly_scores,
@@ -203,7 +203,7 @@ CREATE POLICY org_pmc_overrides_manage_own_org ON public.organization_pro_move_c
 -- =====================================================
 -- 8. Drop get_user_org_id only if nothing in pg_policies references it any
 --    more. Guards against this migration running against a database where
---    some other, not-yet-updated policy still calls it — raises instead of
+--    some other, not-yet-updated policy still calls it. Raises instead of
 --    dropping a function something still depends on.
 -- =====================================================
 DO $$
@@ -219,21 +219,21 @@ BEGIN
     );
 
   IF v_still_referenced > 0 THEN
-    RAISE EXCEPTION 'PML-2d: % RLS polic(ies) still reference get_user_org_id — not dropping the function', v_still_referenced;
+    RAISE EXCEPTION 'PML-2d: % RLS polic(ies) still reference get_user_org_id, not dropping the function', v_still_referenced;
   END IF;
 
   DROP FUNCTION IF EXISTS public.get_user_org_id(uuid);
-  RAISE NOTICE 'PML-2d: get_user_org_id(uuid) dropped — current_user_org_id() is the one org-id resolver';
+  RAISE NOTICE 'PML-2d: get_user_org_id(uuid) dropped, current_user_org_id() is the one org-id resolver';
 END $$;
 
 -- =====================================================
 -- 9. Drop the dead resolve_role_display_name RPC. The app resolves org role
 --    labels entirely through useRoleDisplayNames (client-side hook reading
---    organization_role_names) — this RPC has no callers.
+--    organization_role_names); this RPC has no callers.
 -- =====================================================
 DROP FUNCTION IF EXISTS public.resolve_role_display_name(uuid, bigint);
 
 DO $$
 BEGIN
-  RAISE NOTICE 'PML-2d: resolve_role_display_name dropped (dead — useRoleDisplayNames is the live mechanism)';
+  RAISE NOTICE 'PML-2d: resolve_role_display_name dropped (dead; useRoleDisplayNames is the live mechanism)';
 END $$;

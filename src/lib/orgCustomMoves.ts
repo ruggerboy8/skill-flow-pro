@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 // table, so every read is a DUAL READ: fetch both sources, merge, done. Once
 // the migration runs, every organization_pro_moves row gets a
 // migrated_action_id stamped on it and this helper's second query returns
-// nothing forever after — the dual read quietly becomes a single read
+// nothing forever after; the dual read quietly becomes a single read
 // without any further code change.
 
 export interface OrgCustomMoveRow {

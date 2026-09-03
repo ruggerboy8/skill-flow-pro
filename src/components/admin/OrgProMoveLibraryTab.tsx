@@ -519,6 +519,14 @@ export function OrgProMoveLibraryTab() {
   // Derive unique roles and domains for filter dropdowns
   const uniqueRoles = [...new Set(rows.map((r) => r.role_name))].sort();
   const uniqueDomains = [...new Set(rows.map((r) => r.domain_name))].filter((d) => d !== '—').sort();
+  // PML-1 Fix 4: the filter still matches on the raw platform role_name (a
+  // deliberately unchanged part of the filtering logic), but the label shown
+  // to the user should be the org's resolved name, so keep a lookup back to
+  // role_id for display.
+  const roleIdByName = new Map<string, number | null>();
+  rows.forEach((r) => {
+    if (!roleIdByName.has(r.role_name)) roleIdByName.set(r.role_name, r.role_id);
+  });
 
   const filtered = rows.filter((r) => {
     const matchesSearch =
@@ -581,7 +589,7 @@ export function OrgProMoveLibraryTab() {
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
                 {uniqueRoles.map((r) => (
-                  <SelectItem key={r} value={r}>{resolveRoleName ? resolveRoleName(0, r) : r}</SelectItem>
+                  <SelectItem key={r} value={r}>{resolveRoleName(roleIdByName.get(r) ?? 0, r)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

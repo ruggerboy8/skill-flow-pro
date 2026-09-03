@@ -27,6 +27,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { fireCelebration } from '@/lib/confetti';
 import { fetchOrgProMoveMetaByIds } from '@/lib/proMoves';
 import { resolveAssignmentRows, collectOrgMoveIds } from '@/lib/resolveAssignmentMove';
+import { fetchContentOverrides } from '@/lib/contentOverrides';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -327,7 +328,12 @@ export default function ConfidenceWizard() {
           // null action_id) have no pro_moves row to join above, so resolve
           // them via organization_pro_moves or they render blank.
           const onboardingOrgMeta = await fetchOrgProMoveMetaByIds(collectOrgMoveIds(assignData || []));
-          assignments = resolveAssignmentRows(assignData || [], onboardingOrgMeta);
+          // PML-2b: participant-facing rewording.
+          const onboardingOverrides = await fetchContentOverrides(
+            staffData.organization_id,
+            (assignData || []).map((r: any) => r.action_id).filter((id: number | null): id is number => id != null)
+          );
+          assignments = resolveAssignmentRows(assignData || [], onboardingOrgMeta, onboardingOverrides);
         } else {
           // weekly_plan retired (2026-07-25, roadmap 2.4 slice B): ongoing-phase
           // repair reads org/global weekly_assignments, same as the current week.
@@ -381,7 +387,12 @@ export default function ConfidenceWizard() {
 
           // PML-1 Fix 5: resolve org custom moves instead of leaving them blank.
           const planOrgMeta = await fetchOrgProMoveMetaByIds(collectOrgMoveIds(planData || []));
-          assignments = resolveAssignmentRows(planData || [], planOrgMeta);
+          // PML-2b: participant-facing rewording.
+          const planOverrides = await fetchContentOverrides(
+            repairOrgId,
+            (planData || []).map((r: any) => r.action_id).filter((id: number | null): id is number => id != null)
+          );
+          assignments = resolveAssignmentRows(planData || [], planOrgMeta, planOverrides);
         }
         
         cycleNumber = targetCycle;
@@ -485,7 +496,12 @@ export default function ConfidenceWizard() {
           // Found assignments (onboarding or global). PML-1 Fix 5: resolve
           // org custom moves instead of leaving them blank.
           const noWeekOrgMeta = await fetchOrgProMoveMetaByIds(collectOrgMoveIds(assignData));
-          assignments = resolveAssignmentRows(assignData, noWeekOrgMeta);
+          // PML-2b: participant-facing rewording.
+          const noWeekOverrides = await fetchContentOverrides(
+            staffData.organization_id,
+            assignData.map((r: any) => r.action_id).filter((id: number | null): id is number => id != null)
+          );
+          assignments = resolveAssignmentRows(assignData, noWeekOrgMeta, noWeekOverrides);
         } else {
           // weekly_plan retired (2026-07-25): org/global weekly_assignments are
           // the only source. Nothing found means the week genuinely has no plan.

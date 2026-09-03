@@ -2,6 +2,7 @@ import { getWeekAnchors } from '@/v2/time';
 import { getPolicyOffsetsForLocation, getAssignmentWeekMondayStr } from '@/lib/submissionPolicy';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchOrgProMoveMetaByIds } from '@/lib/proMoves';
+import { fetchContentOverrides, resolveStatement } from '@/lib/contentOverrides';
 // (backlog helpers removed 2026-07-25 — no missed-assignment workflow; roadmap 2.3)
 import { format } from 'date-fns';
 import { computeWeekCycleMath } from '@/lib/weekCycleMath';
@@ -282,14 +283,26 @@ export async function assembleWeek(params: {
       ? await fetchOrgProMoveMetaByIds(orgMoveIds)
       : new Map();
 
+    // PML-2b: participant-facing rewording. Fetch this org's content
+    // overrides for every platform action_id in the week, so the org's
+    // custom wording (not the platform default) is what shows at check-in.
+    const platformActionIds = enrichedAssign
+      .map((a: any) => a.action_id)
+      .filter((id: number | null): id is number => id != null);
+    const overrides = await fetchContentOverrides(orgId, platformActionIds);
+
     const assignments = enrichedAssign.map((assign: any) => {
       const om = assign.org_move_id ? orgMeta.get(assign.org_move_id) : undefined;
+      const platformStatement = assign.pro_moves?.action_statement || null;
+      const resolvedPlatformStatement = platformStatement
+        ? resolveStatement(assign.action_id, platformStatement, overrides)
+        : null;
       return {
         weekly_focus_id: `assign:${assign.id}`,
         type: 'site',
         pro_move_id: assign.action_id,
         org_move_id: assign.org_move_id ?? null,
-        action_statement: assign.pro_moves?.action_statement || om?.statement || 'Pro Move',
+        action_statement: resolvedPlatformStatement || om?.statement || 'Pro Move',
         intervention_text: assign.pro_moves?.intervention_text || om?.description || null,
         competency_name: assign.pro_moves?.competencies?.name || om?.competencyName || 'General',
         domain_name: assign.pro_moves?.competencies?.domains?.domain_name || om?.domain || 'General',

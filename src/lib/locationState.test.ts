@@ -256,3 +256,74 @@ describe('assembleWeek — canonical weekStartDate', () => {
     expect(result).toEqual({ assignments: [], weekStartDate: null });
   });
 });
+
+// PML-2b: participant-facing rewording. assembleWeek is the "current week"
+// path both wizards go through (via assembleCurrentWeek).
+describe('assembleWeek — content overrides (PML-2b)', () => {
+  function queueThroughToAssignments(assignmentRows: unknown[]) {
+    queueTable('locations', {
+      data: { timezone: 'America/Chicago', group_id: 'group-1' },
+      error: null,
+    });
+    queueTable('practice_groups', { data: { organization_id: 'org-1' }, error: null });
+    queueTable('organizations', { data: { timezone: 'America/Chicago' }, error: null });
+    // 1st weekly_assignments call: the plain count/existence check.
+    queueTable('weekly_assignments', { data: assignmentRows, error: null });
+    // 2nd weekly_assignments call: the enriched (joined) fetch.
+    queueTable('weekly_assignments', { data: assignmentRows, error: null });
+  }
+
+  it("shows the org's override statement for a platform move instead of the platform text", async () => {
+    queueThroughToAssignments([
+      {
+        id: 'assign-1',
+        action_id: 260,
+        org_move_id: null,
+        display_order: 1,
+        self_select: false,
+        pro_moves: { action_statement: 'Original platform wording', intervention_text: null },
+      },
+    ]);
+    queueTable('organization_pro_move_content_overrides', {
+      data: [{ pro_move_id: 260, custom_statement: "Confirm tomorrow's schedule with the front desk" }],
+      error: null,
+    });
+
+    const result = await assembleWeek({
+      userId: 'user-1',
+      roleId: 2,
+      locationId: 'loc-1',
+      cycleNumber: 1,
+      weekInCycle: 1,
+    });
+
+    expect(result.assignments[0].action_statement).toBe("Confirm tomorrow's schedule with the front desk");
+
+    const overrideCall = getTableCalls('organization_pro_move_content_overrides')[0];
+    expect(overrideCall.filters).toContainEqual({ op: 'eq', args: ['org_id', 'org-1'] });
+  });
+
+  it('falls back to the platform statement when the org has no override for that move', async () => {
+    queueThroughToAssignments([
+      {
+        id: 'assign-2',
+        action_id: 261,
+        org_move_id: null,
+        display_order: 1,
+        self_select: false,
+        pro_moves: { action_statement: 'Original platform wording', intervention_text: null },
+      },
+    ]);
+    queueTable('organization_pro_move_content_overrides', { data: [], error: null });
+
+    const result = await assembleWeek({
+      userId: 'user-1',
+      roleId: 2,
+      locationId: 'loc-1',
+      cycleNumber: 1,
+      weekInCycle: 1,
+    });
+
+    expect(result.assignments[0].action_statement).toBe('Original platform wording');
+  });
+});

@@ -17,6 +17,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -39,6 +49,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Eye, EyeOff, Search, Pencil, Plus, Loader2, RotateCcw } from 'lucide-react';
+import { getDomainColor } from '@/lib/domainColors';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -66,6 +77,7 @@ interface OrgCustomMove {
   role_name: string;
   competency_id: number | null;
   competency_name: string;
+  domain_name: string;
   practice_types: string[];
   source: 'org';
 }
@@ -112,6 +124,15 @@ export function OrgProMoveLibraryTab() {
     competency_id: '',
   });
   const [savingNewMove, setSavingNewMove] = useState(false);
+
+  // Edit dialog for an existing org custom move (action statement + description only)
+  const [editingCustomMove, setEditingCustomMove] = useState<OrgCustomMove | null>(null);
+  const [customEditDraft, setCustomEditDraft] = useState({ action_statement: '', description: '' });
+  const [savingCustomEdit, setSavingCustomEdit] = useState(false);
+
+  // Deactivate confirm for an org custom move
+  const [deactivatingMove, setDeactivatingMove] = useState<OrgCustomMove | null>(null);
+  const [deactivating, setDeactivating] = useState(false);
 
   // ── Data loading ─────────────────────────────────────────────────────────────
 
@@ -209,7 +230,10 @@ export function OrgProMoveLibraryTab() {
         .select(`
           id, action_statement, description, role_id, competency_id, practice_types,
           roles!organization_pro_moves_role_id_fkey(role_name),
-          competencies!organization_pro_moves_competency_id_fkey(name)
+          competencies!organization_pro_moves_competency_id_fkey(
+            name,
+            domains!fk_competencies_domain_id(domain_name)
+          )
         `)
         .eq('org_id', organizationId)
         .eq('active', true)
@@ -224,6 +248,7 @@ export function OrgProMoveLibraryTab() {
           role_name: m.roles?.role_name ?? '—',
           competency_id: m.competency_id ?? null,
           competency_name: m.competencies?.name ?? '—',
+          domain_name: m.competencies?.domains?.domain_name ?? '—',
           practice_types: m.practice_types ?? [],
           source: 'org',
         }))
@@ -420,11 +445,88 @@ export function OrgProMoveLibraryTab() {
     }
   };
 
+  // ── Edit / deactivate a custom move ───────────────────────────────────────────
+  // Role and competency are fixed after creation (PML-1 scope decision);
+  // only action statement and description are editable here.
+
+  const startCustomEdit = (move: OrgCustomMove) => {
+    setEditingCustomMove(move);
+    setCustomEditDraft({
+      action_statement: move.action_statement,
+      description: move.description ?? '',
+    });
+  };
+
+  const cancelCustomEdit = () => {
+    setEditingCustomMove(null);
+  };
+
+  const saveCustomEdit = async () => {
+    if (!editingCustomMove) return;
+    const statement = customEditDraft.action_statement.trim();
+    if (!statement) return;
+    setSavingCustomEdit(true);
+    try {
+      const description = customEditDraft.description.trim() || null;
+      const { error } = await (supabase as any)
+        .from('organization_pro_moves')
+        .update({ action_statement: statement, description })
+        .eq('id', editingCustomMove.id);
+      if (error) throw error;
+
+      setCustomMoves((prev) =>
+        prev.map((m) =>
+          m.id === editingCustomMove.id ? { ...m, action_statement: statement, description } : m
+        )
+      );
+      toast({ title: 'Saved', description: 'Custom pro move updated.' });
+      setEditingCustomMove(null);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to save', variant: 'destructive' });
+    } finally {
+      setSavingCustomEdit(false);
+    }
+  };
+
+  const confirmDeactivate = (move: OrgCustomMove) => setDeactivatingMove(move);
+
+  const cancelDeactivate = () => setDeactivatingMove(null);
+
+  const deactivateCustomMove = async () => {
+    if (!deactivatingMove) return;
+    setDeactivating(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('organization_pro_moves')
+        .update({ active: false })
+        .eq('id', deactivatingMove.id);
+      if (error) throw error;
+
+      // Active-only filtering already happens at the query (Fix 3), so a
+      // deactivated move simply drops out of the list here.
+      setCustomMoves((prev) => prev.filter((m) => m.id !== deactivatingMove.id));
+      toast({ title: 'Deactivated', description: 'This custom pro move is now hidden everywhere it was pickable.' });
+      setDeactivatingMove(null);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to deactivate', variant: 'destructive' });
+    } finally {
+      setDeactivating(false);
+    }
+  };
+
   // ── Filter ────────────────────────────────────────────────────────────────────
 
   // Derive unique roles and domains for filter dropdowns
   const uniqueRoles = [...new Set(rows.map((r) => r.role_name))].sort();
   const uniqueDomains = [...new Set(rows.map((r) => r.domain_name))].filter((d) => d !== '—').sort();
+  // PML-1 Fix 4: the filter still matches on the raw platform role_name (a
+  // deliberately unchanged part of the filtering logic), but the label shown
+  // to the user should be the org's resolved name, so keep a lookup back to
+  // role_id for display.
+  const roleIdByName = new Map<string, number | null>();
+  rows.forEach((r) => {
+    if (!roleIdByName.has(r.role_name)) roleIdByName.set(r.role_name, r.role_id);
+  });
 
   const filtered = rows.filter((r) => {
     const matchesSearch =
@@ -487,7 +589,7 @@ export function OrgProMoveLibraryTab() {
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
                 {uniqueRoles.map((r) => (
-                  <SelectItem key={r} value={r}>{resolveRoleName ? resolveRoleName(0, r) : r}</SelectItem>
+                  <SelectItem key={r} value={r}>{resolveRoleName(roleIdByName.get(r) ?? 0, r)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -671,7 +773,18 @@ export function OrgProMoveLibraryTab() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm">{resolveRoleName(move.role_id ?? 0, move.role_name)}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">—</TableCell>
+                          <TableCell className="text-sm">
+                            {move.domain_name !== '—' ? (
+                              <span
+                                className="text-xs px-1.5 py-0.5 rounded font-medium"
+                                style={{ backgroundColor: getDomainColor(move.domain_name) }}
+                              >
+                                {move.domain_name}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-sm">{move.competency_name}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="text-xs">
@@ -679,7 +792,26 @@ export function OrgProMoveLibraryTab() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="text-xs text-muted-foreground">Custom</span>
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => startCustomEdit(move)}
+                                title="Edit this custom move"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground"
+                                onClick={() => confirmDeactivate(move)}
+                                title="Deactivate this custom move"
+                              >
+                                <EyeOff className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -778,6 +910,76 @@ export function OrgProMoveLibraryTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Custom Move Dialog: action statement + description only.
+          Role and competency are fixed after creation (PML-2 territory). */}
+      <Dialog open={!!editingCustomMove} onOpenChange={(open) => !open && cancelCustomEdit()}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Custom Pro Move</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-custom-statement">Pro move statement *</Label>
+              <Textarea
+                id="edit-custom-statement"
+                value={customEditDraft.action_statement}
+                onChange={(e) =>
+                  setCustomEditDraft((p) => ({ ...p, action_statement: e.target.value }))
+                }
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-custom-description">Description (optional)</Label>
+              <Textarea
+                id="edit-custom-description"
+                value={customEditDraft.description}
+                onChange={(e) =>
+                  setCustomEditDraft((p) => ({ ...p, description: e.target.value }))
+                }
+                placeholder="Additional guidance for staff or coaches"
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelCustomEdit}>
+              Cancel
+            </Button>
+            <Button
+              onClick={saveCustomEdit}
+              disabled={savingCustomEdit || !customEditDraft.action_statement.trim()}
+            >
+              {savingCustomEdit && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deactivate confirm */}
+      <AlertDialog open={!!deactivatingMove} onOpenChange={(open) => !open && cancelDeactivate()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate this custom pro move?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It will disappear from the library and every picker. Weeks that already
+              used it are untouched.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deactivating}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={deactivateCustomMove} disabled={deactivating}>
+              {deactivating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

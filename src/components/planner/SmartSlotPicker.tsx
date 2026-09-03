@@ -3,18 +3,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sparkles, Loader2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getDomainColor } from '@/lib/domainColors';
+import { mergeMovesByDomain } from '@/lib/mergeMovesByDomain';
 import type { RankedMove } from '@/lib/sequencerAdapter';
 
 interface SmartSlotPickerProps {
   open: boolean;
   onClose: () => void;
-  onSelect: (actionId: number, actionStatement: string, source: 'ranked' | 'ai' | 'browse') => void;
+  onSelect: (actionId: number | null, actionStatement: string, source: 'ranked' | 'ai' | 'browse', orgMoveId?: string) => void;
   slot: { weekStart: string; displayOrder: 1 | 2 | 3 } | null;
   roleId: number;
   roleName: string;
@@ -38,10 +40,12 @@ function reasonLabel(move: RankedMove): string {
 }
 
 interface BrowseMove {
-  action_id: number;
+  action_id: number | null;
+  orgMoveId: string | null;
   action_statement: string;
   domain_name: string;
   competency_name: string;
+  isOrgCustom: boolean;
 }
 
 export function SmartSlotPicker({
@@ -59,29 +63,73 @@ export function SmartSlotPicker({
     .filter(m => !excludeActionIds.includes(m.proMoveId))
     .slice(0, 8);
 
-  // Load browse moves lazily when tab opens
+  // Load browse moves lazily when tab opens. Fetches platform pro_moves and
+  // active org custom moves for this role, then merges them into one
+  // domain-ordered list (org moves get a "Custom" badge, not a separate
+  // section, per John's scope decision on PML-1).
   const loadBrowseMoves = async () => {
     if (browseMoves.length > 0) return;
     setBrowseLoading(true);
     try {
-      const { data } = await supabase
-        .from('pro_moves')
-        .select(`
-          action_id, action_statement,
-          competencies!fk_pro_moves_competency_id(
-            name,
-            domains!fk_competencies_domain_id(domain_name)
-          )
-        `)
-        .eq('role_id', roleId)
-        .eq('active', true)
-        .order('action_id');
-      setBrowseMoves((data ?? []).map((m: any) => ({
+      const [platformResult, orgResult] = await Promise.all([
+        supabase
+          .from('pro_moves')
+          .select(`
+            action_id, action_statement,
+            competencies!fk_pro_moves_competency_id(
+              name,
+              domains!fk_competencies_domain_id(domain_name)
+            )
+          `)
+          .eq('role_id', roleId)
+          .eq('active', true)
+          .order('action_id'),
+        orgId
+          ? supabase
+              .from('organization_pro_moves')
+              .select('id, action_statement, competency_id')
+              .eq('org_id', orgId)
+              .eq('role_id', roleId)
+              .eq('active', true)
+              .order('sort_order')
+          : Promise.resolve({ data: null }),
+      ]);
+
+      const platformMoves: BrowseMove[] = (platformResult.data ?? []).map((m: any) => ({
         action_id: m.action_id,
+        orgMoveId: null,
         action_statement: m.action_statement,
         domain_name: m.competencies?.domains?.domain_name ?? '—',
         competency_name: m.competencies?.name ?? '—',
-      })));
+        isOrgCustom: false,
+      }));
+
+      const orgRows = orgResult.data ?? [];
+      let orgMoves: BrowseMove[] = [];
+      if (orgRows.length > 0) {
+        const compIds = Array.from(new Set(orgRows.map((m: any) => m.competency_id).filter(Boolean)));
+        const compMap = new Map<number, string>();
+        if (compIds.length > 0) {
+          const { data: comps } = await supabase
+            .from('competencies')
+            .select('competency_id, domains:fk_competencies_domain_id(domain_name)')
+            .in('competency_id', compIds as number[]);
+          (comps || []).forEach(c => {
+            compMap.set(c.competency_id, (c.domains as any)?.domain_name || '');
+          });
+        }
+        orgMoves = orgRows.map((m: any) => ({
+          action_id: null,
+          orgMoveId: m.id,
+          action_statement: m.action_statement,
+          domain_name: compMap.get(m.competency_id) || '—',
+          competency_name: '—',
+          isOrgCustom: true,
+        }));
+      }
+
+      // Mixed in by domain, not a separate org-custom section.
+      setBrowseMoves(mergeMovesByDomain(platformMoves, orgMoves));
     } finally {
       setBrowseLoading(false);
     }
@@ -251,7 +299,7 @@ export function SmartSlotPicker({
                 {filteredBrowse.map(m => {
                   const domainColor = getDomainColor(m.domain_name);
                   return (
-                    <div key={m.action_id} className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors">
+                    <div key={m.orgMoveId ? `org-${m.orgMoveId}` : `platform-${m.action_id}`} className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span
@@ -260,7 +308,13 @@ export function SmartSlotPicker({
                           >
                             {m.domain_name}
                           </span>
-                          <span className="text-xs text-muted-foreground">{m.competency_name}</span>
+                          {m.isOrgCustom ? (
+                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
+                              Custom
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">{m.competency_name}</span>
+                          )}
                         </div>
                         <p className="text-sm font-medium leading-snug line-clamp-2">{m.action_statement}</p>
                       </div>
@@ -268,7 +322,7 @@ export function SmartSlotPicker({
                         size="sm"
                         variant="outline"
                         className="flex-none"
-                        onClick={() => { onSelect(m.action_id, m.action_statement, 'browse'); onClose(); }}
+                        onClick={() => { onSelect(m.action_id, m.action_statement, 'browse', m.orgMoveId ?? undefined); onClose(); }}
                       >
                         Pick
                       </Button>

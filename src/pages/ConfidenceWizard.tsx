@@ -25,6 +25,8 @@ import { AlertCircle, Loader2, ChevronLeft, ChevronRight, Check } from 'lucide-r
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fireCelebration } from '@/lib/confetti';
+import { fetchOrgProMoveMetaByIds } from '@/lib/proMoves';
+import { resolveAssignmentRows, collectOrgMoveIds } from '@/lib/resolveAssignmentMove';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -297,16 +299,17 @@ export default function ConfidenceWizard() {
               competency_id,
               self_select,
               action_id,
+              org_move_id,
               week_start_date,
-              pro_moves!weekly_assignments_action_id_fkey ( 
+              pro_moves!weekly_assignments_action_id_fkey (
                 action_statement,
                 intervention_text,
-                competencies ( 
+                competencies (
                   name,
                   domains!competencies_domain_id_fkey ( domain_name )
                 )
               ),
-              competencies ( 
+              competencies (
                 name,
                 domains!competencies_domain_id_fkey ( domain_name )
               )
@@ -320,25 +323,11 @@ export default function ConfidenceWizard() {
 
           debug('Repair query result (assignments):', { assignData, assignError });
 
-          assignments = (assignData || []).map((item: any) => {
-            let domainName = 'Unknown';
-            if (item.pro_moves?.competencies?.domains?.domain_name) {
-              domainName = item.pro_moves.competencies.domains.domain_name;
-            } else if (item.competencies?.domains?.domain_name) {
-              domainName = item.competencies.domains.domain_name;
-            }
-
-            return {
-              weekly_focus_id: `assign:${item.id}`,
-              type: item.self_select ? 'self_select' : 'site',
-              display_order: item.display_order,
-              action_statement: item.pro_moves?.action_statement || '',
-              intervention_text: item.pro_moves?.intervention_text || null,
-              domain_name: domainName,
-              required: true,
-              locked: false
-            };
-          });
+          // PML-1 Fix 5: assignments carrying org_move_id (org custom move,
+          // null action_id) have no pro_moves row to join above, so resolve
+          // them via organization_pro_moves or they render blank.
+          const onboardingOrgMeta = await fetchOrgProMoveMetaByIds(collectOrgMoveIds(assignData || []));
+          assignments = resolveAssignmentRows(assignData || [], onboardingOrgMeta);
         } else {
           // weekly_plan retired (2026-07-25, roadmap 2.4 slice B): ongoing-phase
           // repair reads org/global weekly_assignments, same as the current week.
@@ -361,6 +350,7 @@ export default function ConfidenceWizard() {
               competency_id,
               self_select,
               action_id,
+              org_move_id,
               pro_moves!weekly_assignments_action_id_fkey (
                 action_statement,
                 intervention_text,
@@ -389,24 +379,9 @@ export default function ConfidenceWizard() {
 
           debug('Repair query result (org/global assignments):', { planData, planError });
 
-          assignments = (planData || []).map((item: any) => {
-            let domainName = 'Unknown';
-            if (item.pro_moves?.competencies?.domains?.domain_name) {
-              domainName = item.pro_moves.competencies.domains.domain_name;
-            } else if (item.competencies?.domains?.domain_name) {
-              domainName = item.competencies.domains.domain_name;
-            }
-
-            return {
-              weekly_focus_id: `assign:${item.id}`,
-              type: item.self_select ? 'self_select' : 'site',
-              display_order: item.display_order,
-              action_statement: item.pro_moves?.action_statement || '',
-              domain_name: domainName,
-              required: true,
-              locked: false
-            };
-          });
+          // PML-1 Fix 5: resolve org custom moves instead of leaving them blank.
+          const planOrgMeta = await fetchOrgProMoveMetaByIds(collectOrgMoveIds(planData || []));
+          assignments = resolveAssignmentRows(planData || [], planOrgMeta);
         }
         
         cycleNumber = targetCycle;
@@ -424,17 +399,18 @@ export default function ConfidenceWizard() {
             competency_id,
             self_select,
             action_id,
+            org_move_id,
             week_start_date,
             source,
-            pro_moves!weekly_assignments_action_id_fkey ( 
+            pro_moves!weekly_assignments_action_id_fkey (
               action_statement,
               intervention_text,
-              competencies ( 
+              competencies (
                 name,
                 domains!competencies_domain_id_fkey ( domain_name )
               )
             ),
-            competencies ( 
+            competencies (
               name,
               domains!competencies_domain_id_fkey ( domain_name )
             )
@@ -473,17 +449,18 @@ export default function ConfidenceWizard() {
               competency_id,
               self_select,
               action_id,
+              org_move_id,
               week_start_date,
               source,
-              pro_moves!weekly_assignments_action_id_fkey ( 
+              pro_moves!weekly_assignments_action_id_fkey (
                 action_statement,
                 intervention_text,
-                competencies ( 
+                competencies (
                   name,
                   domains!competencies_domain_id_fkey ( domain_name )
                 )
               ),
-              competencies ( 
+              competencies (
                 name,
                 domains!competencies_domain_id_fkey ( domain_name )
               )
@@ -505,26 +482,10 @@ export default function ConfidenceWizard() {
         }
 
         if (assignData && assignData.length > 0) {
-          // Found assignments (onboarding or global)
-          assignments = assignData.map((item: any) => {
-            let domainName = 'Unknown';
-            if (item.pro_moves?.competencies?.domains?.domain_name) {
-              domainName = item.pro_moves.competencies.domains.domain_name;
-            } else if (item.competencies?.domains?.domain_name) {
-              domainName = item.competencies.domains.domain_name;
-            }
-
-            return {
-              weekly_focus_id: `assign:${item.id}`,
-              type: item.self_select ? 'self_select' : 'site',
-              display_order: item.display_order,
-              action_statement: item.pro_moves?.action_statement || '',
-              intervention_text: item.pro_moves?.intervention_text || null,
-              domain_name: domainName,
-              required: true,
-              locked: false
-            };
-          });
+          // Found assignments (onboarding or global). PML-1 Fix 5: resolve
+          // org custom moves instead of leaving them blank.
+          const noWeekOrgMeta = await fetchOrgProMoveMetaByIds(collectOrgMoveIds(assignData));
+          assignments = resolveAssignmentRows(assignData, noWeekOrgMeta);
         } else {
           // weekly_plan retired (2026-07-25): org/global weekly_assignments are
           // the only source. Nothing found means the week genuinely has no plan.

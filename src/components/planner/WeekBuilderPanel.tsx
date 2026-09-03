@@ -1038,9 +1038,9 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
         <SmartSlotPicker
           open={pickerOpen}
           onClose={() => { setPickerOpen(false); setSelectedSlot(null); }}
-          onSelect={(actionId, actionStatement, _source) => {
+          onSelect={(actionId, actionStatement, _source, orgMoveId) => {
             if (selectedSlot) {
-              handleSelectProMove(actionId, selectedSlot.weekStart, selectedSlot.displayOrder);
+              handleSelectProMove(actionId, selectedSlot.weekStart, selectedSlot.displayOrder, orgMoveId ?? null);
             }
             setPickerOpen(false);
             setSelectedSlot(null);

@@ -129,12 +129,26 @@ export function ProMovePickerDialog({
     // 4) Org custom moves for this role (if orgId provided)
     let orgCustomEnriched: ProMove[] = [];
     if (orgId) {
-      const { data: orgMoves } = await (supabase as any)
+      // PML-1 Fix 2b: the competencies embed's PK column is competency_id,
+      // not id, so selecting `id` here 400'd silently and this branch always
+      // returned nothing. Also fetch the domain nesting so org moves get a
+      // real domain_name instead of the hardcoded '' below.
+      const { data: orgMoves, error: orgMovesError } = await (supabase as any)
         .from('organization_pro_moves')
-        .select('id, action_statement, competency_id, competencies!organization_pro_moves_competency_id_fkey(id, name, domain_id)')
+        .select(`
+          id, action_statement, competency_id,
+          competencies!organization_pro_moves_competency_id_fkey(
+            competency_id, name, domain_id,
+            domains!fk_competencies_domain_id(domain_name)
+          )
+        `)
         .eq('org_id', orgId)
         .eq('role_id', roleId)
         .eq('active', true);
+
+      if (orgMovesError) {
+        console.error('Failed to load org custom pro moves for picker:', orgMovesError);
+      }
 
       orgCustomEnriched = (orgMoves ?? []).map((m: any) => ({
         action_id: null,
@@ -142,7 +156,11 @@ export function ProMovePickerDialog({
         action_statement: m.action_statement,
         competency_id: m.competency_id ?? null,
         competencies: m.competencies
-          ? { name: m.competencies.name, domain_id: m.competencies.domain_id, domains: { domain_name: '' } }
+          ? {
+              name: m.competencies.name,
+              domain_id: m.competencies.domain_id,
+              domains: { domain_name: m.competencies.domains?.domain_name ?? '' },
+            }
           : null,
         source: 'org',
       }));

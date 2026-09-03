@@ -58,12 +58,17 @@ export function ProMovePickerDialog({
     setLoading(true);
     setHiddenCount(0);
 
-    // 1) Platform moves for this role
+    // 1) Platform moves for this role. PML-2a deploy-order rule: owner-aware
+    // — post-fold, pro_moves also holds every OTHER org's org_custom rows,
+    // so this must stay scoped to platform rows (owner_org_id IS NULL). This
+    // org's own custom moves are added in via the separate orgMoves query
+    // below.
     let movesQuery = supabase
       .from('pro_moves')
       .select('action_id, action_statement, competency_id')
       .eq('role_id', roleId)
-      .eq('active', true);
+      .eq('active', true)
+      .is('owner_org_id', null);
 
     // When no org context, filter by practiceType if provided
     if (!orgId && practiceType) {
@@ -144,7 +149,12 @@ export function ProMovePickerDialog({
         `)
         .eq('org_id', orgId)
         .eq('role_id', roleId)
-        .eq('active', true);
+        .eq('active', true)
+        // Dual-read during the PML-2a transition — see SmartSlotPicker's
+        // loadBrowseMoves for the full rationale. Once the fold migration
+        // runs, every row here has migrated_action_id set and this returns
+        // nothing (no duplicate listing).
+        .is('migrated_action_id' as any, null);
 
       if (orgMovesError) {
         console.error('Failed to load org custom pro moves for picker:', orgMovesError);

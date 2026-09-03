@@ -75,7 +75,11 @@ Deno.serve(async (req) => {
       .eq('is_hidden', true);
     const hiddenIds = new Set((hiddenOverrides ?? []).map((o: any) => o.pro_move_id));
 
-    // Fetch pro moves for this role (active, not hidden by org)
+    // Fetch pro moves for this role (active, not hidden by org). PML-2a
+    // deploy-order rule: owner-aware — post-fold, pro_moves also holds every
+    // OTHER org's org_custom rows, so this must stay scoped to platform rows
+    // (owner_org_id IS NULL). PML-2c widens this to include the org's own
+    // moves via the shared eligibility rule instead of this ad-hoc query.
     const { data: moves, error: movesErr } = await supabase
       .from('pro_moves')
       .select(`
@@ -89,6 +93,7 @@ Deno.serve(async (req) => {
       `)
       .eq('role_id', roleId)
       .eq('active', true)
+      .is('owner_org_id', null)
       .order('action_id');
 
     if (movesErr) throw movesErr;

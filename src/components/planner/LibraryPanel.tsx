@@ -189,6 +189,8 @@ export function LibraryPanel({
     setBrowseLoading(true);
     try {
       const [platformResult, orgResult] = await Promise.all([
+        // PML-2a deploy-order rule: owner-aware — see
+        // SmartSlotPicker.loadBrowseMoves for the full rationale.
         supabase
           .from('pro_moves')
           .select(`
@@ -200,6 +202,7 @@ export function LibraryPanel({
           `)
           .eq('role_id', roleId)
           .eq('active', true)
+          .is('owner_org_id', null)
           .order('action_id'),
         orgId
           ? supabase
@@ -208,6 +211,8 @@ export function LibraryPanel({
               .eq('org_id', orgId)
               .eq('role_id', roleId)
               .eq('active', true)
+              // Dual-read during the PML-2a transition (see SmartSlotPicker).
+              .is('migrated_action_id' as any, null)
               .order('sort_order')
           : Promise.resolve({ data: null }),
       ]);

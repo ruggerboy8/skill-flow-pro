@@ -72,6 +72,10 @@ export function SmartSlotPicker({
     setBrowseLoading(true);
     try {
       const [platformResult, orgResult] = await Promise.all([
+        // PML-2a deploy-order rule: owner-aware. Post-fold, pro_moves also
+        // holds every OTHER org's org_custom rows, so this must stay scoped
+        // to platform rows (owner_org_id IS NULL) — org custom moves for
+        // THIS org are added in via the separate orgResult query below.
         supabase
           .from('pro_moves')
           .select(`
@@ -83,6 +87,7 @@ export function SmartSlotPicker({
           `)
           .eq('role_id', roleId)
           .eq('active', true)
+          .is('owner_org_id', null)
           .order('action_id'),
         orgId
           ? supabase
@@ -91,6 +96,11 @@ export function SmartSlotPicker({
               .eq('org_id', orgId)
               .eq('role_id', roleId)
               .eq('active', true)
+              // Dual-read during the PML-2a transition: once the fold
+              // migration runs, every row here has migrated_action_id set
+              // and shows up as a real pro_moves row instead, so this query
+              // returns nothing forever after (no duplicate listing).
+              .is('migrated_action_id' as any, null)
               .order('sort_order')
           : Promise.resolve({ data: null }),
       ]);

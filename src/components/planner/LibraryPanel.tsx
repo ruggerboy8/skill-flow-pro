@@ -11,7 +11,7 @@ import { adaptSequencerResponse, type RankedMove } from '@/lib/sequencerAdapter'
 import { getDomainColor } from '@/lib/domainColors';
 import { LibraryCard } from './LibraryCard';
 import { fetchProMoveMetaByIds, fetchOrgProMoveMetaByIds } from '@/lib/proMoves';
-import { fetchEligibleProMoves } from '@/lib/proMoveEligibility';
+import { fetchEligibleProMoves, type EligibleProMove } from '@/lib/proMoveEligibility';
 import { fetchContentOverrides, resolveStatement } from '@/lib/contentOverrides';
 import { formatWeekOf } from '@/lib/plannerUtils';
 
@@ -193,8 +193,11 @@ export function LibraryPanel({
       // PML-2c: one shared eligibility rule when an org is known — see
       // SmartSlotPicker.loadBrowseMoves for the full rationale. No-org case
       // (rare — platform testing surfaces) keeps the plain role+active query.
+      const eligiblePromise: Promise<EligibleProMove[] | null> = orgId
+        ? fetchEligibleProMoves(orgId, roleId)
+        : Promise.resolve(null);
       const [eligible, legacyOrgResult] = await Promise.all([
-        orgId ? fetchEligibleProMoves(orgId, roleId) : Promise.resolve(null),
+        eligiblePromise,
         orgId
           ? supabase
               .from('organization_pro_moves')

@@ -98,7 +98,36 @@ with check (
   )
 );
 
--- 5) Sanity checks.
+-- 5) RLS fix (Codex review of the first cut of this migration, CONFIRMED
+--    against live prod): the live SELECT policy on pro_moves is
+--    "Read pro_moves" USING (true) for authenticated, written back when
+--    pro_moves only ever held platform content. Post-fold, pro_moves also
+--    holds every org's org_custom rows, so that blanket USING (true) would
+--    let any authenticated user in any org read every other org's custom
+--    moves through the ~25 broad frontend readers (useCraftAtlas.ts,
+--    useDomainDetail.ts, etc.). Fixed in this same migration, not a
+--    follow-up, so there is no window where the fold has landed but the
+--    read policy has not caught up. SECURITY DEFINER RPCs and service-role
+--    edge functions (sequencer-rank, etc.) bypass RLS entirely, so those
+--    paths are unaffected either way.
+drop policy if exists "Read pro_moves" on public.pro_moves;
+
+create policy "Read pro_moves"
+on public.pro_moves
+for select
+to authenticated
+using (
+  owner_org_id is null
+  or owner_org_id = current_user_org_id()
+  or exists (
+    select 1 from public.staff s
+    left join public.user_capabilities uc on uc.staff_id = s.id
+    where s.user_id = auth.uid()
+      and (coalesce(s.is_super_admin, false) or coalesce(uc.is_platform_admin, false))
+  )
+);
+
+-- 6) Sanity checks.
 do $$
 declare
   v_remaining_org_move_refs int;

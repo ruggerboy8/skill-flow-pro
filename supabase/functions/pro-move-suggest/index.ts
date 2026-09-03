@@ -67,38 +67,42 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const roleName = roleData?.role_name ?? 'Unknown';
 
-    // Fetch org visibility overrides (hidden moves)
-    const { data: hiddenOverrides } = await supabase
-      .from('organization_pro_move_overrides')
-      .select('pro_move_id')
-      .eq('org_id', orgId)
-      .eq('is_hidden', true);
-    const hiddenIds = new Set((hiddenOverrides ?? []).map((o: any) => o.pro_move_id));
+    // PML-2c: one shared eligibility rule. org_visible_pro_moves is the same
+    // RPC the sequencer and the planner picker call — active platform moves
+    // matching the org's practice type, plus the org's own moves, minus the
+    // org's hidden list. Replaces the old ad-hoc query here, which never
+    // filtered by practice_type at all (audit finding D) and could never
+    // suggest an org's own custom moves.
+    const { data: visibleMoves, error: visibleErr } = await supabase
+      .rpc('org_visible_pro_moves', { p_org_id: orgId, p_role_id: roleId });
+    if (visibleErr) throw visibleErr;
 
-    // Fetch pro moves for this role (active, not hidden by org). PML-2a
-    // deploy-order rule: owner-aware — post-fold, pro_moves also holds every
-    // OTHER org's org_custom rows, so this must stay scoped to platform rows
-    // (owner_org_id IS NULL). PML-2c widens this to include the org's own
-    // moves via the shared eligibility rule instead of this ad-hoc query.
-    const { data: moves, error: movesErr } = await supabase
-      .from('pro_moves')
-      .select(`
-        action_id,
-        action_statement,
-        description,
-        competencies!fk_pro_moves_competency_id(
-          name,
-          domains!fk_competencies_domain_id(domain_name)
-        )
-      `)
-      .eq('role_id', roleId)
-      .eq('active', true)
-      .is('owner_org_id', null)
-      .order('action_id');
+    const actionIds = (visibleMoves ?? []).map((m: any) => m.action_id);
 
+    // The RPC doesn't return description or the joined competency/domain
+    // names, so fetch those for exactly the eligible set.
+    const { data: moveDetails, error: movesErr } = actionIds.length
+      ? await supabase
+          .from('pro_moves')
+          .select(`
+            action_id,
+            description,
+            competencies!fk_pro_moves_competency_id(
+              name,
+              domains!fk_competencies_domain_id(domain_name)
+            )
+          `)
+          .in('action_id', actionIds)
+      : { data: [], error: null };
     if (movesErr) throw movesErr;
 
-    const eligibleMoves = (moves ?? []).filter((m: any) => !hiddenIds.has(m.action_id));
+    const detailMap = new Map((moveDetails ?? []).map((m: any) => [m.action_id, m]));
+    const eligibleMoves = (visibleMoves ?? []).map((m: any) => ({
+      action_id: m.action_id,
+      action_statement: m.action_statement,
+      description: detailMap.get(m.action_id)?.description ?? null,
+      competencies: detailMap.get(m.action_id)?.competencies ?? null,
+    }));
 
     if (eligibleMoves.length === 0) {
       return new Response(JSON.stringify({ interpretation: 'No eligible pro moves found.', domainFocus: [], suggestions: [] }), {

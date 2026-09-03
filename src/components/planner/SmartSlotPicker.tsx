@@ -11,6 +11,8 @@ import { Sparkles, Loader2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getDomainColor } from '@/lib/domainColors';
 import { mergeMovesByDomain } from '@/lib/mergeMovesByDomain';
+import { fetchEligibleProMoves } from '@/lib/proMoveEligibility';
+import { fetchContentOverrides, resolveStatement } from '@/lib/contentOverrides';
 import type { RankedMove } from '@/lib/sequencerAdapter';
 
 interface SmartSlotPickerProps {
@@ -63,80 +65,96 @@ export function SmartSlotPicker({
     .filter(m => !excludeActionIds.includes(m.proMoveId))
     .slice(0, 8);
 
-  // Load browse moves lazily when tab opens. Fetches platform pro_moves and
-  // active org custom moves for this role, then merges them into one
+  // Load browse moves lazily when tab opens. PML-2c: fetches the org's
+  // eligible moves via the one shared eligibility rule (org_visible_pro_moves,
+  // the same RPC the sequencer uses), plus any not-yet-migrated org-custom
+  // moves during the PML-2a transition, then merges them into one
   // domain-ordered list (org moves get a "Custom" badge, not a separate
   // section, per John's scope decision on PML-1).
   const loadBrowseMoves = async () => {
     if (browseMoves.length > 0) return;
     setBrowseLoading(true);
     try {
-      const [platformResult, orgResult] = await Promise.all([
-        // PML-2a deploy-order rule: owner-aware. Post-fold, pro_moves also
-        // holds every OTHER org's org_custom rows, so this must stay scoped
-        // to platform rows (owner_org_id IS NULL) — org custom moves for
-        // THIS org are added in via the separate orgResult query below.
+      const [eligible, legacyOrgResult] = await Promise.all([
+        fetchEligibleProMoves(orgId, roleId),
+        // Dual-read during the PML-2a transition: once the fold migration
+        // runs, every row here has migrated_action_id set and shows up as a
+        // real pro_moves row instead, so this returns nothing forever after
+        // (no duplicate listing).
         supabase
-          .from('pro_moves')
-          .select(`
-            action_id, action_statement,
-            competencies!fk_pro_moves_competency_id(
-              name,
-              domains!fk_competencies_domain_id(domain_name)
-            )
-          `)
+          .from('organization_pro_moves')
+          .select('id, action_statement, competency_id')
+          .eq('org_id', orgId)
           .eq('role_id', roleId)
           .eq('active', true)
-          .is('owner_org_id', null)
-          .order('action_id'),
-        orgId
-          ? supabase
-              .from('organization_pro_moves')
-              .select('id, action_statement, competency_id')
-              .eq('org_id', orgId)
-              .eq('role_id', roleId)
-              .eq('active', true)
-              // Dual-read during the PML-2a transition: once the fold
-              // migration runs, every row here has migrated_action_id set
-              // and shows up as a real pro_moves row instead, so this query
-              // returns nothing forever after (no duplicate listing).
-              .is('migrated_action_id' as any, null)
-              .order('sort_order')
-          : Promise.resolve({ data: null }),
+          .is('migrated_action_id' as any, null)
+          .order('sort_order'),
       ]);
 
-      const platformMoves: BrowseMove[] = (platformResult.data ?? []).map((m: any) => ({
-        action_id: m.action_id,
-        orgMoveId: null,
-        action_statement: m.action_statement,
-        domain_name: m.competencies?.domains?.domain_name ?? '—',
-        competency_name: m.competencies?.name ?? '—',
-        isOrgCustom: false,
-      }));
+      const platformIds = eligible.filter(m => m.source === 'platform').map(m => m.actionId);
+      const overrides = await fetchContentOverrides(orgId, platformIds);
 
-      const orgRows = orgResult.data ?? [];
-      let orgMoves: BrowseMove[] = [];
-      if (orgRows.length > 0) {
-        const compIds = Array.from(new Set(orgRows.map((m: any) => m.competency_id).filter(Boolean)));
-        const compMap = new Map<number, string>();
-        if (compIds.length > 0) {
+      const competencyIds = [
+        ...new Set(eligible.map(m => m.competencyId).filter((id): id is number => id != null)),
+      ];
+      const compMap = new Map<number, string>();
+      if (competencyIds.length > 0) {
+        const { data: comps } = await supabase
+          .from('competencies')
+          .select('competency_id, domains:fk_competencies_domain_id(domain_name)')
+          .in('competency_id', competencyIds);
+        (comps || []).forEach(c => {
+          compMap.set(c.competency_id, (c.domains as any)?.domain_name || '');
+        });
+      }
+
+      const platformMoves: BrowseMove[] = eligible
+        .filter(m => m.source === 'platform')
+        .map(m => ({
+          action_id: m.actionId,
+          orgMoveId: null,
+          action_statement: resolveStatement(m.actionId, m.actionStatement, overrides),
+          domain_name: m.competencyId != null ? compMap.get(m.competencyId) ?? '—' : '—',
+          competency_name: '—',
+          isOrgCustom: false,
+        }));
+
+      const migratedOrgMoves: BrowseMove[] = eligible
+        .filter(m => m.source === 'org_custom')
+        .map(m => ({
+          action_id: m.actionId,
+          orgMoveId: null,
+          action_statement: m.actionStatement,
+          domain_name: m.competencyId != null ? compMap.get(m.competencyId) ?? '—' : '—',
+          competency_name: '—',
+          isOrgCustom: true,
+        }));
+
+      const legacyOrgRows = legacyOrgResult.data ?? [];
+      let legacyOrgMoves: BrowseMove[] = [];
+      if (legacyOrgRows.length > 0) {
+        const legacyCompIds = Array.from(new Set(legacyOrgRows.map((m: any) => m.competency_id).filter(Boolean)));
+        const legacyCompMap = new Map<number, string>();
+        if (legacyCompIds.length > 0) {
           const { data: comps } = await supabase
             .from('competencies')
             .select('competency_id, domains:fk_competencies_domain_id(domain_name)')
-            .in('competency_id', compIds as number[]);
+            .in('competency_id', legacyCompIds as number[]);
           (comps || []).forEach(c => {
-            compMap.set(c.competency_id, (c.domains as any)?.domain_name || '');
+            legacyCompMap.set(c.competency_id, (c.domains as any)?.domain_name || '');
           });
         }
-        orgMoves = orgRows.map((m: any) => ({
+        legacyOrgMoves = legacyOrgRows.map((m: any) => ({
           action_id: null,
           orgMoveId: m.id,
           action_statement: m.action_statement,
-          domain_name: compMap.get(m.competency_id) || '—',
+          domain_name: legacyCompMap.get(m.competency_id) || '—',
           competency_name: '—',
           isOrgCustom: true,
         }));
       }
+
+      const orgMoves = [...migratedOrgMoves, ...legacyOrgMoves];
 
       // Mixed in by domain, not a separate org-custom section.
       setBrowseMoves(mergeMovesByDomain(platformMoves, orgMoves));

@@ -11,6 +11,8 @@ import { adaptSequencerResponse, type RankedMove } from '@/lib/sequencerAdapter'
 import { getDomainColor } from '@/lib/domainColors';
 import { LibraryCard } from './LibraryCard';
 import { fetchProMoveMetaByIds, fetchOrgProMoveMetaByIds } from '@/lib/proMoves';
+import { fetchEligibleProMoves } from '@/lib/proMoveEligibility';
+import { fetchContentOverrides, resolveStatement } from '@/lib/contentOverrides';
 import { formatWeekOf } from '@/lib/plannerUtils';
 
 interface BrowseMove {
@@ -188,22 +190,11 @@ export function LibraryPanel({
     if (browseMoves.length > 0) return;
     setBrowseLoading(true);
     try {
-      const [platformResult, orgResult] = await Promise.all([
-        // PML-2a deploy-order rule: owner-aware — see
-        // SmartSlotPicker.loadBrowseMoves for the full rationale.
-        supabase
-          .from('pro_moves')
-          .select(`
-            action_id, action_statement,
-            competencies!fk_pro_moves_competency_id(
-              name,
-              domains!fk_competencies_domain_id(domain_name)
-            )
-          `)
-          .eq('role_id', roleId)
-          .eq('active', true)
-          .is('owner_org_id', null)
-          .order('action_id'),
+      // PML-2c: one shared eligibility rule when an org is known — see
+      // SmartSlotPicker.loadBrowseMoves for the full rationale. No-org case
+      // (rare — platform testing surfaces) keeps the plain role+active query.
+      const [eligible, legacyOrgResult] = await Promise.all([
+        orgId ? fetchEligibleProMoves(orgId, roleId) : Promise.resolve(null),
         orgId
           ? supabase
               .from('organization_pro_moves')
@@ -217,17 +208,74 @@ export function LibraryPanel({
           : Promise.resolve({ data: null }),
       ]);
 
-      const platformMoves: BrowseMove[] = (platformResult.data ?? []).map((m: any) => ({
-        action_id: m.action_id,
-        action_statement: m.action_statement,
-        domain_name: m.competencies?.domains?.domain_name ?? '—',
-        competency_name: m.competencies?.name ?? '—',
-        isOrgCustom: false,
-      }));
+      let platformMoves: BrowseMove[];
+      let migratedOrgMoves: BrowseMove[] = [];
 
-      let orgMoves: BrowseMove[] = [];
-      if (orgResult.data && orgResult.data.length > 0) {
-        const compIds = Array.from(new Set(orgResult.data.map((m: any) => m.competency_id).filter(Boolean)));
+      if (eligible) {
+        const platformIds = eligible.filter(m => m.source === 'platform').map(m => m.actionId);
+        const overrides = orgId ? await fetchContentOverrides(orgId, platformIds) : new Map<number, string>();
+
+        const competencyIds = [
+          ...new Set(eligible.map(m => m.competencyId).filter((id): id is number => id != null)),
+        ];
+        const compMap = new Map<number, string>();
+        if (competencyIds.length > 0) {
+          const { data: comps } = await supabase
+            .from('competencies')
+            .select('competency_id, domains:fk_competencies_domain_id(domain_name)')
+            .in('competency_id', competencyIds);
+          (comps || []).forEach(c => {
+            compMap.set(c.competency_id, (c.domains as any)?.domain_name || '');
+          });
+        }
+
+        platformMoves = eligible
+          .filter(m => m.source === 'platform')
+          .map(m => ({
+            action_id: m.actionId,
+            action_statement: resolveStatement(m.actionId, m.actionStatement, overrides),
+            domain_name: m.competencyId != null ? compMap.get(m.competencyId) ?? '—' : '—',
+            competency_name: '—',
+            isOrgCustom: false,
+          }));
+
+        migratedOrgMoves = eligible
+          .filter(m => m.source === 'org_custom')
+          .map(m => ({
+            action_id: m.actionId ?? undefined,
+            action_statement: m.actionStatement,
+            domain_name: m.competencyId != null ? compMap.get(m.competencyId) ?? '—' : '—',
+            competency_name: '—',
+            isOrgCustom: true,
+          }));
+      } else {
+        const { data: platformData } = await supabase
+          .from('pro_moves')
+          .select(`
+            action_id, action_statement,
+            competencies!fk_pro_moves_competency_id(
+              name,
+              domains!fk_competencies_domain_id(domain_name)
+            )
+          `)
+          .eq('role_id', roleId)
+          .eq('active', true)
+          .is('owner_org_id', null)
+          .order('action_id');
+
+        platformMoves = (platformData ?? []).map((m: any) => ({
+          action_id: m.action_id,
+          action_statement: m.action_statement,
+          domain_name: m.competencies?.domains?.domain_name ?? '—',
+          competency_name: m.competencies?.name ?? '—',
+          isOrgCustom: false,
+        }));
+      }
+
+      let legacyOrgMoves: BrowseMove[] = [];
+      const legacyOrgRows = legacyOrgResult.data ?? [];
+      if (legacyOrgRows.length > 0) {
+        const compIds = Array.from(new Set(legacyOrgRows.map((m: any) => m.competency_id).filter(Boolean)));
         const compMap = new Map<number, string>();
         if (compIds.length > 0) {
           const { data: comps } = await supabase
@@ -238,7 +286,7 @@ export function LibraryPanel({
             compMap.set(c.competency_id, (c.domains as any)?.domain_name || '');
           });
         }
-        orgMoves = orgResult.data.map((m: any) => ({
+        legacyOrgMoves = legacyOrgRows.map((m: any) => ({
           orgMoveId: m.id,
           action_statement: m.action_statement,
           domain_name: compMap.get(m.competency_id) || '—',
@@ -248,7 +296,7 @@ export function LibraryPanel({
       }
 
       // Org custom moves appear first
-      setBrowseMoves([...orgMoves, ...platformMoves]);
+      setBrowseMoves([...migratedOrgMoves, ...legacyOrgMoves, ...platformMoves]);
     } finally {
       setBrowseLoading(false);
     }

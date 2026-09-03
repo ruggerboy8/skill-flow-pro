@@ -39,6 +39,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Eye, EyeOff, Search, Pencil, Plus, Loader2, RotateCcw } from 'lucide-react';
+import { getDomainColor } from '@/lib/domainColors';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ interface OrgCustomMove {
   role_name: string;
   competency_id: number | null;
   competency_name: string;
+  domain_name: string;
   practice_types: string[];
   source: 'org';
 }
@@ -209,7 +211,10 @@ export function OrgProMoveLibraryTab() {
         .select(`
           id, action_statement, description, role_id, competency_id, practice_types,
           roles!organization_pro_moves_role_id_fkey(role_name),
-          competencies!organization_pro_moves_competency_id_fkey(name)
+          competencies!organization_pro_moves_competency_id_fkey(
+            name,
+            domains!fk_competencies_domain_id(domain_name)
+          )
         `)
         .eq('org_id', organizationId)
         .eq('active', true)
@@ -224,6 +229,7 @@ export function OrgProMoveLibraryTab() {
           role_name: m.roles?.role_name ?? '—',
           competency_id: m.competency_id ?? null,
           competency_name: m.competencies?.name ?? '—',
+          domain_name: m.competencies?.domains?.domain_name ?? '—',
           practice_types: m.practice_types ?? [],
           source: 'org',
         }))
@@ -671,7 +677,18 @@ export function OrgProMoveLibraryTab() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm">{resolveRoleName(move.role_id ?? 0, move.role_name)}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">—</TableCell>
+                          <TableCell className="text-sm">
+                            {move.domain_name !== '—' ? (
+                              <span
+                                className="text-xs px-1.5 py-0.5 rounded font-medium"
+                                style={{ backgroundColor: getDomainColor(move.domain_name) }}
+                              >
+                                {move.domain_name}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-sm">{move.competency_name}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="text-xs">

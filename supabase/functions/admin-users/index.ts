@@ -1796,7 +1796,18 @@ serve(async (req: Request) => {
         // 9. Delete org-level data
         await requireDelete("org role names", admin.from("organization_role_names").delete().eq("org_id", organization_id));
         await requireDelete("org pro move overrides", admin.from("organization_pro_move_overrides").delete().eq("org_id", organization_id));
-        // Delete org-owned pro moves
+        // PML-2d: explicit deletes for the two other org-scoped pro-move
+        // tables ahead of the organizations row delete below. Both already
+        // have ON DELETE CASCADE on org_id -> organizations(id), so this is
+        // belt-and-braces (matches the pattern the versioning implementation
+        // plan used for the delete guard's own exemptions), not a behavior
+        // change — it just makes teardown's intent explicit instead of
+        // relying entirely on the cascade.
+        await requireDelete("org custom pro moves (legacy, pre-fold)", admin.from("organization_pro_moves").delete().eq("org_id", organization_id));
+        await requireDelete("org pro move content overrides", admin.from("organization_pro_move_content_overrides").delete().eq("org_id", organization_id));
+        // Delete org-owned pro moves. Pre-PML-2a this matched nothing (dead
+        // columns, real writes went to organization_pro_moves instead); now
+        // it does what it says.
         await requireDelete("org pro moves", admin.from("pro_moves").delete().eq("owner_org_id", organization_id));
 
         // 10. Delete the organization itself

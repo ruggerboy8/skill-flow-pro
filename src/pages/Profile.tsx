@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { User, Mail, Building, MapPin, Calendar, Link2 } from 'lucide-react';
 import { useMobileShell } from '@/hooks/useMobileShell';
 import { BackPill } from '@/components/mobile/BackPill';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 
 interface ProfileData {
   id: string;
@@ -19,6 +20,7 @@ interface ProfileData {
   organization: string | null;
   location: string | null;
   created_at: string;
+  role_id: number | null;
   role_name: string | null;
   scheduling_link: string | null;
   is_clinical_director: boolean;
@@ -34,6 +36,8 @@ export default function Profile() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const isMobileShell = useMobileShell();
+  // PML-2d: org label everywhere a normal user sees a role name.
+  const { resolve: resolveRoleName } = useRoleDisplayNames();
 
   useEffect(() => {
     if (user) {
@@ -57,6 +61,7 @@ export default function Profile() {
           scheduling_link,
           is_clinical_director,
           is_super_admin,
+          role_id,
           roles(role_name)
         `)
         .eq('user_id', user.id)
@@ -235,7 +240,7 @@ export default function Profile() {
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4 text-muted-foreground" />
                 <Input
-                  value={profile.role_name}
+                  value={profile.role_id != null ? resolveRoleName(profile.role_id, profile.role_name) : profile.role_name}
                   disabled
                   className="bg-muted"
                 />

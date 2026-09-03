@@ -90,8 +90,8 @@ function useTeamRowSub(locationId: string | null, staffId: string | undefined, r
  * out) are the same for every mobile-shell user. "Install the app" (MOB-2)
  * only shows outside standalone mode and only until the "shared device"
  * opt-out is set — tapping it opens the same install instructions as the
- * first-run bottom banner (InstallBanner), reachable here at any time
- * regardless of whether that banner was dismissed. It carries no telemetry:
+ * first-run install takeover (InstallBanner), reachable here at any time
+ * regardless of whether that takeover was dismissed. It carries no telemetry:
  * both gates are read from localStorage only, nothing is written except the
  * two existing localStorage flags dismissBanner()/setDeviceOptOut() already
  * used.

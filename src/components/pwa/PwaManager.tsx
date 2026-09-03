@@ -8,8 +8,8 @@ import { InstallBanner } from './InstallBanner';
 /**
  * Orchestrates per-user PWA activation (docs/features/pwa-push-notifications.md D2):
  * when the signed-in user is flagged (staff.pwa_enabled or the pwa_v1
- * localStorage flag), registers the service worker and shows the install
- * banner. The update toast is the reload path in standalone mode, where
+ * localStorage flag), registers the service worker and shows the full-screen
+ * install takeover. The update toast is the reload path in standalone mode, where
  * there is no browser refresh button.
  */
 export function PwaManager() {

@@ -6,9 +6,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { BookOpen, TrendingUp, Trophy } from 'lucide-react';
 import { ProMovesLogo } from '@/components/ProMovesLogo';
 import { useOrgBranding } from '@/hooks/useOrgBranding';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 
 interface StaffInfo {
   name: string;
+  roleId: number | null;
   roleName: string | null;
   locationName: string | null;
 }
@@ -18,6 +20,8 @@ export default function Welcome() {
   const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const { branding } = useOrgBranding({ applyPrimary: true });
+  // PML-2d: org label everywhere a normal user sees a role name.
+  const { resolve: resolveRoleName } = useRoleDisplayNames();
 
   useEffect(() => {
     const fetchStaffInfo = async () => {
@@ -32,6 +36,7 @@ export default function Welcome() {
           .from('staff')
           .select(`
             name,
+            role_id,
             roles:role_id(role_name),
             locations:primary_location_id(name)
           `)
@@ -41,6 +46,7 @@ export default function Welcome() {
         if (staff) {
           setStaffInfo({
             name: staff.name,
+            roleId: staff.role_id ?? null,
             roleName: (staff.roles as any)?.role_name || null,
             locationName: (staff.locations as any)?.name || null
           });
@@ -105,14 +111,20 @@ export default function Welcome() {
                   Welcome, {firstName}! 🎉
                 </h1>
                 <p className="text-muted-foreground">
-                  {staffInfo?.roleName && staffInfo?.locationName 
-                    ? `We're thrilled to have you as a ${staffInfo.roleName} at ${staffInfo.locationName}.`
-                    : staffInfo?.roleName 
-                      ? `We're thrilled to have you as a ${staffInfo.roleName}.`
-                      : staffInfo?.locationName
-                        ? `We're thrilled to have you on the ${staffInfo.locationName} team.`
-                        : `We're thrilled to have you on board.`
-                  }
+                  {(() => {
+                    const roleLabel = staffInfo?.roleName
+                      ? staffInfo.roleId != null
+                        ? resolveRoleName(staffInfo.roleId, staffInfo.roleName)
+                        : staffInfo.roleName
+                      : null;
+                    return roleLabel && staffInfo?.locationName
+                      ? `We're thrilled to have you as a ${roleLabel} at ${staffInfo.locationName}.`
+                      : roleLabel
+                        ? `We're thrilled to have you as a ${roleLabel}.`
+                        : staffInfo?.locationName
+                          ? `We're thrilled to have you on the ${staffInfo.locationName} team.`
+                          : `We're thrilled to have you on board.`;
+                  })()}
                 </p>
                 <p className="text-muted-foreground text-sm">
                   Your team is here to support your professional growth every step of the way.

@@ -67,33 +67,59 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const roleName = roleData?.role_name ?? 'Unknown';
 
-    // Fetch org visibility overrides (hidden moves)
-    const { data: hiddenOverrides } = await supabase
-      .from('organization_pro_move_overrides')
-      .select('pro_move_id')
-      .eq('org_id', orgId)
-      .eq('is_hidden', true);
-    const hiddenIds = new Set((hiddenOverrides ?? []).map((o: any) => o.pro_move_id));
+    // PML-2c: one shared eligibility rule. org_visible_pro_moves is the same
+    // RPC the sequencer and the planner picker call: active platform moves
+    // matching the org's practice type, plus the org's own moves, minus the
+    // org's hidden list. Replaces the old ad-hoc query here, which never
+    // filtered by practice_type at all (audit finding D) and could never
+    // suggest an org's own custom moves.
+    const { data: visibleMoves, error: visibleErr } = await supabase
+      .rpc('org_visible_pro_moves', { p_org_id: orgId, p_role_id: roleId });
+    if (visibleErr) throw visibleErr;
 
-    // Fetch pro moves for this role (active, not hidden by org)
-    const { data: moves, error: movesErr } = await supabase
-      .from('pro_moves')
-      .select(`
-        action_id,
-        action_statement,
-        description,
-        competencies!fk_pro_moves_competency_id(
-          name,
-          domains!fk_competencies_domain_id(domain_name)
-        )
-      `)
-      .eq('role_id', roleId)
-      .eq('active', true)
-      .order('action_id');
+    const actionIds = (visibleMoves ?? []).map((m: any) => m.action_id);
 
+    // The RPC doesn't return description or the joined competency/domain
+    // names, so fetch those for exactly the eligible set.
+    const { data: moveDetails, error: movesErr } = actionIds.length
+      ? await supabase
+          .from('pro_moves')
+          .select(`
+            action_id,
+            description,
+            competencies!fk_pro_moves_competency_id(
+              name,
+              domains!fk_competencies_domain_id(domain_name)
+            )
+          `)
+          .in('action_id', actionIds)
+      : { data: [], error: null };
     if (movesErr) throw movesErr;
 
-    const eligibleMoves = (moves ?? []).filter((m: any) => !hiddenIds.has(m.action_id));
+    const detailMap = new Map((moveDetails ?? []).map((m: any) => [m.action_id, m]));
+
+    // Org content overrides are participant-facing wording, so suggestions
+    // must use them too (platform moves only; owner_org_id null).
+    const { data: overrides, error: overridesErr } = actionIds.length
+      ? await supabase
+          .from('organization_pro_move_content_overrides')
+          .select('pro_move_id, custom_statement')
+          .eq('org_id', orgId)
+          .in('pro_move_id', actionIds)
+      : { data: [], error: null };
+    if (overridesErr) throw overridesErr;
+    const overrideMap = new Map(
+      (overrides ?? []).map((o: any) => [o.pro_move_id, o.custom_statement]),
+    );
+
+    const eligibleMoves = (visibleMoves ?? []).map((m: any) => ({
+      action_id: m.action_id,
+      action_statement:
+        (m.owner_org_id == null ? overrideMap.get(m.action_id) : null) ??
+        m.action_statement,
+      description: detailMap.get(m.action_id)?.description ?? null,
+      competencies: detailMap.get(m.action_id)?.competencies ?? null,
+    }));
 
     if (eligibleMoves.length === 0) {
       return new Response(JSON.stringify({ interpretation: 'No eligible pro moves found.', domainFocus: [], suggestions: [] }), {

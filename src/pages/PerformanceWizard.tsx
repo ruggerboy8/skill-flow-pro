@@ -25,6 +25,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { fireCelebration } from '@/lib/confetti';
 import { fetchOrgProMoveMetaByIds } from '@/lib/proMoves';
 import { resolveAssignmentRows, collectOrgMoveIds } from '@/lib/resolveAssignmentMove';
+import { fetchContentOverrides } from '@/lib/contentOverrides';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -295,7 +296,12 @@ export default function PerformanceWizard() {
           // null action_id) have no pro_moves row to join above, so resolve
           // them via organization_pro_moves or they render blank.
           const onboardingOrgMeta = await fetchOrgProMoveMetaByIds(collectOrgMoveIds(assignData || []));
-          weekAssignments = resolveAssignmentRows(assignData || [], onboardingOrgMeta);
+          // PML-2b: participant-facing rewording.
+          const onboardingOverrides = await fetchContentOverrides(
+            staffData.organization_id,
+            (assignData || []).map((r: any) => r.action_id).filter((id: number | null): id is number => id != null)
+          );
+          weekAssignments = resolveAssignmentRows(assignData || [], onboardingOrgMeta, onboardingOverrides);
         } else {
           // Try org-scoped weekly_assignments first, then fall back to weekly_plan
           const repairOrgId = staffData.organization_id || (staffData.locations as any)?.group_id
@@ -348,7 +354,12 @@ export default function PerformanceWizard() {
             // PML-1 Fix 5: resolve org custom moves (org_move_id set, no
             // pro_moves row) instead of leaving them blank.
             const orgScopedMeta = await fetchOrgProMoveMetaByIds(collectOrgMoveIds(assignData));
-            weekAssignments = resolveAssignmentRows(assignData, orgScopedMeta);
+            // PML-2b: participant-facing rewording.
+            const orgScopedOverrides = await fetchContentOverrides(
+              repairOrgId,
+              assignData.map((r: any) => r.action_id).filter((id: number | null): id is number => id != null)
+            );
+            weekAssignments = resolveAssignmentRows(assignData, orgScopedMeta, orgScopedOverrides);
           }
           // (weekly_plan fallback removed 2026-07-25, roadmap 2.4 slice B —
           // weekly_assignments is the only assignment source.)
@@ -409,7 +420,12 @@ export default function PerformanceWizard() {
         if (assignData2 && assignData2.length > 0) {
           // PML-1 Fix 5: resolve org custom moves instead of leaving them blank.
           const orgScopedMeta2 = await fetchOrgProMoveMetaByIds(collectOrgMoveIds(assignData2));
-          weekAssignments = resolveAssignmentRows(assignData2, orgScopedMeta2);
+          // PML-2b: participant-facing rewording.
+          const orgScopedOverrides2 = await fetchContentOverrides(
+            repairOrgId2,
+            assignData2.map((r: any) => r.action_id).filter((id: number | null): id is number => id != null)
+          );
+          weekAssignments = resolveAssignmentRows(assignData2, orgScopedMeta2, orgScopedOverrides2);
         } else {
           // weekly_plan retired (2026-07-25): org/global weekly_assignments are
           // the only source. Nothing found means the week genuinely has no plan.

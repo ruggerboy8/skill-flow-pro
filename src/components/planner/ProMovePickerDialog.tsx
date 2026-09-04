@@ -8,6 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Search } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
 import { getDomainOrderIndex } from '@/lib/domainUtils';
+import { fetchEligibleProMoves } from '@/lib/proMoveEligibility';
+import { fetchContentOverrides, resolveStatement } from '@/lib/contentOverrides';
 
 interface ProMove {
   action_id: number | null;   // null for org-custom moves (they use UUID id)
@@ -29,6 +31,40 @@ interface ProMovePickerDialogProps {
   onSelect: (actionId: number | null, orgMoveId?: string) => void;
   orgId?: string; // When provided, hides moves the org has marked not-visible, and adds org custom moves
   practiceType?: string;
+}
+
+/**
+ * Informational "N moves hidden by your organization's library settings"
+ * banner count. org_visible_pro_moves already excludes hidden moves from
+ * its result, so this is a small separate query: how many of this org's
+ * hidden platform moves would otherwise have been eligible for this role
+ * (active, matching the org's practice type)?
+ */
+async function fetchHiddenPlatformMoveCount(orgId: string, roleId: number): Promise<number> {
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('practice_type')
+    .eq('id', orgId)
+    .maybeSingle();
+  if (!org?.practice_type) return 0;
+
+  const { data: hiddenOverrides } = await (supabase as any)
+    .from('organization_pro_move_overrides')
+    .select('pro_move_id')
+    .eq('org_id', orgId)
+    .eq('is_hidden', true);
+  const hiddenIds = (hiddenOverrides ?? []).map((o: any) => o.pro_move_id);
+  if (hiddenIds.length === 0) return 0;
+
+  const { data: matches } = await supabase
+    .from('pro_moves')
+    .select('action_id')
+    .eq('role_id', roleId)
+    .eq('active', true)
+    .is('owner_org_id', null)
+    .overlaps('practice_types', [org.practice_type])
+    .in('action_id', hiddenIds);
+  return (matches ?? []).length;
 }
 
 export function ProMovePickerDialog({
@@ -58,46 +94,125 @@ export function ProMovePickerDialog({
     setLoading(true);
     setHiddenCount(0);
 
-    // 1) Platform moves for this role
+    // PML-2c: one shared eligibility rule. When an org is known,
+    // fetchEligibleProMoves calls the exact same org_visible_pro_moves RPC
+    // the sequencer uses, so this dialog can never re-diverge into its own
+    // ad-hoc practice-type/hidden-list logic. This also fixes the bug the
+    // audit flagged (finding D): this dialog used to skip practice_type
+    // filtering entirely whenever orgId was passed, which was every real
+    // caller, so it could leak another practice type's moves into the
+    // picker. Org-custom moves come back from the same call (they match on
+    // owner_org_id), so there is no separate org-custom query any more.
+    if (orgId) {
+      const [eligible, hiddenCountForRole, orgMoves] = await Promise.all([
+        fetchEligibleProMoves(orgId, roleId),
+        fetchHiddenPlatformMoveCount(orgId, roleId),
+        // Dual-read during the PML-2a transition: org-custom rows not yet
+        // folded into pro_moves still live in organization_pro_moves. Once
+        // the fold migration runs, every row here has migrated_action_id
+        // set and this returns nothing (no duplicate listing), and those
+        // moves show up via `eligible` above instead.
+        (supabase as any)
+          .from('organization_pro_moves')
+          .select(`
+            id, action_statement, competency_id,
+            competencies!organization_pro_moves_competency_id_fkey(
+              competency_id, name, domain_id,
+              domains!fk_competencies_domain_id(domain_name)
+            )
+          `)
+          .eq('org_id', orgId)
+          .eq('role_id', roleId)
+          .eq('active', true)
+          .is('migrated_action_id' as any, null),
+      ]);
+
+      setHiddenCount(hiddenCountForRole);
+
+      const platformIds = eligible.filter(m => m.source === 'platform').map(m => m.actionId);
+      const overrides = await fetchContentOverrides(orgId, platformIds);
+
+      // Competencies + domains for the eligible set (the RPC returns
+      // competency_id but not the joined name/domain).
+      const competencyIds = [...new Set(eligible.map(m => m.competencyId).filter((id): id is number => id != null))];
+      const { data: competenciesData } = competencyIds.length
+        ? await supabase
+            .from('competencies')
+            .select('competency_id, name, domain_id, domains:fk_competencies_domain_id(domain_id, domain_name)')
+            .in('competency_id', competencyIds)
+        : { data: [] };
+      const compMap = new Map(
+        (competenciesData || []).map(c => [
+          c.competency_id,
+          {
+            name: c.name,
+            domain_id: c.domain_id,
+            domains: { domain_name: (c.domains as any)?.domain_name || '' },
+          },
+        ])
+      );
+
+      const platformEnriched: ProMove[] = eligible
+        .filter(m => m.source === 'platform')
+        .map(m => ({
+          action_id: m.actionId,
+          org_move_id: null,
+          action_statement: resolveStatement(m.actionId, m.actionStatement, overrides),
+          competency_id: m.competencyId,
+          competencies: m.competencyId != null ? compMap.get(m.competencyId) || null : null,
+          source: 'platform',
+        }));
+
+      // Migrated org-custom moves (real pro_moves rows, owner_org_id = org)
+      // returned by the RPC alongside the platform ones.
+      const migratedOrgEnriched: ProMove[] = eligible
+        .filter(m => m.source === 'org_custom')
+        .map(m => ({
+          action_id: m.actionId,
+          org_move_id: null,
+          action_statement: m.actionStatement,
+          competency_id: m.competencyId,
+          competencies: m.competencyId != null ? compMap.get(m.competencyId) || null : null,
+          source: 'org',
+        }));
+
+      // Not-yet-migrated org-custom moves (legacy organization_pro_moves rows).
+      const legacyOrgEnriched: ProMove[] = ((orgMoves as any).data ?? []).map((m: any) => ({
+        action_id: null,
+        org_move_id: m.id,
+        action_statement: m.action_statement,
+        competency_id: m.competency_id ?? null,
+        competencies: m.competencies
+          ? {
+              name: m.competencies.name,
+              domain_id: m.competencies.domain_id,
+              domains: { domain_name: m.competencies.domains?.domain_name ?? '' },
+            }
+          : null,
+        source: 'org',
+      }));
+
+      finalizeMoves([...platformEnriched, ...migratedOrgEnriched, ...legacyOrgEnriched]);
+      return;
+    }
+
+    // No org context (rare, super-admin/platform testing surfaces): plain
+    // practice-type filter, no visibility overrides or org-custom moves
+    // apply (there is no org).
     let movesQuery = supabase
       .from('pro_moves')
       .select('action_id, action_statement, competency_id')
       .eq('role_id', roleId)
-      .eq('active', true);
+      .eq('active', true)
+      .is('owner_org_id', null);
 
-    // When no org context, filter by practiceType if provided
-    if (!orgId && practiceType) {
+    if (practiceType) {
       movesQuery = movesQuery.contains('practice_types', [practiceType]);
     }
 
     const { data: movesData } = await movesQuery;
 
-    // 2) Org visibility overrides — exclude hidden moves; also apply content overrides
-    let hiddenIds = new Set<number>();
-    const contentOverrideMap = new Map<number, string>(); // action_id → custom_statement
-    if (orgId && movesData && movesData.length > 0) {
-      const [{ data: overrides }, { data: contentOverrides }] = await Promise.all([
-        (supabase as any)
-          .from('organization_pro_move_overrides')
-          .select('pro_move_id')
-          .eq('org_id', orgId)
-          .eq('is_hidden', true),
-        (supabase as any)
-          .from('organization_pro_move_content_overrides')
-          .select('pro_move_id, custom_statement')
-          .eq('org_id', orgId),
-      ]);
-      hiddenIds = new Set((overrides ?? []).map((o: any) => o.pro_move_id));
-      for (const co of contentOverrides ?? []) {
-        if (co.custom_statement) contentOverrideMap.set(co.pro_move_id, co.custom_statement);
-      }
-    }
-
-    const visibleMoves = (movesData ?? []).filter(m => !hiddenIds.has(m.action_id));
-    setHiddenCount((movesData ?? []).length - visibleMoves.length);
-
-    // 3) Competencies + domains for visible platform moves
-    const competencyIds = [...new Set(visibleMoves.map(m => m.competency_id))];
+    const competencyIds = [...new Set((movesData ?? []).map(m => m.competency_id))];
     const { data: competenciesData } = await supabase
       .from('competencies')
       .select(
@@ -116,57 +231,19 @@ export function ProMovePickerDialog({
       ])
     );
 
-    const platformEnriched: ProMove[] = visibleMoves.map(m => ({
+    const platformEnriched: ProMove[] = (movesData ?? []).map(m => ({
       action_id: m.action_id,
       org_move_id: null,
-      // Use org's custom text if available, otherwise platform text
-      action_statement: contentOverrideMap.get(m.action_id) ?? m.action_statement,
+      action_statement: m.action_statement,
       competency_id: m.competency_id,
       competencies: compMap.get(m.competency_id) || null,
       source: 'platform',
     }));
 
-    // 4) Org custom moves for this role (if orgId provided)
-    let orgCustomEnriched: ProMove[] = [];
-    if (orgId) {
-      // PML-1 Fix 2b: the competencies embed's PK column is competency_id,
-      // not id, so selecting `id` here 400'd silently and this branch always
-      // returned nothing. Also fetch the domain nesting so org moves get a
-      // real domain_name instead of the hardcoded '' below.
-      const { data: orgMoves, error: orgMovesError } = await (supabase as any)
-        .from('organization_pro_moves')
-        .select(`
-          id, action_statement, competency_id,
-          competencies!organization_pro_moves_competency_id_fkey(
-            competency_id, name, domain_id,
-            domains!fk_competencies_domain_id(domain_name)
-          )
-        `)
-        .eq('org_id', orgId)
-        .eq('role_id', roleId)
-        .eq('active', true);
+    finalizeMoves(platformEnriched);
+  };
 
-      if (orgMovesError) {
-        console.error('Failed to load org custom pro moves for picker:', orgMovesError);
-      }
-
-      orgCustomEnriched = (orgMoves ?? []).map((m: any) => ({
-        action_id: null,
-        org_move_id: m.id,
-        action_statement: m.action_statement,
-        competency_id: m.competency_id ?? null,
-        competencies: m.competencies
-          ? {
-              name: m.competencies.name,
-              domain_id: m.competencies.domain_id,
-              domains: { domain_name: m.competencies.domains?.domain_name ?? '' },
-            }
-          : null,
-        source: 'org',
-      }));
-    }
-
-    const allMoves = [...platformEnriched, ...orgCustomEnriched];
+  const finalizeMoves = (allMoves: ProMove[]) => {
 
     // Sort: domain order → competency_id → action_id
     allMoves.sort((a, b) => {

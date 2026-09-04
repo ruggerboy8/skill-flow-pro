@@ -97,9 +97,26 @@ Deno.serve(async (req) => {
     if (movesErr) throw movesErr;
 
     const detailMap = new Map((moveDetails ?? []).map((m: any) => [m.action_id, m]));
+
+    // Org content overrides are participant-facing wording, so suggestions
+    // must use them too (platform moves only; owner_org_id null).
+    const { data: overrides, error: overridesErr } = actionIds.length
+      ? await supabase
+          .from('organization_pro_move_content_overrides')
+          .select('pro_move_id, custom_statement')
+          .eq('org_id', orgId)
+          .in('pro_move_id', actionIds)
+      : { data: [], error: null };
+    if (overridesErr) throw overridesErr;
+    const overrideMap = new Map(
+      (overrides ?? []).map((o: any) => [o.pro_move_id, o.custom_statement]),
+    );
+
     const eligibleMoves = (visibleMoves ?? []).map((m: any) => ({
       action_id: m.action_id,
-      action_statement: m.action_statement,
+      action_statement:
+        (m.owner_org_id == null ? overrideMap.get(m.action_id) : null) ??
+        m.action_statement,
       description: detailMap.get(m.action_id)?.description ?? null,
       competencies: detailMap.get(m.action_id)?.competencies ?? null,
     }));

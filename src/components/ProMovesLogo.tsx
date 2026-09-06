@@ -7,16 +7,23 @@ import { cn } from '@/lib/utils';
  * hasn't uploaded its own logo. For org-specific surfaces, prefer the org's
  * logo_url via useOrgBranding and fall back to this.
  *
+ * Two builds of the mark (2026-09-02, from the take-3 clip review):
+ * - master (`promoves-wordmark.svg`): hero/marketing sizes.
+ * - small build (`promoves-wordmark-small.svg`, icon-build P: wider gap,
+ *   dot r7): app chrome and anything rendered below ~32px cap height,
+ *   where the master's dot visually dies. Pass `small` on headers,
+ *   sidebars, and menus; leave pre-auth/hero screens on the master.
+ *
  * Sizing: the image height is em-based, so existing text-size classes
  * (text-base, text-xl, text-3xl) passed via className keep working as scale
  * controls, exactly as they did for the old typed-text version. Light-ground
  * variant only; the app has no dark chrome behind the logo today (the
- * -reversed master exists in the kit when that day comes).
+ * -reversed and -small-dark masters exist in the kit when that day comes).
  */
-export function ProMovesLogo({ className }: { className?: string }) {
+export function ProMovesLogo({ className, small = false }: { className?: string; small?: boolean }) {
   return (
     <img
-      src="/brand/promoves-wordmark.svg"
+      src={small ? '/brand/promoves-wordmark-small.svg' : '/brand/promoves-wordmark.svg'}
       alt="Pro Moves"
       className={cn(
         // max-w-full + object-contain: in narrow containers (the max-w-md

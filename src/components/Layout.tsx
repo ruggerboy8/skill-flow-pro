@@ -295,7 +295,7 @@ export default function Layout() {
               pending={orgMarkPending}
               imgClassName="h-6 object-contain dark:invert flex-none"
             />
-            <ProMovesLogo className="text-sm shrink min-w-0" />
+            <ProMovesLogo small className="text-sm shrink min-w-0" />
           </div>
           {/* Former "More" tab's contents (Profile, Sign out, My evaluations,
               Practice log, lead Team) plus a role-aware management section for
@@ -341,7 +341,7 @@ export default function Layout() {
                   organizationId={organizationId}
                   orgName={orgName}
                   pending={orgMarkPending}
-                  fallback={<ProMovesLogo className="text-base" />}
+                  fallback={<ProMovesLogo small className="text-base" />}
                 />
               </div>
               

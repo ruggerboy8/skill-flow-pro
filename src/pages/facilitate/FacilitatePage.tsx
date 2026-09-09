@@ -283,7 +283,7 @@ export default function FacilitatePage() {
                 icon={PartyPopper} iconColor={v("--score-4")}
                 question="What glowed this week?"
                 showJourney={showJourney} setShowJourney={setShowJourney}
-                role={legacyRoleKey} activeStage={activeStage} setActiveStage={setActiveStage}
+                role={legacyRoleKey} roleDisplayName={roleDisplayName} activeStage={activeStage} setActiveStage={setActiveStage}
               />
             )}
 
@@ -292,7 +292,7 @@ export default function FacilitatePage() {
                 icon={Sprout} iconColor={v("--score-2")}
                 question="What can we grow next week?"
                 showJourney={showJourney} setShowJourney={setShowJourney}
-                role={legacyRoleKey} activeStage={activeStage} setActiveStage={setActiveStage}
+                role={legacyRoleKey} roleDisplayName={roleDisplayName} activeStage={activeStage} setActiveStage={setActiveStage}
               />
             )}
           </div>
@@ -446,10 +446,10 @@ function ScaleReference({ kind }: { kind: "confidence" | "performance" }) {
   );
 }
 
-function Reflection({ icon: Icon, iconColor, question, showJourney, setShowJourney, role, activeStage, setActiveStage }: {
+function Reflection({ icon: Icon, iconColor, question, showJourney, setShowJourney, role, roleDisplayName, activeStage, setActiveStage }: {
   icon: React.ElementType; iconColor: string; question: string;
   showJourney: boolean; setShowJourney: (b: boolean) => void;
-  role: Role; activeStage: number | null; setActiveStage: (i: number) => void;
+  role: Role; roleDisplayName: string; activeStage: number | null; setActiveStage: (i: number) => void;
 }) {
   return (
     <>
@@ -458,7 +458,9 @@ function Reflection({ icon: Icon, iconColor, question, showJourney, setShowJourn
         <p className="text-6xl font-semibold leading-[1.05] tracking-tight max-w-4xl">{question}</p>
       </div>
 
-      {showJourney && <JourneyExplorer role={role} active={activeStage} setActive={setActiveStage} />}
+      {showJourney && (
+        <JourneyExplorer role={role} roleDisplayName={roleDisplayName} active={activeStage} setActive={setActiveStage} />
+      )}
 
       {/* Ariana's "supply cabinet": understated, off to the side */}
       <div className="mt-12">
@@ -472,8 +474,8 @@ function Reflection({ icon: Icon, iconColor, question, showJourney, setShowJourn
   );
 }
 
-function JourneyExplorer({ role, active, setActive }: {
-  role: Role; active: number | null; setActive: (i: number) => void;
+function JourneyExplorer({ role, roleDisplayName, active, setActive }: {
+  role: Role; roleDisplayName: string; active: number | null; setActive: (i: number) => void;
 }) {
   const stage = active === null ? null : journeyStages[active];
   const stagePms = useMemo(() => (stage ? stage.proMovesByRole[role] : []), [stage, role]);
@@ -497,7 +499,7 @@ function JourneyExplorer({ role, active, setActive }: {
         <div className={`mt-4 p-7 animate-in fade-in duration-200 ${glass}`}>
           <div className="text-2xl font-semibold mb-2">{stage.name}</div>
           <p className="text-lg text-muted-foreground leading-relaxed mb-5 max-w-3xl">{stage.description}</p>
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Pro moves here for {roleLabels[role]}</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Pro moves here for {roleDisplayName || roleLabels[role]}</div>
           <div className="flex flex-wrap gap-2">
             {stagePms.length === 0 && (
               <span className="text-base text-muted-foreground italic">No specific moves for this role at this stage.</span>

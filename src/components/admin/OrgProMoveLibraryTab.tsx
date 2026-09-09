@@ -50,6 +50,13 @@ import {
 } from '@/components/ui/table';
 import { Eye, EyeOff, Search, Pencil, Plus, Loader2, RotateCcw } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
+import {
+  fetchOrgCustomMoves,
+  createOrgCustomMove,
+  updateOrgCustomMove,
+  deactivateOrgCustomMove,
+  type OrgCustomMoveRow,
+} from '@/lib/orgCustomMoves';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -67,19 +74,6 @@ interface ProMoveRow {
   override_id: string | null;
   custom_statement: string | null;
   source: 'platform';
-}
-
-interface OrgCustomMove {
-  id: string;
-  action_statement: string;
-  description: string | null;
-  role_id: number | null;
-  role_name: string;
-  competency_id: number | null;
-  competency_name: string;
-  domain_name: string;
-  practice_types: string[];
-  source: 'org';
 }
 
 interface RoleOption {
@@ -100,7 +94,7 @@ export function OrgProMoveLibraryTab() {
   const { resolve: resolveRoleName } = useRoleDisplayNames();
 
   const [rows, setRows] = useState<ProMoveRow[]>([]);
-  const [customMoves, setCustomMoves] = useState<OrgCustomMove[]>([]);
+  const [customMoves, setCustomMoves] = useState<OrgCustomMoveRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [savingId, setSavingId] = useState<number | null>(null);
@@ -126,12 +120,12 @@ export function OrgProMoveLibraryTab() {
   const [savingNewMove, setSavingNewMove] = useState(false);
 
   // Edit dialog for an existing org custom move (action statement + description only)
-  const [editingCustomMove, setEditingCustomMove] = useState<OrgCustomMove | null>(null);
+  const [editingCustomMove, setEditingCustomMove] = useState<OrgCustomMoveRow | null>(null);
   const [customEditDraft, setCustomEditDraft] = useState({ action_statement: '', description: '' });
   const [savingCustomEdit, setSavingCustomEdit] = useState(false);
 
   // Deactivate confirm for an org custom move
-  const [deactivatingMove, setDeactivatingMove] = useState<OrgCustomMove | null>(null);
+  const [deactivatingMove, setDeactivatingMove] = useState<OrgCustomMoveRow | null>(null);
   const [deactivating, setDeactivating] = useState(false);
 
   // ── Data loading ─────────────────────────────────────────────────────────────
@@ -161,7 +155,14 @@ export function OrgProMoveLibraryTab() {
         return;
       }
 
-      // 2. Fetch active pro moves for this practice type
+      // 2. Fetch active PLATFORM pro moves for this practice type. Explicitly
+      // scoped to owner_org_id IS NULL (PML-2a deploy-order rule): after the
+      // fold migration runs, pro_moves also contains every other org's
+      // org_custom rows, and this table is meant to show platform rows only
+      // (this org's own custom moves render separately below, via
+      // fetchOrgCustomMoves). Without this filter, once two orgs share a
+      // practice_type, one org's custom moves would leak into another org's
+      // "platform" table.
       const { data: proMoves, error: pmErr } = await supabase
         .from('pro_moves')
         .select(`
@@ -177,6 +178,7 @@ export function OrgProMoveLibraryTab() {
           )
         `)
         .eq('active', true)
+        .is('owner_org_id', null)
         .overlaps('practice_types', [orgPracticeType])
         .order('action_id');
 
@@ -224,35 +226,11 @@ export function OrgProMoveLibraryTab() {
 
       setRows(merged);
 
-      // 5. Fetch org custom moves
-      const { data: orgMoves } = await (supabase as any)
-        .from('organization_pro_moves')
-        .select(`
-          id, action_statement, description, role_id, competency_id, practice_types,
-          roles!organization_pro_moves_role_id_fkey(role_name),
-          competencies!organization_pro_moves_competency_id_fkey(
-            name,
-            domains!fk_competencies_domain_id(domain_name)
-          )
-        `)
-        .eq('org_id', organizationId)
-        .eq('active', true)
-        .order('sort_order');
-
-      setCustomMoves(
-        (orgMoves ?? []).map((m: any) => ({
-          id: m.id,
-          action_statement: m.action_statement,
-          description: m.description ?? null,
-          role_id: m.role_id ?? null,
-          role_name: m.roles?.role_name ?? '—',
-          competency_id: m.competency_id ?? null,
-          competency_name: m.competencies?.name ?? '—',
-          domain_name: m.competencies?.domains?.domain_name ?? '—',
-          practice_types: m.practice_types ?? [],
-          source: 'org',
-        }))
-      );
+      // 5. Fetch org custom moves. PML-2a: dual-read across pro_moves
+      // (owner_org_id = org, the live write path now) and
+      // organization_pro_moves (legacy rows not yet migrated). See
+      // fetchOrgCustomMoves' module header for why.
+      setCustomMoves(await fetchOrgCustomMoves(organizationId));
 
       // 6. Preload role options for new move dialog
       const { data: orgRoles } = await supabase
@@ -419,18 +397,15 @@ export function OrgProMoveLibraryTab() {
         .eq('id', organizationId)
         .maybeSingle();
 
-      const { data, error } = await (supabase as any)
-        .from('organization_pro_moves')
-        .insert({
-          org_id: organizationId,
-          action_statement: newMove.action_statement.trim(),
-          description: newMove.description.trim() || null,
-          role_id: newMove.role_id ? Number(newMove.role_id) : null,
-          competency_id: newMove.competency_id ? Number(newMove.competency_id) : null,
-          practice_types: orgData?.practice_type ? [orgData.practice_type] : [],
-        })
-        .select('id')
-        .single();
+      // PML-2a: new custom moves write into pro_moves (owner_org_id = org,
+      // source = 'org_custom'), the one write path going forward.
+      const { error } = await createOrgCustomMove(organizationId, {
+        actionStatement: newMove.action_statement.trim(),
+        description: newMove.description.trim() || null,
+        roleId: newMove.role_id ? Number(newMove.role_id) : null,
+        competencyId: newMove.competency_id ? Number(newMove.competency_id) : null,
+        practiceTypes: orgData?.practice_type ? [orgData.practice_type] : [],
+      });
 
       if (error) throw error;
 
@@ -449,10 +424,10 @@ export function OrgProMoveLibraryTab() {
   // Role and competency are fixed after creation (PML-1 scope decision);
   // only action statement and description are editable here.
 
-  const startCustomEdit = (move: OrgCustomMove) => {
+  const startCustomEdit = (move: OrgCustomMoveRow) => {
     setEditingCustomMove(move);
     setCustomEditDraft({
-      action_statement: move.action_statement,
+      action_statement: move.actionStatement,
       description: move.description ?? '',
     });
   };
@@ -468,15 +443,16 @@ export function OrgProMoveLibraryTab() {
     setSavingCustomEdit(true);
     try {
       const description = customEditDraft.description.trim() || null;
-      const { error } = await (supabase as any)
-        .from('organization_pro_moves')
-        .update({ action_statement: statement, description })
-        .eq('id', editingCustomMove.id);
+      // PML-2a: edit whichever table this row actually lives in.
+      const { error } = await updateOrgCustomMove(editingCustomMove, {
+        actionStatement: statement,
+        description,
+      });
       if (error) throw error;
 
       setCustomMoves((prev) =>
         prev.map((m) =>
-          m.id === editingCustomMove.id ? { ...m, action_statement: statement, description } : m
+          m.key === editingCustomMove.key ? { ...m, actionStatement: statement, description } : m
         )
       );
       toast({ title: 'Saved', description: 'Custom pro move updated.' });
@@ -488,7 +464,7 @@ export function OrgProMoveLibraryTab() {
     }
   };
 
-  const confirmDeactivate = (move: OrgCustomMove) => setDeactivatingMove(move);
+  const confirmDeactivate = (move: OrgCustomMoveRow) => setDeactivatingMove(move);
 
   const cancelDeactivate = () => setDeactivatingMove(null);
 
@@ -496,15 +472,13 @@ export function OrgProMoveLibraryTab() {
     if (!deactivatingMove) return;
     setDeactivating(true);
     try {
-      const { error } = await (supabase as any)
-        .from('organization_pro_moves')
-        .update({ active: false })
-        .eq('id', deactivatingMove.id);
+      // PML-2a: deactivate whichever table this row actually lives in.
+      const { error } = await deactivateOrgCustomMove(deactivatingMove);
       if (error) throw error;
 
       // Active-only filtering already happens at the query (Fix 3), so a
       // deactivated move simply drops out of the list here.
-      setCustomMoves((prev) => prev.filter((m) => m.id !== deactivatingMove.id));
+      setCustomMoves((prev) => prev.filter((m) => m.key !== deactivatingMove.key));
       toast({ title: 'Deactivated', description: 'This custom pro move is now hidden everywhere it was pickable.' });
       setDeactivatingMove(null);
     } catch (err: any) {
@@ -516,9 +490,17 @@ export function OrgProMoveLibraryTab() {
 
   // ── Filter ────────────────────────────────────────────────────────────────────
 
-  // Derive unique roles and domains for filter dropdowns
-  const uniqueRoles = [...new Set(rows.map((r) => r.role_name))].sort();
-  const uniqueDomains = [...new Set(rows.map((r) => r.domain_name))].filter((d) => d !== '—').sort();
+  // Derive unique roles and domains for filter dropdowns. PML-2a QA
+  // follow-up: union in org-custom moves' roles/domains too, so a role or
+  // domain that exists only on a custom move is still selectable.
+  const uniqueRoles = [
+    ...new Set([...rows.map((r) => r.role_name), ...customMoves.map((m) => m.roleName)]),
+  ].sort();
+  const uniqueDomains = [
+    ...new Set([...rows.map((r) => r.domain_name), ...customMoves.map((m) => m.domainName)]),
+  ]
+    .filter((d) => d !== '—')
+    .sort();
   // PML-1 Fix 4: the filter still matches on the raw platform role_name (a
   // deliberately unchanged part of the filtering logic), but the label shown
   // to the user should be the org's resolved name, so keep a lookup back to
@@ -526,6 +508,9 @@ export function OrgProMoveLibraryTab() {
   const roleIdByName = new Map<string, number | null>();
   rows.forEach((r) => {
     if (!roleIdByName.has(r.role_name)) roleIdByName.set(r.role_name, r.role_id);
+  });
+  customMoves.forEach((m) => {
+    if (!roleIdByName.has(m.roleName)) roleIdByName.set(m.roleName, m.roleId);
   });
 
   const filtered = rows.filter((r) => {
@@ -542,12 +527,22 @@ export function OrgProMoveLibraryTab() {
     return matchesSearch && matchesRole && matchesDomain && matchesVisibility;
   });
 
-  const filteredCustom = customMoves.filter(
-    (m) =>
-      m.action_statement.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.role_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.competency_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // PML-2a QA follow-up: the role/domain/visibility filters now apply to
+  // org-custom moves too, not just search. Org-custom moves have no
+  // per-org "hidden" override concept of their own (they're either active
+  // and shown, or deactivated and gone from the list already), so the
+  // hidden filter always excludes them and the visible/all filters always
+  // include them.
+  const filteredCustom = customMoves.filter((m) => {
+    const matchesSearch =
+      m.actionStatement.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.roleName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.competencyName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === 'all' || m.roleName === roleFilter;
+    const matchesDomain = domainFilter === 'all' || m.domainName === domainFilter;
+    const matchesVisibility = visibilityFilter !== 'hidden';
+    return matchesSearch && matchesRole && matchesDomain && matchesVisibility;
+  });
 
   const visibleCount = rows.filter((r) => !r.is_hidden).length;
 
@@ -765,30 +760,30 @@ export function OrgProMoveLibraryTab() {
 
                       {/* Org custom moves */}
                       {filteredCustom.map((move) => (
-                        <TableRow key={`org-${move.id}`} className="border-l-2 border-l-blue-400">
+                        <TableRow key={move.key} className="border-l-2 border-l-blue-400">
                           <TableCell className="font-medium text-sm">
-                            {move.action_statement}
+                            {move.actionStatement}
                             <Badge variant="outline" className="ml-2 text-xs text-blue-600 border-blue-300">
                               Org custom
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-sm">{resolveRoleName(move.role_id ?? 0, move.role_name)}</TableCell>
+                          <TableCell className="text-sm">{resolveRoleName(move.roleId ?? 0, move.roleName)}</TableCell>
                           <TableCell className="text-sm">
-                            {move.domain_name !== '—' ? (
+                            {move.domainName !== '—' ? (
                               <span
                                 className="text-xs px-1.5 py-0.5 rounded font-medium"
-                                style={{ backgroundColor: getDomainColor(move.domain_name) }}
+                                style={{ backgroundColor: getDomainColor(move.domainName) }}
                               >
-                                {move.domain_name}
+                                {move.domainName}
                               </span>
                             ) : (
                               <span className="text-muted-foreground">—</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-sm">{move.competency_name}</TableCell>
+                          <TableCell className="text-sm">{move.competencyName}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="text-xs">
-                              {move.practice_types.join(', ') || '—'}
+                              {move.practiceTypes.join(', ') || '—'}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">

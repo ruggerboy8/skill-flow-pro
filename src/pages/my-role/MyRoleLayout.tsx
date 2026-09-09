@@ -4,6 +4,7 @@ import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMobileShell } from '@/hooks/useMobileShell';
 import { BackPill } from '@/components/mobile/BackPill';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 
 export default function MyRoleLayout() {
   const location = useLocation();
@@ -13,6 +14,8 @@ export default function MyRoleLayout() {
     redirectToSetup: false,
     showErrorToast: false
   });
+  // PML-2d: org label everywhere a normal user sees a role name.
+  const { resolve: resolveRoleName } = useRoleDisplayNames();
 
   // Extract the tab from the pathname
   const pathParts = location.pathname.split('/');
@@ -37,7 +40,10 @@ export default function MyRoleLayout() {
 
   // Determine role subtitle from archetype (multi-org safe).
   const archetype = (staffProfile as any)?.roles?.archetype_code as string | null | undefined;
-  const roleLabel = (staffProfile as any)?.roles?.role_name as string | null | undefined;
+  const platformRoleName = (staffProfile as any)?.roles?.role_name as string | null | undefined;
+  const roleLabel = platformRoleName && staffProfile?.role_id != null
+    ? resolveRoleName(staffProfile.role_id, platformRoleName)
+    : platformRoleName;
   const roleSubtitle =
     staffProfile?.is_lead && archetype === 'dental_assistant'
       ? 'Lead Dental Assistant Competency Blueprint'

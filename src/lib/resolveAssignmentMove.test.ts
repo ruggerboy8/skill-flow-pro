@@ -107,6 +107,57 @@ describe('resolveAssignmentRows', () => {
   });
 });
 
+describe('resolveAssignmentRows: content overrides (PML-2b)', () => {
+  it('shows the org override statement instead of the platform statement when one exists', () => {
+    const rows: AssignmentRowForResolve[] = [
+      {
+        id: 'a9',
+        display_order: 1,
+        action_id: 260,
+        pro_moves: {
+          action_statement: 'Original platform wording',
+          competencies: { domains: { domain_name: 'Clerical' } },
+        },
+      },
+    ];
+    const overrides = new Map([[260, "Confirm tomorrow's schedule with the front desk"]]);
+    const result = resolveAssignmentRows(rows, new Map(), overrides);
+    expect(result[0].action_statement).toBe("Confirm tomorrow's schedule with the front desk");
+  });
+
+  it('falls back to the platform statement when no override exists for that action_id', () => {
+    const rows: AssignmentRowForResolve[] = [
+      {
+        id: 'a10',
+        display_order: 1,
+        action_id: 999,
+        pro_moves: { action_statement: 'Original platform wording' },
+      },
+    ];
+    const overrides = new Map([[260, 'Unrelated override']]);
+    const result = resolveAssignmentRows(rows, new Map(), overrides);
+    expect(result[0].action_statement).toBe('Original platform wording');
+  });
+
+  it('never applies an override to an org-custom move, even if its action_id happens to collide', () => {
+    const rows: AssignmentRowForResolve[] = [
+      { id: 'a11', display_order: 1, org_move_id: 'org-move-uuid', action_id: null },
+    ];
+    const orgMeta = new Map([['org-move-uuid', { statement: 'Org custom wording', domain: 'Cultural' }]]);
+    const overrides = new Map([[260, 'Should never apply']]);
+    const result = resolveAssignmentRows(rows, orgMeta, overrides);
+    expect(result[0].action_statement).toBe('Org custom wording');
+  });
+
+  it('defaults to no overrides when the third argument is omitted (backward compatible)', () => {
+    const rows: AssignmentRowForResolve[] = [
+      { id: 'a12', display_order: 1, action_id: 260, pro_moves: { action_statement: 'Platform wording' } },
+    ];
+    const result = resolveAssignmentRows(rows, new Map());
+    expect(result[0].action_statement).toBe('Platform wording');
+  });
+});
+
 describe('collectOrgMoveIds', () => {
   it('returns an empty array when no row has an org_move_id', () => {
     const rows: AssignmentRowForResolve[] = [{ id: 'a1', display_order: 1 }];

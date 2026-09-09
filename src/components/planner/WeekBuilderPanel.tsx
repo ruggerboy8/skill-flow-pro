@@ -9,10 +9,10 @@ import { formatWeekOf } from '@/lib/plannerUtils';
 import { getAssignmentWeekMondayStr } from '@/lib/submissionPolicy';
 import { CT_TZ } from '@/lib/centralTime';
 import { addDaysToDateString, firstMondayOfMonth } from '@/lib/dateUtils';
-import { ProMovePickerDialog } from './ProMovePickerDialog';
 import { SmartSlotPicker } from './SmartSlotPicker';
 import type { RankedMove } from '@/lib/sequencerAdapter';
 import { fetchProMoveMetaByIds, fetchOrgProMoveMetaByIds } from '@/lib/proMoves';
+import { computeExcludeActionIds } from '@/lib/weekBuilderExclusions';
 import { getDomainColor } from '@/lib/domainColors';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -1034,7 +1034,17 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
         </CardContent>
       </Card>
 
-      {pickerOpen && selectedSlot ? (
+      {/* PML-2a: this used to branch to a ProMovePickerDialog fallback when
+          pickerOpen was true but selectedSlot was null. Every call site that
+          sets pickerOpen(true) also sets selectedSlot in the same breath, so
+          that branch could never actually render, removed rather than
+          fixed, per the PML-1 QA follow-up (its onSelect signature also
+          didn't match handleSelectProMove's, which would have broken it the
+          moment it became reachable). ProMovePickerDialog itself is kept
+          (PML-2c still updates its eligibility logic) but currently has no
+          live caller in the app; worth a follow-up ticket to decide whether
+          to give it a real entry point or delete it. */}
+      {pickerOpen && selectedSlot && (
         <SmartSlotPicker
           open={pickerOpen}
           onClose={() => { setPickerOpen(false); setSelectedSlot(null); }}
@@ -1052,19 +1062,8 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
           practiceType={practiceType}
           rankedMoves={rankedMoves ?? []}
           excludeActionIds={
-            (weeks.find(w => w.weekStart === selectedSlot.weekStart)?.slots ?? [])
-              .map(s => s.actionId)
-              .filter((id): id is number => id !== null)
+            computeExcludeActionIds(weeks.find(w => w.weekStart === selectedSlot.weekStart)?.slots ?? [])
           }
-        />
-      ) : (
-        <ProMovePickerDialog
-          open={pickerOpen && !selectedSlot}
-          onClose={() => setPickerOpen(false)}
-          roleId={roleId}
-          onSelect={handleSelectProMove}
-          orgId={orgId}
-          practiceType={practiceType}
         />
       )}
 

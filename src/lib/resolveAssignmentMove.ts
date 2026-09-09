@@ -1,3 +1,5 @@
+import { resolveStatement } from './contentOverrides';
+
 // PML-1 Fix 5: shared resolver for turning a raw weekly_assignments row (as
 // returned by the wizards' repair-mode queries, joined to pro_moves) into the
 // display fields the check-in/check-out wizards need: action_statement,
@@ -10,12 +12,19 @@
 // the participant. This already happened once in prod (Avenue Dental, week
 // of 2026-06-15). The caller must batch-fetch org move meta first (see
 // fetchOrgProMoveMetaByIds in src/lib/proMoves.ts) and pass it in here.
+//
+// PML-2b: participant-facing rewording. A platform move's statement is
+// COALESCE(org content override, platform text); the `overrides` param
+// (action_id -> custom_statement, see src/lib/contentOverrides.ts) applies
+// only on the platform branch (item.action_id set, no org_move_id); org-custom
+// moves are worded directly by the org, not through an override row.
 
 export interface AssignmentRowForResolve {
   id: string | number;
   display_order: number;
   self_select?: boolean | null;
   org_move_id?: string | null;
+  action_id?: number | null;
   pro_moves?: {
     action_statement?: string | null;
     intervention_text?: string | null;
@@ -52,10 +61,15 @@ export interface ResolvedAssignmentMove {
  * (fetch it first with fetchOrgProMoveMetaByIds). A row whose org_move_id
  * has no matching entry resolves to an empty statement and 'Unknown' domain
  * rather than throwing, so one bad id doesn't blank the whole wizard.
+ *
+ * `overrides` (default empty) is this org's content-override map, action_id
+ * -> custom_statement (fetch it first with fetchContentOverrides). Applies
+ * only to the platform branch; see the module header.
  */
 export function resolveAssignmentRows(
   rows: AssignmentRowForResolve[],
-  orgMoveMeta: Map<string, OrgMoveMetaForResolve>
+  orgMoveMeta: Map<string, OrgMoveMetaForResolve>,
+  overrides: Map<number, string> = new Map()
 ): ResolvedAssignmentMove[] {
   return rows.map((item) => {
     let actionStatement = '';
@@ -72,7 +86,7 @@ export function resolveAssignmentRows(
       } else if (item.competencies?.domains?.domain_name) {
         domainName = item.competencies.domains.domain_name;
       }
-      actionStatement = item.pro_moves?.action_statement || '';
+      actionStatement = resolveStatement(item.action_id, item.pro_moves?.action_statement || '', overrides);
       interventionText = item.pro_moves?.intervention_text ?? null;
     }
 

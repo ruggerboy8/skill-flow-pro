@@ -142,13 +142,13 @@ export function InviteUserDialog({
   // Role (optional unless isParticipant)
   const [roleId, setRoleId] = useState("");
 
-  // Team lead flag — kept separate from role_id. The correct way to mark
+  // Team lead flag, kept separate from role_id. The correct way to mark
   // someone a lead is their normal role plus this flag, not a distinct
   // "Lead ..." role_id (see isAssignableRoleOption / role-picker-trap ticket).
   const [isLead, setIsLead] = useState(false);
 
   // Only roles the weekly planner can actually build assignments for should
-  // be pickable here — see isAssignableRoleOption for why.
+  // be pickable here. See isAssignableRoleOption for why.
   const assignableRoles = useMemo(() => roles.filter(isAssignableRoleOption), [roles]);
 
   // Participation
@@ -615,8 +615,8 @@ export function InviteUserDialog({
                   <p className="text-sm font-medium leading-none">Team lead</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Marks this person as a location lead on top of their role above.
-                    They keep their regular role's weekly Pro Moves — don't select a
-                    separate "Lead" role for this.
+                    Their weekly Pro Moves still come from that role, so there's no
+                    separate "Lead" role to pick.
                   </p>
                 </div>
               </label>

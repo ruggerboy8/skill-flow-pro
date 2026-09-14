@@ -4,7 +4,7 @@ import { isAssignableRoleOption, getArchetype, DISPLAY_ONLY_ROLE_ARCHETYPES } fr
 // role-picker-trap ticket (2026-09): invite/edit-user flows must never offer
 // "Lead Dental Assistant" (archetype_code = 'lead_dental_assistant') as a
 // selectable role, because the weekly planner never builds assignments for
-// it — a staff member created with that role_id gets zero weekly Pro Moves
+// it. A staff member created with that role_id gets zero weekly Pro Moves
 // forever. The correct config is the base role + staff.is_lead = true.
 
 describe('isAssignableRoleOption', () => {

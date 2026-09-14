@@ -321,6 +321,13 @@ serve(async (req: Request) => {
           return json({ error: "role_id is required for participants" }, 400);
         }
 
+        // Reject display-only roles (e.g. Lead Dental Assistant) before we
+        // create an auth user for this invite. See rejectDisplayOnlyRole.
+        if (role_id) {
+          const displayOnlyErr = await rejectDisplayOnlyRole(admin, role_id);
+          if (displayOnlyErr) return displayOnlyErr;
+        }
+
         // Resolve the actual location_id to use for the staff record
         let resolvedLocationId = location_id;
 
@@ -416,7 +423,7 @@ serve(async (req: Request) => {
           primary_location_id: resolvedLocationId,
           is_participant: isParticipantUser,
           // Leads use their normal role_id plus this flag, never a distinct
-          // "Lead ..." role_id — see role-picker-trap ticket.
+          // "Lead ..." role_id. See role-picker-trap ticket.
           is_lead: is_lead === true,
           user_id: invite.user.id,
         };
@@ -538,9 +545,16 @@ serve(async (req: Request) => {
         if (!user_id) return json({ error: "user_id required" }, 400);
         
         // Block role changes - must use role_preset instead
-        if (is_super_admin !== undefined || is_coach !== undefined || is_lead !== undefined || 
+        if (is_super_admin !== undefined || is_coach !== undefined || is_lead !== undefined ||
             is_participant !== undefined || coach_scope_type !== undefined || coach_scope_id !== undefined) {
           return json({ error: "Use action=role_preset for role changes." }, 400);
+        }
+
+        // Reject display-only roles (e.g. Lead Dental Assistant) before
+        // writing role_id. See rejectDisplayOnlyRole.
+        if (role_id !== undefined) {
+          const displayOnlyErr = await rejectDisplayOnlyRole(admin, role_id);
+          if (displayOnlyErr) return displayOnlyErr;
         }
 
         // Get current state for audit
@@ -1840,6 +1854,39 @@ serve(async (req: Request) => {
 async function safeJson(req: Request) {
   try { return await req.json(); } catch { return null; }
 }
+
+// Role archetypes that must never be written directly to staff.role_id.
+// Mirrors DISPLAY_ONLY_ROLE_ARCHETYPES in src/lib/roleArchetypes.ts. Kept as
+// a separate local copy because edge functions can't import from src/.
+const DISPLAY_ONLY_ROLE_ARCHETYPES = ["lead_dental_assistant"];
+
+/**
+ * Rejects a role_id whose archetype is display-only (currently just "Lead
+ * Dental Assistant"). Those roles have no weekly-planner rotation, so
+ * assigning one directly leaves a staff member with zero Pro Moves forever.
+ * The correct config is the base role plus staff.is_lead. Returns an error
+ * Response to send back to the caller, or null when the role is fine to
+ * assign. See the role-picker-trap ticket.
+ */
+async function rejectDisplayOnlyRole(admin: any, roleId: number): Promise<Response | null> {
+  const { data: role, error } = await admin
+    .from("roles")
+    .select("archetype_code")
+    .eq("role_id", roleId)
+    .maybeSingle();
+  if (error) {
+    console.error("rejectDisplayOnlyRole: roles lookup failed", error);
+    return null; // don't block the request on a transient lookup failure
+  }
+  if (role?.archetype_code && DISPLAY_ONLY_ROLE_ARCHETYPES.includes(role.archetype_code)) {
+    return json(
+      { error: "This role is display-only. Assign the base role and set is_lead instead." },
+      400,
+    );
+  }
+  return null;
+}
+
 function json(body: any, status = 200) {
   return new Response(JSON.stringify(body), {
     status,

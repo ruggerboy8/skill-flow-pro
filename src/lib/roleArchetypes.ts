@@ -1,6 +1,6 @@
 /**
- * Role archetype system — single source of truth for how the platform
- * treats each role behaviorally.
+ * Role archetype system. This is the single source of truth for how the
+ * platform treats each role behaviorally.
  *
  * `archetype_code` is stored on the `roles` table and backfilled for all
  * existing roles. System behavior is driven by this map, NOT by raw role_id
@@ -105,11 +105,11 @@ export function getArchetype(code: string | null | undefined): ArchetypeBehavior
  * the weekly planner has no tab to build rotations for it, so a staff row
  * created with this role_id gets zero weekly Pro Moves, forever. The
  * correct way to mark someone a lead is the BASE role (e.g. Dental
- * Assistant) plus `staff.is_lead = true` — that's the config used by every
+ * Assistant) plus `staff.is_lead = true`. That's the config used by every
  * real Alcan lead. Picking "Lead Dental Assistant" as a role_id directly is
  * a UI trap, not a valid alternative (role-picker-trap ticket, 2026-09).
  *
- * This does not make the role rows themselves invalid — they're still used
+ * This does not make the role rows themselves invalid. They're still used
  * for competency lookups (see useLeadRoleId) and content authoring, so they
  * stay in the `roles` table and keep showing up correctly for any staff row
  * that already has one. Only the list of pickable options is filtered.

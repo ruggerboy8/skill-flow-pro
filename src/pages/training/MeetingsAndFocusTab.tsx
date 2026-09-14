@@ -424,6 +424,14 @@ function BlastSlot({
   const [recipientsLoading, setRecipientsLoading] = useState(false);
   const lastGeneratedRef = useRef('');
 
+  // Codex review (PR #115): live mirrors of the editor text and the loaded
+  // blast row, so an in-flight polish can detect on resolve that the user
+  // typed or navigated weeks mid-request and drop its stale result.
+  const editedBodyRef = useRef(editedBody);
+  editedBodyRef.current = editedBody;
+  const weekBlastRef = useRef(weekBlast);
+  weekBlastRef.current = weekBlast;
+
   // Re-sync local edit state when a different week's draft loads. Keyed on
   // id + week so it doesn't stomp on in-progress typing when the query
   // silently refetches the same row.
@@ -472,11 +480,27 @@ function BlastSlot({
   // right after a polish still warns that the polish result will be lost.
   const onPolishClick = async () => {
     if (!weekBlast) return;
+    // Codex review (PR #115): capture what was sent and which row it was
+    // for, so a slow response can be recognized as stale and dropped
+    // instead of stomping newer typing or another week's editor.
+    const requestedBody = editedBody;
+    const requestedBlastId = weekBlast.id;
     setPolishing(true);
     try {
-      const polished = await blastsHook.polishDraft.mutateAsync(editedBody);
+      const polished = await blastsHook.polishDraft.mutateAsync(requestedBody);
+      const staleRow = weekBlastRef.current?.id !== requestedBlastId;
+      const staleText = editedBodyRef.current !== requestedBody;
+      if (staleRow || staleText) {
+        toast({
+          title: 'Polish discarded',
+          description: staleRow
+            ? 'You moved to a different week while polishing, so the result was not applied.'
+            : 'The text changed while polishing, so the result was not applied. Polish again when ready.',
+        });
+        return;
+      }
       setEditedBody(polished);
-      blastsHook.updateBlastBody.mutate({ id: weekBlast.id, body: polished, subject: weekBlast.subject });
+      blastsHook.updateBlastBody.mutate({ id: requestedBlastId, body: polished, subject: weekBlast.subject });
     } catch {
       // Failure toast already shown by the hook's onError.
     } finally {
@@ -582,7 +606,7 @@ function BlastSlot({
         <Button
           size="sm"
           variant="outline"
-          disabled={!editedBody.trim() || !weekBlast || blastsHook.updateBlastBody.isPending}
+          disabled={!editedBody.trim() || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending}
           onClick={() => weekBlast && blastsHook.updateBlastBody.mutate({ id: weekBlast.id, body: editedBody, subject: editedSubject })}
         >
           {blastsHook.updateBlastBody.isPending ? (
@@ -611,7 +635,7 @@ function BlastSlot({
         <Button
           size="sm"
           variant="outline"
-          disabled={!editedBody.trim() || !weekBlast || blastsHook.testSendBlast.isPending}
+          disabled={!editedBody.trim() || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending || blastsHook.testSendBlast.isPending}
           onClick={onTestSendClick}
         >
           {blastsHook.testSendBlast.isPending ? (
@@ -620,7 +644,7 @@ function BlastSlot({
             <><Send className="mr-1.5 h-4 w-4" />Send a test to me</>
           )}
         </Button>
-        <Button size="sm" className="ml-auto" disabled={!editedBody.trim() || !weekBlast || recipientsLoading} onClick={onSendClick}>
+        <Button size="sm" className="ml-auto" disabled={!editedBody.trim() || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending || recipientsLoading} onClick={onSendClick}>
           {recipientsLoading ? (
             <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Checking…</>
           ) : (

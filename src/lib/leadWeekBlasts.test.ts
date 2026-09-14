@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   canDraftBlast, deriveBlastSlotState, blastSlotBadgeStatus, blastBadgeLabel,
   buildSendConfirmBody, shouldConfirmRegenerate, canConfirmSend, formatSentSummary,
-  buildDefaultBlastSubject, buildExcludedSuffix,
+  buildDefaultBlastSubject, buildExcludedSuffix, canPolish,
 } from './leadWeekBlasts';
 import type { LeadWeekBlastRow } from '@/types/leadWeekBlasts';
 
@@ -166,6 +166,24 @@ describe('buildDefaultBlastSubject', () => {
 
   it('has no em dash anywhere in the output', () => {
     expect(buildDefaultBlastSubject('2026-12-28')).not.toMatch(/—/);
+  });
+});
+
+describe('canPolish', () => {
+  it('is false when the editor is empty', () => {
+    expect(canPolish('', false)).toBe(false);
+  });
+
+  it('is false when the editor holds only whitespace', () => {
+    expect(canPolish('   \n  ', false)).toBe(false);
+  });
+
+  it('is false while a generation is in flight, even with text present', () => {
+    expect(canPolish('Hello doctors', true)).toBe(false);
+  });
+
+  it('is true once there is text and nothing else is in flight', () => {
+    expect(canPolish('Hello doctors', false)).toBe(true);
   });
 });
 

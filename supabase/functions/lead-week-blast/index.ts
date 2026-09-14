@@ -278,6 +278,103 @@ A memo, not prose. A busy doctor should absorb the whole thing in a
   return jsonResponse({ body, subject: buildDefaultSubject(weekStartDate) });
 }
 
+// LRM-8: how much editor text `polish` will accept in one call. Generous
+// enough for a hand-appended paragraph or two on top of a drafted memo,
+// small enough to keep the OpenAI call cheap and fast.
+const POLISH_MAX_BODY_LENGTH = 8000;
+
+/**
+ * LRM-8: tightens whatever is currently in the editor -- the drafted memo
+ * plus anything she hand-typed under it -- into the same memo shape as
+ * handleDraft produces. Unlike handleDraft, this NEVER reads focus items,
+ * meetings, or transcripts from the database: the editor text passed in
+ * `payload.body` is the entire input, so a hand-appended note that never
+ * touched a database row still comes back tightened, not dropped.
+ */
+async function handlePolish(admin: ReturnType<typeof createClient>, callerStaff: { id: string }, payload: any) {
+  const body = payload?.body;
+  if (typeof body !== 'string' || !body.trim()) {
+    return jsonResponse({ error: 'body is required' }, 400);
+  }
+  if (body.length > POLISH_MAX_BODY_LENGTH) {
+    return jsonResponse({ error: `Text is too long to polish (max ${POLISH_MAX_BODY_LENGTH} characters).` }, 400);
+  }
+
+  const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+  if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not configured');
+
+  const systemPrompt = `# Role
+You are a Dental Training Director's assistant. The director has a draft
+email to doctors sitting in an editor -- some of it AI-drafted, some of it
+she typed herself (often rough notes appended at the bottom, such as
+regional framing). Your job is to tighten the WHOLE thing into a clean memo,
+not to write new content.
+
+# Hard constraints
+- Preserve every point and fact in the input, including anything that reads
+  like a rough, hand-typed addition. Rewording a rough line into a clean
+  bullet is the job; dropping it, or any other point, is a failure.
+- If a line is wrapped in quotation marks, treat it as a focus item quoted
+  verbatim elsewhere and keep it word for word, quotes and all -- do not
+  reword or paraphrase quoted text.
+- Add nothing that is not already in the input. No new facts, no new
+  recommendations, no filler sentences to pad it out.
+- Never mention a named individual, anyone's performance, or any personnel
+  matter of any kind, even if the input names someone. If the input
+  references a person, omit that detail entirely and describe only the
+  process-level point being made.
+- No em dashes anywhere in the output.
+- Do not add a greeting line ("Dear Doctors," or similar) or a signature or
+  sign-off ("Best," "Thank you," or similar). Output only the body content.
+
+# Style
+A memo, not prose. A busy doctor should absorb the whole thing in a
+15-second glance.
+- Bullets, one point per bullet, one sentence per bullet, grouped under
+  short label lines the same way the input is already organized. Start each
+  bullet with the action, decision, or rule itself, never with framing
+  filler ("we discussed the importance of", "it was underscored that").
+- Use a hyphen and a space ("- ") for every bullet. PLAIN TEXT ONLY: this is
+  sent as a plain-text email, so never use markdown syntax (no asterisks,
+  no #, no underscores for emphasis).
+- Aim for roughly 120 words. Go longer only if the content genuinely needs
+  it to preserve every point -- never cut a point just to hit the target.
+- Word choice stays warm and plain in the Alcan voice, but brevity wins
+  every tie.`;
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: body },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error('[lead-week-blast] OpenAI error:', response.status, errText);
+    if (response.status === 429) {
+      return jsonResponse({ error: 'Rate limit exceeded, please try again later.' }, 429);
+    }
+    if (response.status === 402 || response.status === 401) {
+      return jsonResponse({ error: 'OpenAI API authentication or billing issue.' }, response.status);
+    }
+    return jsonResponse({ error: 'Polish failed' }, 502);
+  }
+
+  const data = await response.json();
+  const polishedBody = data.choices?.[0]?.message?.content?.trim() ?? '';
+  if (!polishedBody) {
+    return jsonResponse({ error: 'No polished text produced' }, 502);
+  }
+
+  return jsonResponse({ body: polishedBody });
+}
+
 /**
  * LRM-4: the review list's source of truth. Same cohort derivation and
  * authority gate as send (the gate is applied once, before dispatch, in
@@ -580,6 +677,7 @@ serve(async (req) => {
     if (action === 'recipients') return await handleRecipients(admin, callerStaff);
     if (action === 'send') return await handleSend(admin, callerStaff, payload);
     if (action === 'test_send') return await handleTestSend(admin, callerStaff, payload);
+    if (action === 'polish') return await handlePolish(admin, callerStaff, payload);
 
     return jsonResponse({ error: 'Unknown action' }, 400);
   } catch (err) {

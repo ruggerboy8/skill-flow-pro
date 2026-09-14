@@ -12,7 +12,7 @@ import type { LeadWeekBlastRow, LeadWeekBlastRecipient } from '@/types/leadWeekB
 import { deriveFocusSlotState, deriveMeetingSlotState, meetingsInWeek } from '@/lib/leadMeetingsAndFocus';
 import {
   deriveBlastSlotState, blastSlotBadgeStatus, blastBadgeLabel, shouldConfirmRegenerate,
-  canConfirmSend, formatSentSummary, buildDefaultBlastSubject, buildExcludedSuffix,
+  canConfirmSend, formatSentSummary, buildDefaultBlastSubject, buildExcludedSuffix, canPolish,
   type BlastSlotState,
 } from '@/lib/leadWeekBlasts';
 import {
@@ -416,12 +416,21 @@ function BlastSlot({
   const [editedBody, setEditedBody] = useState(weekBlast?.body ?? '');
   const [editedSubject, setEditedSubject] = useState(weekBlast?.subject || buildDefaultBlastSubject(weekStartDate));
   const [drafting, setDrafting] = useState(false);
+  const [polishing, setPolishing] = useState(false);
   const [regenConfirmOpen, setRegenConfirmOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [recipients, setRecipients] = useState<LeadWeekBlastRecipient[]>([]);
   const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
   const [recipientsLoading, setRecipientsLoading] = useState(false);
   const lastGeneratedRef = useRef('');
+
+  // Codex review (PR #115): live mirrors of the editor text and the loaded
+  // blast row, so an in-flight polish can detect on resolve that the user
+  // typed or navigated weeks mid-request and drop its stale result.
+  const editedBodyRef = useRef(editedBody);
+  editedBodyRef.current = editedBody;
+  const weekBlastRef = useRef(weekBlast);
+  weekBlastRef.current = weekBlast;
 
   // Re-sync local edit state when a different week's draft loads. Keyed on
   // id + week so it doesn't stomp on in-progress typing when the query
@@ -458,6 +467,44 @@ function BlastSlot({
       setRegenConfirmOpen(true);
     } else {
       runDraft();
+    }
+  };
+
+  // LRM-8: sends ONLY the current editor text -- never the week's focus
+  // items or meeting notes -- and replaces the editor with the result.
+  // Persistence mirrors how Regenerate saves an existing draft: only the
+  // body is written back, and the subject stays whatever is already
+  // persisted (weekBlast.subject), so an unsaved in-progress subject edit
+  // is never clobbered. Note lastGeneratedRef is deliberately left alone
+  // here -- it still points at the pre-polish text, so hitting Regenerate
+  // right after a polish still warns that the polish result will be lost.
+  const onPolishClick = async () => {
+    if (!weekBlast) return;
+    // Codex review (PR #115): capture what was sent and which row it was
+    // for, so a slow response can be recognized as stale and dropped
+    // instead of stomping newer typing or another week's editor.
+    const requestedBody = editedBody;
+    const requestedBlastId = weekBlast.id;
+    setPolishing(true);
+    try {
+      const polished = await blastsHook.polishDraft.mutateAsync(requestedBody);
+      const staleRow = weekBlastRef.current?.id !== requestedBlastId;
+      const staleText = editedBodyRef.current !== requestedBody;
+      if (staleRow || staleText) {
+        toast({
+          title: 'Polish discarded',
+          description: staleRow
+            ? 'You moved to a different week while polishing, so the result was not applied.'
+            : 'The text changed while polishing, so the result was not applied. Polish again when ready.',
+        });
+        return;
+      }
+      setEditedBody(polished);
+      blastsHook.updateBlastBody.mutate({ id: requestedBlastId, body: polished, subject: weekBlast.subject });
+    } catch {
+      // Failure toast already shown by the hook's onError.
+    } finally {
+      setPolishing(false);
     }
   };
 
@@ -559,14 +606,14 @@ function BlastSlot({
         <Button
           size="sm"
           variant="outline"
-          disabled={!editedBody.trim() || !weekBlast || blastsHook.updateBlastBody.isPending}
+          disabled={!editedBody.trim() || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending}
           onClick={() => weekBlast && blastsHook.updateBlastBody.mutate({ id: weekBlast.id, body: editedBody, subject: editedSubject })}
         >
           {blastsHook.updateBlastBody.isPending ? (
             <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</>
           ) : 'Save draft'}
         </Button>
-        <Button size="sm" variant="outline" disabled={drafting} onClick={onRegenerateClick}>
+        <Button size="sm" variant="outline" disabled={drafting || polishing} onClick={onRegenerateClick}>
           {drafting ? (
             <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Regenerating…</>
           ) : (
@@ -576,7 +623,19 @@ function BlastSlot({
         <Button
           size="sm"
           variant="outline"
-          disabled={!editedBody.trim() || !weekBlast || blastsHook.testSendBlast.isPending}
+          disabled={!weekBlast || !canPolish(editedBody, drafting || polishing)}
+          onClick={onPolishClick}
+        >
+          {polishing ? (
+            <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Polishing…</>
+          ) : (
+            <><Sparkles className="mr-1.5 h-4 w-4" />Polish</>
+          )}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!editedBody.trim() || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending || blastsHook.testSendBlast.isPending}
           onClick={onTestSendClick}
         >
           {blastsHook.testSendBlast.isPending ? (
@@ -585,7 +644,7 @@ function BlastSlot({
             <><Send className="mr-1.5 h-4 w-4" />Send a test to me</>
           )}
         </Button>
-        <Button size="sm" className="ml-auto" disabled={!editedBody.trim() || !weekBlast || recipientsLoading} onClick={onSendClick}>
+        <Button size="sm" className="ml-auto" disabled={!editedBody.trim() || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending || recipientsLoading} onClick={onSendClick}>
           {recipientsLoading ? (
             <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Checking…</>
           ) : (
@@ -648,7 +707,7 @@ function RecipientReviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-lg">
+      <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Send to doctors</DialogTitle>
           <DialogDescription>Review who this goes to before sending. It cannot be sent twice.</DialogDescription>
@@ -671,7 +730,18 @@ function RecipientReviewDialog({
           <span className="text-xs font-semibold text-muted-foreground">{buildSendingSummary(recipients.length, excludedIds.size)}</span>
         </div>
 
-        <ScrollArea className="-mx-1 max-h-[45vh] px-1">
+        {/*
+          LRM-8: fixed header/subject/Everyone toggle above, fixed footer
+          below -- only this region scrolls. flex-1 (not a fixed max-h) lets
+          it take exactly whatever space is left inside DialogContent's own
+          max-h-[85vh] budget, so it stays reachable regardless of how many
+          location groups or doctors there are. min-h-0 overrides the flex
+          item's default min-height:auto, which otherwise refuses to shrink
+          below its content size and lets the list spill out of the dialog
+          uncontained instead of scrolling internally -- the actual bug
+          reported live with 15+ recipients.
+        */}
+        <ScrollArea className="-mx-1 min-h-0 flex-1 px-1">
           <div className="space-y-3">
             {groups.map((group) => {
               const groupChecked = isGroupFullyIncluded(excludedIds, group);

@@ -1530,11 +1530,26 @@ serve(async (req: Request) => {
         // Get staff record
         const { data: staffToDelete, error: fetchErr } = await admin
           .from("staff")
-          .select("id")
+          .select("id, is_super_admin")
           .eq("user_id", user_id)
           .maybeSingle();
 
         if (fetchErr) throw fetchErr;
+
+        // Privileged accounts (super/platform admins) may share an org with
+        // regular org admins; only a super/platform caller may delete them.
+        if (staffToDelete) {
+          const { data: targetCaps } = await admin
+            .from("user_capabilities")
+            .select("is_platform_admin")
+            .eq("staff_id", staffToDelete.id)
+            .maybeSingle();
+          const targetIsPrivileged = staffToDelete.is_super_admin || targetCaps?.is_platform_admin;
+          const callerIsPrivileged = me.is_super_admin || meCaps?.is_platform_admin;
+          if (targetIsPrivileged && !callerIsPrivileged) {
+            return json({ error: "Only super admins can delete a super admin account" }, 403);
+          }
+        }
 
         if (staffToDelete) {
           const sid = staffToDelete.id;

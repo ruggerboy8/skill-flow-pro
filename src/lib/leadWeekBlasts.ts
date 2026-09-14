@@ -117,6 +117,19 @@ export function buildDefaultBlastSubject(weekStartDate: string): string {
 }
 
 /**
+ * LRM-8: whether the Polish button should be enabled. Mirrors the other
+ * draft-slot buttons' disabled rule (see Regenerate/Send in
+ * MeetingsAndFocusTab.tsx) -- there has to be text to polish, and no other
+ * generation (drafting, regenerating, or a previous polish) can already be
+ * in flight. The "blast is sent" case is handled separately: the draft
+ * editor, and this button with it, is only ever rendered while the blast's
+ * status is 'draft' in the first place.
+ */
+export function canPolish(body: string, busy: boolean): boolean {
+  return !!body.trim() && !busy;
+}
+
+/**
  * LRM-4: the "(X excluded)" suffix appended to the sent summary, omitted
  * entirely when nothing was excluded (omit-absent-content rule -- a sent
  * blast with no exclusions should read exactly as it did before this

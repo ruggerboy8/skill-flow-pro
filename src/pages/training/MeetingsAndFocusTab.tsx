@@ -12,7 +12,7 @@ import type { LeadWeekBlastRow, LeadWeekBlastRecipient } from '@/types/leadWeekB
 import { deriveFocusSlotState, deriveMeetingSlotState, meetingsInWeek } from '@/lib/leadMeetingsAndFocus';
 import {
   deriveBlastSlotState, blastSlotBadgeStatus, blastBadgeLabel, shouldConfirmRegenerate,
-  canConfirmSend, formatSentSummary, buildDefaultBlastSubject, buildExcludedSuffix,
+  canConfirmSend, formatSentSummary, buildDefaultBlastSubject, buildExcludedSuffix, canPolish,
   type BlastSlotState,
 } from '@/lib/leadWeekBlasts';
 import {
@@ -416,6 +416,7 @@ function BlastSlot({
   const [editedBody, setEditedBody] = useState(weekBlast?.body ?? '');
   const [editedSubject, setEditedSubject] = useState(weekBlast?.subject || buildDefaultBlastSubject(weekStartDate));
   const [drafting, setDrafting] = useState(false);
+  const [polishing, setPolishing] = useState(false);
   const [regenConfirmOpen, setRegenConfirmOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [recipients, setRecipients] = useState<LeadWeekBlastRecipient[]>([]);
@@ -458,6 +459,28 @@ function BlastSlot({
       setRegenConfirmOpen(true);
     } else {
       runDraft();
+    }
+  };
+
+  // LRM-8: sends ONLY the current editor text -- never the week's focus
+  // items or meeting notes -- and replaces the editor with the result.
+  // Persistence mirrors how Regenerate saves an existing draft: only the
+  // body is written back, and the subject stays whatever is already
+  // persisted (weekBlast.subject), so an unsaved in-progress subject edit
+  // is never clobbered. Note lastGeneratedRef is deliberately left alone
+  // here -- it still points at the pre-polish text, so hitting Regenerate
+  // right after a polish still warns that the polish result will be lost.
+  const onPolishClick = async () => {
+    if (!weekBlast) return;
+    setPolishing(true);
+    try {
+      const polished = await blastsHook.polishDraft.mutateAsync(editedBody);
+      setEditedBody(polished);
+      blastsHook.updateBlastBody.mutate({ id: weekBlast.id, body: polished, subject: weekBlast.subject });
+    } catch {
+      // Failure toast already shown by the hook's onError.
+    } finally {
+      setPolishing(false);
     }
   };
 
@@ -566,11 +589,23 @@ function BlastSlot({
             <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</>
           ) : 'Save draft'}
         </Button>
-        <Button size="sm" variant="outline" disabled={drafting} onClick={onRegenerateClick}>
+        <Button size="sm" variant="outline" disabled={drafting || polishing} onClick={onRegenerateClick}>
           {drafting ? (
             <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Regenerating…</>
           ) : (
             <><Sparkles className="mr-1.5 h-4 w-4" />Regenerate</>
+          )}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!weekBlast || !canPolish(editedBody, drafting || polishing)}
+          onClick={onPolishClick}
+        >
+          {polishing ? (
+            <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Polishing…</>
+          ) : (
+            <><Sparkles className="mr-1.5 h-4 w-4" />Polish</>
           )}
         </Button>
         <Button

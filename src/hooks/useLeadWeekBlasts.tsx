@@ -91,6 +91,27 @@ export function useLeadWeekBlasts() {
       toast({ title: "Couldn't draft the blast", description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  /**
+   * LRM-8: calls the lead-week-blast edge function's "polish" action. Sends
+   * only the text passed in -- whatever is currently in the editor, drafted
+   * body plus any hand-appended rough lines -- and never touches the DB.
+   * Does not write to the DB -- the caller replaces the editor content with
+   * the returned body, same as generateDraft.
+   */
+  const polishDraft = useMutation({
+    mutationFn: async (body: string): Promise<string> => {
+      const { data, error } = await supabase.functions.invoke('lead-week-blast', {
+        body: { action: 'polish', body },
+      });
+      if (error) throw error;
+      const polished = (data as any)?.body;
+      if (!polished) throw new Error('No polished text produced');
+      return polished;
+    },
+    onError: (e: any) =>
+      toast({ title: "Couldn't polish that", description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   /** Calls the lead-week-blast edge function's "recipients" action -- the review list's source of truth. */
   const fetchRecipients = useMutation({
     mutationFn: async (): Promise<LeadWeekBlastRecipient[]> => {
@@ -141,6 +162,7 @@ export function useLeadWeekBlasts() {
     createBlast,
     updateBlastBody,
     generateDraft,
+    polishDraft,
     fetchRecipients,
     sendBlast,
     testSendBlast,

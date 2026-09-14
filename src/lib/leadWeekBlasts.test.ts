@@ -185,6 +185,16 @@ describe('canPolish', () => {
   it('is true once there is text and nothing else is in flight', () => {
     expect(canPolish('Hello doctors', false)).toBe(true);
   });
+
+  // LRM-10: body is HTML from RichTextEditor now, so a blank editor is
+  // `<p><br></p>`, not `''`.
+  it('is false for an empty HTML editor document', () => {
+    expect(canPolish('<p><br></p>', false)).toBe(false);
+  });
+
+  it('is true once there is real text inside HTML tags', () => {
+    expect(canPolish('<p>Hello doctors</p>', false)).toBe(true);
+  });
 });
 
 describe('buildExcludedSuffix', () => {

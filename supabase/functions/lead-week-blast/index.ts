@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sanitizeBlastHtml, blastHtmlToPlainText, hasVisibleText, upgradeBlastBodyToHtml } from "./htmlUtils.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -69,6 +70,39 @@ function formatWeekLabel(weekStartDate: string): string {
 // buildDefaultBlastSubject -- keep the two in sync if this wording changes.
 function buildDefaultSubject(weekStartDate: string): string {
   return `This week with your Lead RDAs: ${formatWeekLabel(weekStartDate)}`;
+}
+
+// LRM-10: shared output-format instructions for both handleDraft and
+// handlePolish -- the composer's RichTextEditor only ever needs, and the
+// server only ever keeps (see sanitizeBlastHtml), these seven tags. Stated
+// explicitly here rather than left implicit so the model can't drift toward
+// markdown or the old hyphen-bullet plain text.
+const HTML_OUTPUT_RULES = `# Output format
+Output constrained HTML only. The only tags allowed anywhere in the output
+are: <p>, <ul>, <ol>, <li>, <strong>, <em>, <br>. No markdown syntax (no
+asterisks, no #, no hyphens used as bullets). No other tags of any kind, no
+attributes, no inline styles, no class names -- anything outside this list
+is stripped before it reaches a doctor's inbox.
+
+Use <strong>...</strong> for a short bolded label line introducing a topic.
+Use a real <ul><li>...</li></ul> list for bullet points, one point per <li>.
+Do not output a bare hyphen or asterisk as a bullet -- use the actual list
+tags.`;
+
+// LRM-10: strips a markdown code fence a model sometimes wraps HTML output
+// in despite being told not to (same defensive pattern as
+// supabase/functions/format-agenda).
+function stripCodeFence(text: string): string {
+  let out = text.trim();
+  if (out.startsWith('```html')) {
+    out = out.slice(7);
+  } else if (out.startsWith('```')) {
+    out = out.slice(3);
+  }
+  if (out.endsWith('```')) {
+    out = out.slice(0, -3);
+  }
+  return out.trim();
 }
 
 interface DoctorRecipient {
@@ -215,30 +249,28 @@ set with their Lead RDAs this week.
 - No em dashes anywhere in the output.
 - Do not add a greeting line ("Dear Doctors," or similar) or a signature or
   sign-off ("Best," "Thank you," or similar). Output only the body content.
+- Aim for roughly 120 words. Go longer only if the content genuinely needs
+  it to preserve every point -- never cut a point just to hit the target.
 
 # What to cover
-1. The week's focus items, quoted verbatim, at the top under a short label
-   line such as "This week's focus:". One bullet per focus item.
+1. The week's focus items, quoted verbatim, as the lead section.
 2. Any process-level clarifications or expectations from the meeting notes
    (what was discussed or decided about how things work), if meeting notes
    are provided, under a label line such as "From this week's lead meeting:".
    If no meeting was held, skip this section entirely.
 
+${HTML_OUTPUT_RULES}
+
 # Style
-A memo, not prose. A busy doctor should absorb the whole thing in a
-15-second glance.
-- Bullets, one point per bullet, one sentence per bullet. Start each bullet
-  with the action, decision, or rule itself, never with framing filler
-  ("we discussed the importance of", "it was underscored that"). Say
-  "Include required screenshots in charts" not "RDAs are advised to
-  continue including required screenshots".
-- Use a hyphen and a space ("- ") for every bullet. PLAIN TEXT ONLY: this
-  is sent as a plain-text email, so never use markdown syntax (no
-  asterisks, no #, no underscores for emphasis).
-- Keep the whole memo under 120 words. Short label lines, blank line
-  between sections, no paragraphs.
-- Word choice stays warm and plain in the Alcan voice, but brevity wins
-  every tie.`;
+A short memo, not flowing prose. Organize under short bolded label lines
+(<strong>...</strong>), one per topic (e.g. this week's focus, meeting
+notes). Under each label, use a real bulleted list, one point per <li>.
+Start each bullet with the action, decision, or rule itself, never with
+framing filler ("we discussed the importance of", "it was underscored
+that"). Say "Include required screenshots in charts" not "RDAs are advised
+to continue including required screenshots". Warm, plain, professional word
+choice in the Alcan voice. Written to be read by a busy doctor in a
+15-second glance.`;
 
   const userContent = `This week's focus items (quote verbatim):\n${focusBlock}\n${framingLine}\nMeeting notes to summarize at a process level (exclude anything about named individuals):\n${meetingBlock}`;
 
@@ -267,8 +299,16 @@ A memo, not prose. A busy doctor should absorb the whole thing in a
   }
 
   const data = await response.json();
-  const body = data.choices?.[0]?.message?.content?.trim() ?? '';
-  if (!body) {
+  const rawBody = data.choices?.[0]?.message?.content?.trim() ?? '';
+  if (!rawBody) {
+    return jsonResponse({ error: 'No draft produced' }, 502);
+  }
+  // LRM-10: the prompt asks for constrained HTML directly, but sanitize
+  // regardless -- a model can ignore its own prompt's formatting rules, and
+  // this is the one gate every draft body passes through before a client
+  // ever sees it.
+  const body = sanitizeBlastHtml(stripCodeFence(rawBody));
+  if (!body.trim()) {
     return jsonResponse({ error: 'No draft produced' }, 502);
   }
 
@@ -293,7 +333,7 @@ const POLISH_MAX_BODY_LENGTH = 8000;
  */
 async function handlePolish(admin: ReturnType<typeof createClient>, callerStaff: { id: string }, payload: any) {
   const body = payload?.body;
-  if (typeof body !== 'string' || !body.trim()) {
+  if (typeof body !== 'string' || !hasVisibleText(body)) {
     return jsonResponse({ error: 'body is required' }, 400);
   }
   if (body.length > POLISH_MAX_BODY_LENGTH) {
@@ -327,20 +367,24 @@ not to write new content.
 - Do not add a greeting line ("Dear Doctors," or similar) or a signature or
   sign-off ("Best," "Thank you," or similar). Output only the body content.
 
+${HTML_OUTPUT_RULES}
+
 # Style
 A memo, not prose. A busy doctor should absorb the whole thing in a
 15-second glance.
 - Bullets, one point per bullet, one sentence per bullet, grouped under
-  short label lines the same way the input is already organized. Start each
-  bullet with the action, decision, or rule itself, never with framing
-  filler ("we discussed the importance of", "it was underscored that").
-- Use a hyphen and a space ("- ") for every bullet. PLAIN TEXT ONLY: this is
-  sent as a plain-text email, so never use markdown syntax (no asterisks,
-  no #, no underscores for emphasis).
+  short bolded label lines (<strong>...</strong>) the same way the input is
+  already organized. Start each bullet with the action, decision, or rule
+  itself, never with framing filler ("we discussed the importance of", "it
+  was underscored that").
 - Aim for roughly 120 words. Go longer only if the content genuinely needs
   it to preserve every point -- never cut a point just to hit the target.
 - Word choice stays warm and plain in the Alcan voice, but brevity wins
-  every tie.`;
+  every tie.
+
+The input may itself already be HTML (it's coming straight out of the same
+editor). Read it for its content regardless of markup; your output must
+still follow the allowlist above.`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -367,8 +411,13 @@ A memo, not prose. A busy doctor should absorb the whole thing in a
   }
 
   const data = await response.json();
-  const polishedBody = data.choices?.[0]?.message?.content?.trim() ?? '';
-  if (!polishedBody) {
+  const rawPolishedBody = data.choices?.[0]?.message?.content?.trim() ?? '';
+  if (!rawPolishedBody) {
+    return jsonResponse({ error: 'No polished text produced' }, 502);
+  }
+  // LRM-10: same sanitize-regardless gate as handleDraft.
+  const polishedBody = sanitizeBlastHtml(stripCodeFence(rawPolishedBody));
+  if (!polishedBody.trim()) {
     return jsonResponse({ error: 'No polished text produced' }, 502);
   }
 
@@ -427,9 +476,17 @@ async function handleSend(admin: ReturnType<typeof createClient>, callerStaff: {
   if (blastRow.status === 'sent') {
     return jsonResponse({ error: 'This blast has already been sent.' }, 409);
   }
-  if (!blastRow.body || !blastRow.body.trim()) {
+  if (!hasVisibleText(blastRow.body)) {
     return jsonResponse({ error: 'The blast body is empty. Add some content before sending.' }, 400);
   }
+
+  // LRM-10: the stored body can predate this ticket (plain text, bare
+  // newlines) if it was never re-opened in the new editor -- upgrade before
+  // sanitizing so an old draft's line breaks survive into the email HTML.
+  // sanitizeBlastHtml is the actual security boundary; upgrade is purely a
+  // backward-compat formatting step ahead of it.
+  const htmlBody = sanitizeBlastHtml(upgradeBlastBodyToHtml(blastRow.body));
+  const textBody = blastHtmlToPlainText(htmlBody);
 
   const doctors = await resolveDoctorCohort(admin, callerStaff.organization_id, callerStaff.id);
   if (doctors.length === 0) {
@@ -507,7 +564,8 @@ async function handleSend(admin: ReturnType<typeof createClient>, callerStaff: {
           to: [doctor.email],
           reply_to: replyTo,
           subject,
-          text: blastRow.body,
+          html: htmlBody,
+          text: textBody,
         }),
       });
 
@@ -521,7 +579,7 @@ async function handleSend(admin: ReturnType<typeof createClient>, callerStaff: {
         target_user_id: doctor.user_id,
         type: 'lead_week_blast',
         subject,
-        body: blastRow.body,
+        body: htmlBody,
       });
 
       successCount++;
@@ -578,7 +636,7 @@ async function handleTestSend(admin: ReturnType<typeof createClient>, callerStaf
   if (blastRow.status !== 'draft') {
     return jsonResponse({ error: 'Only a draft blast can be test sent.' }, 400);
   }
-  if (!blastRow.body || !blastRow.body.trim()) {
+  if (!hasVisibleText(blastRow.body)) {
     return jsonResponse({ error: 'The blast body is empty. Add some content before sending a test.' }, 400);
   }
 
@@ -590,6 +648,10 @@ async function handleTestSend(admin: ReturnType<typeof createClient>, callerStaf
   const baseSubject = (blastRow.subject && blastRow.subject.trim()) || buildDefaultSubject(blastRow.week_start_date);
   const subject = `[Test] ${baseSubject}`;
 
+  // LRM-10: same upgrade-then-sanitize-regardless treatment as handleSend.
+  const htmlBody = sanitizeBlastHtml(upgradeBlastBodyToHtml(blastRow.body));
+  const textBody = blastHtmlToPlainText(htmlBody);
+
   const resendResponse = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
@@ -598,7 +660,8 @@ async function handleTestSend(admin: ReturnType<typeof createClient>, callerStaf
       to: [callerStaff.email],
       reply_to: replyTo,
       subject,
-      text: blastRow.body,
+      html: htmlBody,
+      text: textBody,
     }),
   });
   if (!resendResponse.ok) {
@@ -612,7 +675,7 @@ async function handleTestSend(admin: ReturnType<typeof createClient>, callerStaf
     target_user_id: callerStaff.user_id,
     type: 'lead_week_blast_test',
     subject,
-    body: blastRow.body,
+    body: htmlBody,
   });
 
   return jsonResponse({ sent: true, email: callerStaff.email });

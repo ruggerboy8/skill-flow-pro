@@ -10,17 +10,28 @@ import 'quill/dist/quill.snow.css';
  * rare case a write produces no change event at all (e.g. re-pasting
  * already-blank content into an already-blank editor), so the flag can
  * never linger true and accidentally swallow the next real user edit.
+ *
+ * LRM-10: also reports the post-write, Quill-normalized HTML via
+ * `onNormalized`, for callers that need to know what Quill actually stored
+ * (not just what was handed in) without treating it as a user edit -- e.g. a
+ * caller comparing "has this been edited since it loaded" needs its baseline
+ * to be Quill's own normalized shape, since Quill can rewrite structural
+ * markup (observed: `<ul>` becomes `<ol data-list="bullet">`, a `<br>`
+ * inside a `<p>` splits into two `<p>` tags) even though it never fires
+ * 'text-change' for a silent write.
  */
 function writeContentSilently(
   quill: Quill,
   html: string,
   suppressChangeRef: MutableRefObject<boolean>,
-  lastKnownHtmlRef: MutableRefObject<string>
+  lastKnownHtmlRef: MutableRefObject<string>,
+  onNormalized?: (html: string) => void
 ) {
   suppressChangeRef.current = true;
   quill.clipboard.dangerouslyPasteHTML(html);
   lastKnownHtmlRef.current = quill.root.innerHTML;
   suppressChangeRef.current = false;
+  onNormalized?.(lastKnownHtmlRef.current);
 }
 
 /**
@@ -68,6 +79,13 @@ export interface RichTextEditorProps {
   formats?: string[];
   readOnly?: boolean;
   className?: string;
+  /**
+   * LRM-10: fires with Quill's normalized HTML after every silent
+   * (non-user) write -- the initial mount seed and any external `value`
+   * sync -- never for a genuine user edit (that's `onChange`). Optional and
+   * additive: existing callers that don't pass it are unaffected.
+   */
+  onReady?: (html: string) => void;
 }
 
 export function RichTextEditor({
@@ -78,6 +96,7 @@ export function RichTextEditor({
   formats,
   readOnly = false,
   className,
+  onReady,
 }: RichTextEditorProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const quillRef = useRef<Quill | null>(null);
@@ -87,6 +106,10 @@ export function RichTextEditor({
   // changed on a render.
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+
+  // Latest onReady, same rebind-avoidance reasoning as onChangeRef.
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
 
   // Tracks the HTML we last set into (or read out of) the editor, so the
   // controlled-value effect below can tell "the parent echoed our own
@@ -153,7 +176,9 @@ export function RichTextEditor({
     // comparison (raw `value` vs. Quill's normalized HTML) will almost
     // always disagree on that very first render for non-canonical input,
     // and would otherwise re-paste with the listener already live.
-    writeContentSilently(quill, value ?? '', suppressChangeRef, lastKnownHtmlRef);
+    writeContentSilently(quill, value ?? '', suppressChangeRef, lastKnownHtmlRef, (html) =>
+      onReadyRef.current?.(html)
+    );
 
     quillRef.current = quill;
 
@@ -185,7 +210,9 @@ export function RichTextEditor({
     const nextValue = value ?? '';
     if (nextValue === lastKnownHtmlRef.current) return;
     const selection = quill.getSelection();
-    writeContentSilently(quill, nextValue, suppressChangeRef, lastKnownHtmlRef);
+    writeContentSilently(quill, nextValue, suppressChangeRef, lastKnownHtmlRef, (html) =>
+      onReadyRef.current?.(html)
+    );
     if (selection) {
       const length = quill.getLength();
       const index = Math.max(0, Math.min(selection.index, length - 1));

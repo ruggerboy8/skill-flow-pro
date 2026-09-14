@@ -30,7 +30,10 @@ import { StatusBadge, type BadgeStatus } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { Skeleton } from '@/components/ui/skeleton';
+import DOMPurify from 'dompurify';
+import { upgradeBlastBodyToHtml, hasBlastBodyContent, reconcileNormalizedLoad, convertQuillListFlavors, needsSaveBeforeSend } from '@/lib/leadWeekBlastHtml';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -405,6 +408,25 @@ function MeetingSlot({ meetings, onRecord, onOpen }: { meetings: LeadMeetingRow[
 const fmtSentAt = (iso: string) =>
   new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
+// LRM-10: the composer's toolbar is deliberately narrowed to exactly the
+// tags the server-side allowlist keeps (p, ul, ol, li, strong, em, br) --
+// no headers, no underline, nothing that would produce a tag the server
+// strips anyway.
+const BLAST_QUILL_MODULES = {
+  toolbar: [['bold', 'italic'], [{ list: 'ordered' }, { list: 'bullet' }], ['clean']],
+};
+
+// Client-side render-time sanitization for stored blast HTML, matching the
+// same allowlist the edge function enforces server-side, and the same
+// DOMPurify.sanitize + dangerouslySetInnerHTML approach the app already uses
+// for other stored rich text (CombinedPrepView, MeetingOutcomeCapture,
+// DoctorReviewPrep, EvaluationViewer, InsightsDisplay all sanitize a
+// stored-HTML field this way before rendering it read-only).
+const BLAST_SANITIZE_CONFIG = {
+  ALLOWED_TAGS: ['p', 'ul', 'ol', 'li', 'strong', 'em', 'br'],
+  ALLOWED_ATTR: [],
+};
+
 function BlastSlot({
   state, weekBlast, weekStartDate, blastsHook,
 }: {
@@ -413,7 +435,7 @@ function BlastSlot({
   weekStartDate: string;
   blastsHook: ReturnType<typeof useLeadWeekBlasts>;
 }) {
-  const [editedBody, setEditedBody] = useState(weekBlast?.body ?? '');
+  const [editedBody, setEditedBody] = useState(upgradeBlastBodyToHtml(weekBlast?.body ?? ''));
   const [editedSubject, setEditedSubject] = useState(weekBlast?.subject || buildDefaultBlastSubject(weekStartDate));
   const [drafting, setDrafting] = useState(false);
   const [polishing, setPolishing] = useState(false);
@@ -432,13 +454,106 @@ function BlastSlot({
   const weekBlastRef = useRef(weekBlast);
   weekBlastRef.current = weekBlast;
 
+  // LRM-10: RichTextEditor can rewrite structural markup when it loads a
+  // value into Quill (observed: `<ul>` becomes `<ol data-list="bullet">`)
+  // with no 'text-change' event at all, so the raw string we hand it as
+  // `value` is not always byte-identical to what ends up as the "current"
+  // content. Comparing a freshly-loaded body against itself must not read
+  // as an edit, so whenever we set editedBody to a value we intend as the
+  // new baseline (a loaded draft, or a fresh Regenerate result), this flag
+  // arms the editor's onReady callback to correct BOTH lastGeneratedRef and
+  // editedBody to Quill's own normalized output once it settles -- not the
+  // raw string we asked it to load.
+  //
+  // QA fix (Codex review): the first version of this only corrected
+  // lastGeneratedRef, leaving editedBody on the raw pre-normalization
+  // string forever. Since the draft/regenerate prompt emits <ul><li> and
+  // Quill rewrites that to <ol data-list="bullet">, editedBody and
+  // lastGeneratedRef differed after essentially every draft with zero user
+  // edits, so shouldConfirmRegenerate popped "Replace the current draft?
+  // Your edits will be lost" on the very next Regenerate click.
+  // pendingWrittenValueRef records exactly what was written so
+  // reconcileNormalizedLoad can tell "nothing touched editedBody since the
+  // write" (safe to replace with the normalized value) apart from "a
+  // keystroke landed first" (must not clobber it) -- onReady only ever
+  // fires for a silent, non-user write, but this guard is cheap insurance
+  // against any path where a keystroke could land in the gap between the
+  // write and onReady firing.
+  //
+  // Deliberately NOT armed for Polish (see onPolishClick): that
+  // intentionally leaves lastGeneratedRef (and now editedBody's sync)
+  // pointing at the pre-polish text.
+  //
+  // Codex review (PR #116, P2): a CHILD component's own mount effect runs
+  // BEFORE this component's effects (React commits child effects
+  // bottom-up), and RichTextEditor calls onReady synchronously while
+  // seeding its initial content. So on first mount with an existing draft,
+  // onReady's first call arrived here BEFORE the week-switch effect below
+  // had a chance to arm this flag -- it was still `false`, the arm-worthy
+  // onReady call was silently ignored, and the flag stayed armed from the
+  // week-switch effect's own run, waiting for whatever onReady fired NEXT.
+  // That next call was often a Polish result (Polish sets editedBody -> the
+  // editor's controlled-value-sync effect -> onReady), so the polish
+  // output got wrongly adopted as the "generated" baseline and Regenerate
+  // stopped warning before discarding a fresh polish.
+  //
+  // Fixed two ways together (traced empirically, not just reasoned through
+  // -- React batches this component's own effect with the child's into one
+  // update, so either fix alone still lets the second clobber the first):
+  // 1. These two refs are armed with their INITIAL values during render
+  //    (useRef's initial argument), before the child ever mounts, so the
+  //    very first onReady call has something correct to consume.
+  // 2. The week-switch effect below skips its arm-then-set body on its own
+  //    first run (isFirstRunRef) -- that effect always fires once at mount
+  //    regardless of its dependency array, and since it unconditionally
+  //    overwrites editedBody with the RAW (pre-Quill-normalization) body,
+  //    letting it run at mount would silently undo the correction onReady
+  //    just made. On a REAL week switch (not mount), isFirstRunRef is
+  //    already false, so the effect's existing arm-then-set ordering runs
+  //    exactly as before -- that path was never broken.
+  const pendingGeneratedSyncRef = useRef(true);
+  const pendingWrittenValueRef = useRef(editedBody);
+  const onEditorReady = (html: string) => {
+    if (pendingGeneratedSyncRef.current) {
+      pendingGeneratedSyncRef.current = false;
+      lastGeneratedRef.current = html;
+      setEditedBody((current) => reconcileNormalizedLoad(current, pendingWrittenValueRef.current, html));
+    }
+  };
+
+  // Codex review (PR #116, P2): this effect always fires once at mount too
+  // (React runs every effect after the initial render regardless of its
+  // dependency array), and its unconditional setEditedBody(upgraded) would
+  // overwrite editedBody's already-correct, Quill-normalized value (set
+  // moments earlier by the render-time-armed onEditorReady above) with the
+  // raw pre-normalization body -- re-breaking the very thing the arming
+  // above just fixed. Skipping this effect's body on its own first run
+  // avoids that: render-time arming already seeded everything correctly for
+  // the initial-mount case, so there is nothing for this run to do. On a
+  // REAL week switch, isFirstRunRef is already false, so this effect's
+  // existing arm-then-set ordering runs exactly as before.
+  const isFirstRunRef = useRef(true);
+
   // Re-sync local edit state when a different week's draft loads. Keyed on
   // id + week so it doesn't stomp on in-progress typing when the query
-  // silently refetches the same row.
+  // silently refetches the same row. Existing rows are plain text (bare
+  // newlines) predating this ticket -- upgradeBlastBodyToHtml is a no-op for
+  // a body that's already HTML, and converts one that isn't into equivalent
+  // HTML paragraphs so nothing is lost visually in the editor.
   useEffect(() => {
-    setEditedBody(weekBlast?.body ?? '');
+    if (isFirstRunRef.current) {
+      isFirstRunRef.current = false;
+      return;
+    }
+    const upgraded = upgradeBlastBodyToHtml(weekBlast?.body ?? '');
+    setEditedBody(upgraded);
     setEditedSubject(weekBlast?.subject || buildDefaultBlastSubject(weekStartDate));
-    lastGeneratedRef.current = weekBlast?.body ?? '';
+    // Synchronous fallback baseline, corrected to Quill's normalized shape
+    // by onEditorReady the moment the editor finishes loading it (see
+    // pendingGeneratedSyncRef above).
+    lastGeneratedRef.current = upgraded;
+    pendingWrittenValueRef.current = upgraded;
+    pendingGeneratedSyncRef.current = true;
   }, [weekBlast?.id, weekStartDate]);
 
   const runDraft = async () => {
@@ -446,6 +561,8 @@ function BlastSlot({
     try {
       const { body, subject } = await blastsHook.generateDraft.mutateAsync(weekStartDate);
       lastGeneratedRef.current = body;
+      pendingWrittenValueRef.current = body;
+      pendingGeneratedSyncRef.current = true;
       setEditedBody(body);
       if (weekBlast) {
         // Regenerating an existing draft only replaces the body -- her
@@ -508,16 +625,61 @@ function BlastSlot({
     }
   };
 
-  const onTestSendClick = () => {
+  // blast-send-trap incident: the editor is local state, previously
+  // persisted only by an explicit "Save draft" click, while both send paths
+  // read `body` (and `subject`) straight from the DB row. A real user edited
+  // her draft and clicked Send; the stale saved AI draft reached 16 doctors
+  // instead of what she was looking at. Both send paths now persist
+  // editedBody AND editedSubject first, whenever either differs from what's
+  // saved (needsSaveBeforeSend), and only proceed on that save's success --
+  // see the function's own doc comment for why "differs" is intentionally
+  // the conservative, no-normalization strict comparison for body, and why
+  // subject gets one narrow, provably-safe exception.
+  //
+  // QA follow-up: the first version of this saved `subject: weekBlast.subject`
+  // (the STALE saved subject), matching the Polish/Regenerate convention of
+  // never touching subject. That reproduced the exact same incident class
+  // for a subject-only edit -- the review dialog renders
+  // `subject={editedSubject}` (the live input) while the send reads the DB
+  // row, so the dialog previewed the new subject and the email went out
+  // with the old one. The send path's contract is different from
+  // Polish/Regenerate on purpose: generation paths must never clobber a
+  // subject she's mid-typing while a draft/polish call is in flight, but
+  // Send and Test-send are what-you-see-is-what-sends for every visible
+  // field, so they now persist `subject: editedSubject` here, verbatim.
+  //
+  // The in-flight lock this shares with "Save draft"
+  // (blastsHook.updateBlastBody.isPending disables both send buttons, see
+  // the JSX below) means a concurrent manual save can't race this one.
+  const onTestSendClick = async () => {
     if (!weekBlast) return;
+    if (needsSaveBeforeSend(editedBody, editedSubject, weekBlast.body, weekBlast.subject, buildDefaultBlastSubject(weekStartDate))) {
+      try {
+        await blastsHook.updateBlastBody.mutateAsync({ id: weekBlast.id, body: editedBody, subject: editedSubject });
+      } catch {
+        // Failure toast already shown by the hook's onError (including the
+        // sent-status seatbelt inside updateBlastBody) -- do not fire the
+        // test send on a failed pre-send save.
+        return;
+      }
+    }
     blastsHook.testSendBlast.mutate(weekBlast.id, {
       onSuccess: (data) => toast({ title: 'Test sent', description: `Sent to ${data.email}.` }),
     });
   };
 
   const onSendClick = async () => {
+    if (!weekBlast) return;
     setRecipientsLoading(true);
     try {
+      if (needsSaveBeforeSend(editedBody, editedSubject, weekBlast.body, weekBlast.subject, buildDefaultBlastSubject(weekStartDate))) {
+        // Persist before recipients are even fetched, let alone the review
+        // dialog opens -- the dialog previews no body and previews subject
+        // from live editor state, not the DB row, so this is the only gate
+        // standing between a stale draft (or stale subject) and a real
+        // send.
+        await blastsHook.updateBlastBody.mutateAsync({ id: weekBlast.id, body: editedBody, subject: editedSubject });
+      }
       const list = await blastsHook.fetchRecipients.mutateAsync();
       // Fresh every open: nothing carries over from a previous review.
       setRecipients(list);
@@ -531,7 +693,9 @@ function BlastSlot({
         toast({ title: 'No doctors to send to', description: 'There are no doctors to send this to yet.' });
       }
     } catch {
-      // Failure toast already shown by the hook's onError.
+      // Failure toast already shown by the hook's onError -- whether the
+      // pre-send save or the recipients lookup failed, stop here in both
+      // cases and never open the review dialog.
     } finally {
       setRecipientsLoading(false);
     }
@@ -586,7 +750,29 @@ function BlastSlot({
     const excludedSuffix = buildExcludedSuffix(weekBlast.excluded_staff_ids?.length ?? 0);
     return (
       <div className="space-y-2.5">
-        <div className="whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">{weekBlast.body}</div>
+        {/*
+          LRM-10: a sent blast can predate this ticket (plain text, bare
+          newlines) or postdate it (HTML). upgradeBlastBodyToHtml handles
+          both -- it's a no-op for a body that's already HTML, and converts
+          plain text into equivalent paragraphs -- so this one render path
+          covers old and new rows alike. Sanitized with the same allowlist
+          the server enforces before rendering, the same DOMPurify.sanitize +
+          dangerouslySetInnerHTML approach the app already uses for other
+          stored rich text (CombinedPrepView, MeetingOutcomeCapture,
+          DoctorReviewPrep, EvaluationViewer, InsightsDisplay).
+
+          Codex review (PR #116, P2): convertQuillListFlavors runs BEFORE
+          DOMPurify -- DOMPurify's ALLOWED_ATTR: [] below strips data-list
+          along with every other attribute, so a Quill-flavored bullet list
+          (`<ol><li data-list="bullet">`) has to become a real `<ul>` first
+          or it renders as a numbered list here too.
+        */}
+        <div
+          className="prose prose-sm max-w-none rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground dark:prose-invert"
+          dangerouslySetInnerHTML={{
+            __html: DOMPurify.sanitize(convertQuillListFlavors(upgradeBlastBodyToHtml(weekBlast.body)), BLAST_SANITIZE_CONFIG),
+          }}
+        />
         <div className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
           Sent {weekBlast.sent_at && fmtSentAt(weekBlast.sent_at)} · {summary}{excludedSuffix}
         </div>
@@ -601,12 +787,19 @@ function BlastSlot({
         <Label htmlFor="blast-subject" className="mb-1.5 block text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Subject</Label>
         <Input id="blast-subject" value={editedSubject} onChange={(e) => setEditedSubject(e.target.value)} />
       </div>
-      <Textarea value={editedBody} onChange={(e) => setEditedBody(e.target.value)} rows={10} />
+      <RichTextEditor
+        value={editedBody}
+        onChange={setEditedBody}
+        onReady={onEditorReady}
+        modules={BLAST_QUILL_MODULES}
+        placeholder="Write the blast body here…"
+        className="bg-background rounded-md [&_.ql-editor]:min-h-[220px]"
+      />
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
           variant="outline"
-          disabled={!editedBody.trim() || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending}
+          disabled={!hasBlastBodyContent(editedBody) || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending}
           onClick={() => weekBlast && blastsHook.updateBlastBody.mutate({ id: weekBlast.id, body: editedBody, subject: editedSubject })}
         >
           {blastsHook.updateBlastBody.isPending ? (
@@ -635,7 +828,7 @@ function BlastSlot({
         <Button
           size="sm"
           variant="outline"
-          disabled={!editedBody.trim() || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending || blastsHook.testSendBlast.isPending}
+          disabled={!hasBlastBodyContent(editedBody) || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending || blastsHook.testSendBlast.isPending}
           onClick={onTestSendClick}
         >
           {blastsHook.testSendBlast.isPending ? (
@@ -644,7 +837,7 @@ function BlastSlot({
             <><Send className="mr-1.5 h-4 w-4" />Send a test to me</>
           )}
         </Button>
-        <Button size="sm" className="ml-auto" disabled={!editedBody.trim() || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending || recipientsLoading} onClick={onSendClick}>
+        <Button size="sm" className="ml-auto" disabled={!hasBlastBodyContent(editedBody) || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending || recipientsLoading} onClick={onSendClick}>
           {recipientsLoading ? (
             <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Checking…</>
           ) : (

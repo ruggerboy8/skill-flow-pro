@@ -69,7 +69,7 @@ export function AppSidebar({ navigation, backfillMissingCount = 0 }: AppSidebarP
           {isCollapsed ? (
             <SignalP size={24} label="Pro Moves" />
           ) : (
-            <ProMovesLogo className="text-xl" />
+            <ProMovesLogo small className="text-xl" />
           )}
         </div>
         

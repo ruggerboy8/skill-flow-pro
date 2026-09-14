@@ -193,7 +193,7 @@ export function MoreMenuRows({
           click), separated from the rows above the same way the sections
           above are separated from each other. */}
       <div className="mt-3 flex justify-center border-t border-border pt-3 cursor-default">
-        <ProMovesLogo className="text-xs opacity-70" />
+        <ProMovesLogo small className="text-xs opacity-70" />
       </div>
     </div>
   );

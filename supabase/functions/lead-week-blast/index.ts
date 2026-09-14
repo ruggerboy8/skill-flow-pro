@@ -256,17 +256,21 @@ set with their Lead RDAs this week.
 1. The week's focus items, quoted verbatim, as the lead section.
 2. Any process-level clarifications or expectations from the meeting notes
    (what was discussed or decided about how things work), if meeting notes
-   are provided. If no meeting was held, skip this and keep the email
-   focus-only.
+   are provided, under a label line such as "From this week's lead meeting:".
+   If no meeting was held, skip this section entirely.
 
 ${HTML_OUTPUT_RULES}
 
 # Style
 A short memo, not flowing prose. Organize under short bolded label lines
 (<strong>...</strong>), one per topic (e.g. this week's focus, meeting
-notes). Under each label, use a real bulleted list, one point per <li>. Warm,
-plain, professional word choice in the Alcan voice. Written to be read by a
-busy doctor in a 15-second glance.`;
+notes). Under each label, use a real bulleted list, one point per <li>.
+Start each bullet with the action, decision, or rule itself, never with
+framing filler ("we discussed the importance of", "it was underscored
+that"). Say "Include required screenshots in charts" not "RDAs are advised
+to continue including required screenshots". Warm, plain, professional word
+choice in the Alcan voice. Written to be read by a busy doctor in a
+15-second glance.`;
 
   const userContent = `This week's focus items (quote verbatim):\n${focusBlock}\n${framingLine}\nMeeting notes to summarize at a process level (exclude anything about named individuals):\n${meetingBlock}`;
 

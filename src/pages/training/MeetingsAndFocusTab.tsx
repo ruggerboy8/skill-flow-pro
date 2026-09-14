@@ -30,7 +30,10 @@ import { StatusBadge, type BadgeStatus } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { Skeleton } from '@/components/ui/skeleton';
+import DOMPurify from 'dompurify';
+import { upgradeBlastBodyToHtml, hasBlastBodyContent } from '@/lib/leadWeekBlastHtml';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -405,6 +408,25 @@ function MeetingSlot({ meetings, onRecord, onOpen }: { meetings: LeadMeetingRow[
 const fmtSentAt = (iso: string) =>
   new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
+// LRM-10: the composer's toolbar is deliberately narrowed to exactly the
+// tags the server-side allowlist keeps (p, ul, ol, li, strong, em, br) --
+// no headers, no underline, nothing that would produce a tag the server
+// strips anyway.
+const BLAST_QUILL_MODULES = {
+  toolbar: [['bold', 'italic'], [{ list: 'ordered' }, { list: 'bullet' }], ['clean']],
+};
+
+// Client-side render-time sanitization for stored blast HTML, matching the
+// same allowlist the edge function enforces server-side, and the same
+// DOMPurify.sanitize + dangerouslySetInnerHTML approach the app already uses
+// for other stored rich text (CombinedPrepView, MeetingOutcomeCapture,
+// DoctorReviewPrep, EvaluationViewer, InsightsDisplay all sanitize a
+// stored-HTML field this way before rendering it read-only).
+const BLAST_SANITIZE_CONFIG = {
+  ALLOWED_TAGS: ['p', 'ul', 'ol', 'li', 'strong', 'em', 'br'],
+  ALLOWED_ATTR: [],
+};
+
 function BlastSlot({
   state, weekBlast, weekStartDate, blastsHook,
 }: {
@@ -413,7 +435,7 @@ function BlastSlot({
   weekStartDate: string;
   blastsHook: ReturnType<typeof useLeadWeekBlasts>;
 }) {
-  const [editedBody, setEditedBody] = useState(weekBlast?.body ?? '');
+  const [editedBody, setEditedBody] = useState(upgradeBlastBodyToHtml(weekBlast?.body ?? ''));
   const [editedSubject, setEditedSubject] = useState(weekBlast?.subject || buildDefaultBlastSubject(weekStartDate));
   const [drafting, setDrafting] = useState(false);
   const [polishing, setPolishing] = useState(false);
@@ -432,13 +454,41 @@ function BlastSlot({
   const weekBlastRef = useRef(weekBlast);
   weekBlastRef.current = weekBlast;
 
+  // LRM-10: RichTextEditor can rewrite structural markup when it loads a
+  // value into Quill (observed: `<ul>` becomes `<ol data-list="bullet">`)
+  // with no 'text-change' event at all, so the raw string we hand it as
+  // `value` is not always byte-identical to what ends up as the "current"
+  // content. Comparing a freshly-loaded body against itself must not read
+  // as an edit, so whenever we set editedBody to a value we intend as the
+  // new baseline (a loaded draft, or a fresh Regenerate result), this flag
+  // arms the editor's onReady callback to correct lastGeneratedRef to
+  // Quill's own normalized output once it settles -- not the raw string we
+  // asked it to load. Deliberately NOT armed for Polish (see onPolishClick):
+  // that intentionally leaves lastGeneratedRef pointing at the pre-polish
+  // text.
+  const pendingGeneratedSyncRef = useRef(false);
+  const onEditorReady = (html: string) => {
+    if (pendingGeneratedSyncRef.current) {
+      pendingGeneratedSyncRef.current = false;
+      lastGeneratedRef.current = html;
+    }
+  };
+
   // Re-sync local edit state when a different week's draft loads. Keyed on
   // id + week so it doesn't stomp on in-progress typing when the query
-  // silently refetches the same row.
+  // silently refetches the same row. Existing rows are plain text (bare
+  // newlines) predating this ticket -- upgradeBlastBodyToHtml is a no-op for
+  // a body that's already HTML, and converts one that isn't into equivalent
+  // HTML paragraphs so nothing is lost visually in the editor.
   useEffect(() => {
-    setEditedBody(weekBlast?.body ?? '');
+    const upgraded = upgradeBlastBodyToHtml(weekBlast?.body ?? '');
+    setEditedBody(upgraded);
     setEditedSubject(weekBlast?.subject || buildDefaultBlastSubject(weekStartDate));
-    lastGeneratedRef.current = weekBlast?.body ?? '';
+    // Synchronous fallback baseline, corrected to Quill's normalized shape
+    // by onEditorReady the moment the editor finishes loading it (see
+    // pendingGeneratedSyncRef above).
+    lastGeneratedRef.current = upgraded;
+    pendingGeneratedSyncRef.current = true;
   }, [weekBlast?.id, weekStartDate]);
 
   const runDraft = async () => {
@@ -446,6 +496,7 @@ function BlastSlot({
     try {
       const { body, subject } = await blastsHook.generateDraft.mutateAsync(weekStartDate);
       lastGeneratedRef.current = body;
+      pendingGeneratedSyncRef.current = true;
       setEditedBody(body);
       if (weekBlast) {
         // Regenerating an existing draft only replaces the body -- her
@@ -586,7 +637,23 @@ function BlastSlot({
     const excludedSuffix = buildExcludedSuffix(weekBlast.excluded_staff_ids?.length ?? 0);
     return (
       <div className="space-y-2.5">
-        <div className="whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">{weekBlast.body}</div>
+        {/*
+          LRM-10: a sent blast can predate this ticket (plain text, bare
+          newlines) or postdate it (HTML). upgradeBlastBodyToHtml handles
+          both -- it's a no-op for a body that's already HTML, and converts
+          plain text into equivalent paragraphs -- so this one render path
+          covers old and new rows alike. Sanitized with the same allowlist
+          the server enforces before rendering, the same DOMPurify.sanitize +
+          dangerouslySetInnerHTML approach the app already uses for other
+          stored rich text (CombinedPrepView, MeetingOutcomeCapture,
+          DoctorReviewPrep, EvaluationViewer, InsightsDisplay).
+        */}
+        <div
+          className="prose prose-sm max-w-none rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground dark:prose-invert"
+          dangerouslySetInnerHTML={{
+            __html: DOMPurify.sanitize(upgradeBlastBodyToHtml(weekBlast.body), BLAST_SANITIZE_CONFIG),
+          }}
+        />
         <div className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
           Sent {weekBlast.sent_at && fmtSentAt(weekBlast.sent_at)} · {summary}{excludedSuffix}
         </div>
@@ -601,12 +668,19 @@ function BlastSlot({
         <Label htmlFor="blast-subject" className="mb-1.5 block text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Subject</Label>
         <Input id="blast-subject" value={editedSubject} onChange={(e) => setEditedSubject(e.target.value)} />
       </div>
-      <Textarea value={editedBody} onChange={(e) => setEditedBody(e.target.value)} rows={10} />
+      <RichTextEditor
+        value={editedBody}
+        onChange={setEditedBody}
+        onReady={onEditorReady}
+        modules={BLAST_QUILL_MODULES}
+        placeholder="Write the blast body here…"
+        className="bg-background rounded-md [&_.ql-editor]:min-h-[220px]"
+      />
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
           variant="outline"
-          disabled={!editedBody.trim() || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending}
+          disabled={!hasBlastBodyContent(editedBody) || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending}
           onClick={() => weekBlast && blastsHook.updateBlastBody.mutate({ id: weekBlast.id, body: editedBody, subject: editedSubject })}
         >
           {blastsHook.updateBlastBody.isPending ? (
@@ -635,7 +709,7 @@ function BlastSlot({
         <Button
           size="sm"
           variant="outline"
-          disabled={!editedBody.trim() || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending || blastsHook.testSendBlast.isPending}
+          disabled={!hasBlastBodyContent(editedBody) || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending || blastsHook.testSendBlast.isPending}
           onClick={onTestSendClick}
         >
           {blastsHook.testSendBlast.isPending ? (
@@ -644,7 +718,7 @@ function BlastSlot({
             <><Send className="mr-1.5 h-4 w-4" />Send a test to me</>
           )}
         </Button>
-        <Button size="sm" className="ml-auto" disabled={!editedBody.trim() || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending || recipientsLoading} onClick={onSendClick}>
+        <Button size="sm" className="ml-auto" disabled={!hasBlastBodyContent(editedBody) || !weekBlast || drafting || polishing || blastsHook.updateBlastBody.isPending || recipientsLoading} onClick={onSendClick}>
           {recipientsLoading ? (
             <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Checking…</>
           ) : (

@@ -41,6 +41,7 @@ import { toast } from 'sonner';
 import { getLocationSubmissionGates, type SubmissionGates } from '@/lib/submissionStatus';
 import { nowUtc } from '@/lib/centralTime';
 import { getChicagoMonday } from '@/lib/plannerUtils';
+import { resolveStaffDetailViewState } from '@/lib/staffDetailViewState';
 
 type ExcusedSubmission = {
   id: string;
@@ -161,13 +162,60 @@ export default function StaffDetailV2() {
     })).sort((a, b) => getDomainOrderIndex(a.domain) - getDomainOrderIndex(b.domain));
   }, [rawData]);
 
-  // Get staff info from first available summary
-  const staffInfo = useMemo(() => {
+  // Staff header identity comes from a direct lookup on the staff table, not
+  // from the weekly-scores RPC. A real staff member with no scores yet (e.g.
+  // a brand-new hire whose first participation week hasn't started) still
+  // has a staff row, so the header must not depend on
+  // get_staff_all_weekly_scores returning any rows.
+  // (BUG: staff-not-found, verified 2026-09-14)
+  const {
+    data: directStaffInfo,
+    isLoading: staffInfoLoading,
+    error: staffInfoError,
+  } = useQuery({
+    queryKey: ['staff-identity', staffId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('staff')
+        .select(`
+          name,
+          role_id,
+          primary_location_id,
+          roles ( role_name ),
+          locations ( name, practice_groups!locations_org_fkey ( name ) )
+        `)
+        .eq('id', staffId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) return null;
+
+      const row = data as any;
+      return {
+        name: row.name as string,
+        role_id: (row.role_id as number | null) ?? 0,
+        role_name: (row.roles?.role_name as string | null) ?? '',
+        location_id: row.primary_location_id as string | null,
+        location_name: (row.locations?.name as string | null) ?? '',
+        group_name: (row.locations?.practice_groups?.name as string | null) ?? '',
+      };
+    },
+    enabled: !!staffId,
+  });
+
+  // Fallback identity, used only when the direct lookup above comes back
+  // empty. The RPC below authorizes a viewer via can_current_user_view_staff,
+  // which has a coach_scopes branch (e.g. a lead with is_lead plus a scope
+  // row passes without can_view_submissions) that the direct staff-table RLS
+  // policies do not mirror. That lets a viewer be authorized for the RPC
+  // while the direct lookup legitimately returns null, so falling back to
+  // the RPC's own week-summary data here keeps that viewer from seeing a
+  // false "Staff not found". (Codex review, PR #112, P1)
+  const rpcDerivedStaffInfo = useMemo(() => {
     const firstSummary = Array.from(weekSummaries.values())[0];
     if (!firstSummary) return null;
     return {
       name: firstSummary.staff_name,
-      email: firstSummary.staff_email,
       role_id: firstSummary.role_id,
       role_name: firstSummary.role_name,
       location_id: firstSummary.location_id,
@@ -175,6 +223,19 @@ export default function StaffDetailV2() {
       group_name: firstSummary.group_name,
     };
   }, [weekSummaries]);
+
+  // Decision table (direct lookup x RPC -> rendered state) lives in
+  // resolveStaffDetailViewState so it can be unit tested on its own.
+  // (Codex review, PR #112)
+  const staffDetailViewState = resolveStaffDetailViewState({
+    loading,
+    staffInfoLoading,
+    error,
+    staffInfoError: staffInfoError as Error | null,
+    directStaffInfo,
+    rpcDerivedStaffInfo,
+  });
+  const staffInfo = staffDetailViewState.kind === 'ready' ? staffDetailViewState.staffInfo : null;
 
   // Group weeks by year/month for accordion (filter out future weeks)
   const groupedWeeks = useMemo(() => {
@@ -344,7 +405,7 @@ export default function StaffDetailV2() {
     );
   }
 
-  if (loading) {
+  if (staffDetailViewState.kind === 'loading') {
     return (
       <div className="space-y-6">
         <Breadcrumb>
@@ -368,7 +429,11 @@ export default function StaffDetailV2() {
     );
   }
 
-  if (error || !staffInfo) {
+  // Errors take precedence over "not found": a transient failure in either
+  // the identity lookup or the RPC must never claim the person does not
+  // exist. When both errored, this still renders a single error state.
+  // (Codex review, PR #112, P2)
+  if (staffDetailViewState.kind === 'error') {
     return (
       <div className="space-y-6">
         <Breadcrumb>
@@ -386,9 +451,35 @@ export default function StaffDetailV2() {
         </Breadcrumb>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-destructive">
-              {error ? `Error loading data: ${error.message}` : 'Staff not found'}
-            </p>
+            <p className="text-destructive">Error loading data: {staffDetailViewState.message}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Neither the direct staff-table lookup nor the RPC fallback (see
+  // rpcDerivedStaffInfo above) produced an identity, and neither errored.
+  // That combination is a genuine "not found." (Codex review, PR #112, P1)
+  if (staffDetailViewState.kind === 'not-found' || !staffInfo) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/coach" className="cursor-pointer" onClick={(e) => { e.preventDefault(); navigate('/coach'); }}>
+                Coach Dashboard
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Not found</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-destructive">Staff not found</p>
           </CardContent>
         </Card>
       </div>
@@ -417,11 +508,17 @@ export default function StaffDetailV2() {
         <div className="space-y-1">
           <h1 className="text-3xl font-bold">{staffInfo.name}</h1>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span>{resolveRole(staffInfo.role_id, staffInfo.role_name)}</span>
-            <span>•</span>
-            <span>{staffInfo.location_name}</span>
-            <span>•</span>
-            <span>{staffInfo.group_name}</span>
+            {/* Omit absent segments instead of rendering dangling bullets
+                when role/location/group is missing. */}
+            <span>
+              {[
+                resolveRole(staffInfo.role_id, staffInfo.role_name),
+                staffInfo.location_name,
+                staffInfo.group_name,
+              ]
+                .filter(Boolean)
+                .join(' • ')}
+            </span>
           </div>
         </div>
       </div>
@@ -474,7 +571,7 @@ export default function StaffDetailV2() {
           {groupedWeeks.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
-                No performance history available
+                No pro moves or scores yet for this staff member
               </CardContent>
             </Card>
           ) : (
@@ -614,7 +711,7 @@ export default function StaffDetailV2() {
               staffInfo={{
                 name: staffInfo.name,
                 role_id: staffInfo.role_id,
-                location_id: staffInfo.location_id,
+                location_id: staffInfo.location_id ?? undefined,
               }}
               currentUserId={user.id}
             />

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, waitFor } from '@testing-library/react';
 import { RichTextEditor } from './RichTextEditor';
+import { reconcileNormalizedLoad } from '@/lib/leadWeekBlastHtml';
 
 // Reaches the live Quill instance the way the wrapper itself does, so tests
 // can drive "user typing" through Quill's own API -- jsdom doesn't run a
@@ -324,5 +325,43 @@ describe('RichTextEditor', () => {
       expect(container.querySelector('.ql-editor')).not.toBeNull();
     });
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  // QA fix (LRM-10): pins the actual bug -- BlastSlot keeps two baselines
+  // (its visible "current content" state and a "last generated" ref) that
+  // both need to end up on the SAME normalized string after a programmatic
+  // load, using reconcileNormalizedLoad's guard (only overwrite the content
+  // baseline if nothing touched it since the write). The original fix only
+  // corrected one of the two baselines from onReady, so they silently
+  // diverged on every load that Quill normalizes (e.g. <ul> -> <ol
+  // data-list="bullet">), producing a false "you have unsaved edits"
+  // reading forever after. This models BlastSlot's exact wiring: a content
+  // ref and a generated-baseline ref, both fed from the same onReady call.
+  it('lets a caller keep a content baseline and a generated baseline equal to the normalized load, not the raw value it wrote', async () => {
+    const writtenValue = '<ul><li>One</li></ul>';
+    const contentRef = { current: writtenValue };
+    const lastGeneratedRef = { current: '' };
+
+    render(
+      <RichTextEditor
+        value={writtenValue}
+        onChange={() => {}}
+        onReady={(html) => {
+          lastGeneratedRef.current = html;
+          contentRef.current = reconcileNormalizedLoad(contentRef.current, writtenValue, html);
+        }}
+        modules={{ toolbar: false }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(lastGeneratedRef.current).toContain('data-list="bullet"');
+    });
+    // Quill actually rewrote the markup -- if it hadn't, this test would
+    // prove nothing.
+    expect(lastGeneratedRef.current).not.toBe(writtenValue);
+    // Both baselines land on the exact same normalized string, so a
+    // same-content comparison (shouldConfirmRegenerate) reads "unchanged".
+    expect(contentRef.current).toBe(lastGeneratedRef.current);
   });
 });

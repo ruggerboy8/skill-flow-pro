@@ -49,6 +49,32 @@ export function upgradeBlastBodyToHtml(value: string | null | undefined): string
 }
 
 /**
+ * QA fix (LRM-10): decides what a "current content" baseline should become
+ * after a programmatic write settles and reports its normalized HTML back
+ * (RichTextEditor's onReady). `writtenValue` is the raw string that was
+ * asked to load; `normalizedValue` is what the editor actually normalized
+ * it to (e.g. Quill rewrites `<ul>` to `<ol data-list="bullet">` with no
+ * 'text-change' event at all). Replaces `currentValue` with
+ * `normalizedValue` only if `currentValue` still equals `writtenValue` --
+ * i.e. nothing (a keystroke) touched it between the write and onReady
+ * firing. If it no longer matches, a real edit landed first and must not be
+ * clobbered, so `currentValue` is returned unchanged.
+ *
+ * Was missing for BlastSlot's `editedBody` state (only `lastGeneratedRef`
+ * was corrected this way), which meant `editedBody` stayed on the raw
+ * pre-normalization string forever, and `shouldConfirmRegenerate`'s
+ * `editedBody` vs. `lastGeneratedRef` comparison read every fresh draft
+ * with a bullet list as "edited" the instant it loaded.
+ */
+export function reconcileNormalizedLoad(
+  currentValue: string,
+  writtenValue: string,
+  normalizedValue: string,
+): string {
+  return currentValue === writtenValue ? normalizedValue : currentValue;
+}
+
+/**
  * Whether an HTML blast body has any real text content, as opposed to an
  * empty Quill document -- a blank RichTextEditor's canonical empty value is
  * `<p><br></p>`, not `''`, so a bare `.trim()` (the plain-text-era check)

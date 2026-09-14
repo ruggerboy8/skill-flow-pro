@@ -33,7 +33,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { Skeleton } from '@/components/ui/skeleton';
 import DOMPurify from 'dompurify';
-import { upgradeBlastBodyToHtml, hasBlastBodyContent } from '@/lib/leadWeekBlastHtml';
+import { upgradeBlastBodyToHtml, hasBlastBodyContent, reconcileNormalizedLoad } from '@/lib/leadWeekBlastHtml';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -461,16 +461,35 @@ function BlastSlot({
   // content. Comparing a freshly-loaded body against itself must not read
   // as an edit, so whenever we set editedBody to a value we intend as the
   // new baseline (a loaded draft, or a fresh Regenerate result), this flag
-  // arms the editor's onReady callback to correct lastGeneratedRef to
-  // Quill's own normalized output once it settles -- not the raw string we
-  // asked it to load. Deliberately NOT armed for Polish (see onPolishClick):
-  // that intentionally leaves lastGeneratedRef pointing at the pre-polish
-  // text.
+  // arms the editor's onReady callback to correct BOTH lastGeneratedRef and
+  // editedBody to Quill's own normalized output once it settles -- not the
+  // raw string we asked it to load.
+  //
+  // QA fix (Codex review): the first version of this only corrected
+  // lastGeneratedRef, leaving editedBody on the raw pre-normalization
+  // string forever. Since the draft/regenerate prompt emits <ul><li> and
+  // Quill rewrites that to <ol data-list="bullet">, editedBody and
+  // lastGeneratedRef differed after essentially every draft with zero user
+  // edits, so shouldConfirmRegenerate popped "Replace the current draft?
+  // Your edits will be lost" on the very next Regenerate click.
+  // pendingWrittenValueRef records exactly what was written so
+  // reconcileNormalizedLoad can tell "nothing touched editedBody since the
+  // write" (safe to replace with the normalized value) apart from "a
+  // keystroke landed first" (must not clobber it) -- onReady only ever
+  // fires for a silent, non-user write, but this guard is cheap insurance
+  // against any path where a keystroke could land in the gap between the
+  // write and onReady firing.
+  //
+  // Deliberately NOT armed for Polish (see onPolishClick): that
+  // intentionally leaves lastGeneratedRef (and now editedBody's sync)
+  // pointing at the pre-polish text.
   const pendingGeneratedSyncRef = useRef(false);
+  const pendingWrittenValueRef = useRef('');
   const onEditorReady = (html: string) => {
     if (pendingGeneratedSyncRef.current) {
       pendingGeneratedSyncRef.current = false;
       lastGeneratedRef.current = html;
+      setEditedBody((current) => reconcileNormalizedLoad(current, pendingWrittenValueRef.current, html));
     }
   };
 
@@ -488,6 +507,7 @@ function BlastSlot({
     // by onEditorReady the moment the editor finishes loading it (see
     // pendingGeneratedSyncRef above).
     lastGeneratedRef.current = upgraded;
+    pendingWrittenValueRef.current = upgraded;
     pendingGeneratedSyncRef.current = true;
   }, [weekBlast?.id, weekStartDate]);
 
@@ -496,6 +516,7 @@ function BlastSlot({
     try {
       const { body, subject } = await blastsHook.generateDraft.mutateAsync(weekStartDate);
       lastGeneratedRef.current = body;
+      pendingWrittenValueRef.current = body;
       pendingGeneratedSyncRef.current = true;
       setEditedBody(body);
       if (weekBlast) {

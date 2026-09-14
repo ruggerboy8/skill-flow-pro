@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isLikelyBlastHtml, upgradeBlastBodyToHtml, blastHtmlToPlainText, hasBlastBodyContent,
+  reconcileNormalizedLoad,
 } from './leadWeekBlastHtml';
 
 describe('isLikelyBlastHtml', () => {
@@ -77,6 +78,31 @@ describe('upgradeBlastBodyToHtml', () => {
 
   it('drops empty/whitespace-only paragraphs from leading/trailing blank lines', () => {
     expect(upgradeBlastBodyToHtml('\n\nOnly paragraph.\n\n')).toBe('<p>Only paragraph.</p>');
+  });
+});
+
+describe('reconcileNormalizedLoad', () => {
+  // QA fix (LRM-10): this is the exact bug -- a bullet-list draft loads,
+  // Quill normalizes <ul> to <ol data-list="bullet">, and without this sync
+  // the visible "current" state stayed on the raw pre-normalization string
+  // forever, so it never matched the (correctly normalized) generated
+  // baseline again.
+  it('replaces the current value with the normalized one when nothing changed since the write', () => {
+    const written = '<ul><li>One</li></ul>';
+    const normalized = '<ol data-list="bullet"><li>One</li></ol>';
+    expect(reconcileNormalizedLoad(written, written, normalized)).toBe(normalized);
+  });
+
+  it('keeps the current value when a real edit landed before the normalized report arrived', () => {
+    const written = '<ul><li>One</li></ul>';
+    const normalized = '<ol data-list="bullet"><li>One</li></ol>';
+    const edited = '<p>User typed something else</p>';
+    expect(reconcileNormalizedLoad(edited, written, normalized)).toBe(edited);
+  });
+
+  it('is a no-op when the normalized value happens to equal the written value', () => {
+    const same = '<p>Hello doctors</p>';
+    expect(reconcileNormalizedLoad(same, same, same)).toBe(same);
   });
 });
 

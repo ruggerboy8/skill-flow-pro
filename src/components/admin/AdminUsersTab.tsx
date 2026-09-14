@@ -54,6 +54,7 @@ interface User {
 interface Role {
   role_id: number;
   role_name: string;
+  archetype_code?: string | null;
 }
 
 interface Location {
@@ -145,7 +146,7 @@ export function AdminUsersTab() {
       }
 
       // Scope roles to the org's practice_type when not a platform admin
-      let rolesQuery = supabase.from("roles").select("role_id, role_name, practice_type").eq("active", true).order("role_name");
+      let rolesQuery = supabase.from("roles").select("role_id, role_name, practice_type, archetype_code").eq("active", true).order("role_name");
 
       if (organizationId) {
         const { data: orgData } = await supabase

@@ -1,6 +1,6 @@
 /**
- * Role archetype system — single source of truth for how the platform
- * treats each role behaviorally.
+ * Role archetype system. This is the single source of truth for how the
+ * platform treats each role behaviorally.
  *
  * `archetype_code` is stored on the `roles` table and backfilled for all
  * existing roles. System behavior is driven by this map, NOT by raw role_id
@@ -95,4 +95,34 @@ export const ARCHETYPE_OPTIONS = (Object.keys(ARCHETYPES) as ArchetypeCode[]).ma
 export function getArchetype(code: string | null | undefined): ArchetypeBehavior | undefined {
   if (!code) return undefined;
   return ARCHETYPES[code as ArchetypeCode];
+}
+
+/**
+ * Archetypes whose `roles` rows must never be offered as a selectable
+ * role_id when inviting or reassigning a staff member's role.
+ *
+ * `lead_dental_assistant` has `hasPlannerTab: false` above (see its comment):
+ * the weekly planner has no tab to build rotations for it, so a staff row
+ * created with this role_id gets zero weekly Pro Moves, forever. The
+ * correct way to mark someone a lead is the BASE role (e.g. Dental
+ * Assistant) plus `staff.is_lead = true`. That's the config used by every
+ * real Alcan lead. Picking "Lead Dental Assistant" as a role_id directly is
+ * a UI trap, not a valid alternative (role-picker-trap ticket, 2026-09).
+ *
+ * This does not make the role rows themselves invalid. They're still used
+ * for competency lookups (see useLeadRoleId) and content authoring, so they
+ * stay in the `roles` table and keep showing up correctly for any staff row
+ * that already has one. Only the list of pickable options is filtered.
+ */
+export const DISPLAY_ONLY_ROLE_ARCHETYPES: ArchetypeCode[] = ['lead_dental_assistant'];
+
+/**
+ * True if a role should appear as an option in an assignable role picker
+ * (inviting a new staff member, or reassigning an existing one's role_id).
+ * Roles with no archetype_code (not yet backfilled) are treated as
+ * assignable rather than silently hidden.
+ */
+export function isAssignableRoleOption(role: { archetype_code?: string | null }): boolean {
+  if (!role.archetype_code) return true;
+  return !DISPLAY_ONLY_ROLE_ARCHETYPES.includes(role.archetype_code as ArchetypeCode);
 }

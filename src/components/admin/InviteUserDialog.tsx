@@ -25,10 +25,12 @@ import {
   type DeputyEmployee,
   type MatchConfidence,
 } from "@/lib/deputyMatching";
+import { isAssignableRoleOption } from "@/lib/roleArchetypes";
 
 interface Role {
   role_id: number;
   role_name: string;
+  archetype_code?: string | null;
 }
 
 interface Location {
@@ -139,6 +141,15 @@ export function InviteUserDialog({
 
   // Role (optional unless isParticipant)
   const [roleId, setRoleId] = useState("");
+
+  // Team lead flag, kept separate from role_id. The correct way to mark
+  // someone a lead is their normal role plus this flag, not a distinct
+  // "Lead ..." role_id (see isAssignableRoleOption / role-picker-trap ticket).
+  const [isLead, setIsLead] = useState(false);
+
+  // Only roles the weekly planner can actually build assignments for should
+  // be pickable here. See isAssignableRoleOption for why.
+  const assignableRoles = useMemo(() => roles.filter(isAssignableRoleOption), [roles]);
 
   // Participation
   const [isParticipant, setIsParticipant] = useState(false);
@@ -306,6 +317,7 @@ export function InviteUserDialog({
         email: formData.email,
         name: formData.name,
         is_participant: isCentralOffice ? false : isParticipant,
+        is_lead: isCentralOffice ? false : isLead,
         // Always send capabilities — participants can also have additional permissions
         capabilities,
       };
@@ -403,6 +415,7 @@ export function InviteUserDialog({
     setFormData({ email: "", name: "", group_id: "", location_id: "" });
     setUserType("clinic");
     setRoleId("");
+    setIsLead(false);
     setIsParticipant(false);
     setParticipationStartAt("");
     setCapabilities({ ...DEFAULT_CAPABILITIES });
@@ -498,6 +511,7 @@ export function InviteUserDialog({
                 setUserType(val);
                 if (val === "central") {
                   setIsParticipant(false);
+                  setIsLead(false);
                   setShowPermissions(true);
                   setFormData({ ...formData, group_id: "", location_id: "" });
                   setRoleId("");
@@ -575,7 +589,7 @@ export function InviteUserDialog({
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
-                    {roles.map((role) => (
+                    {assignableRoles.map((role) => (
                       <SelectItem key={role.role_id} value={role.role_id.toString()}>
                         {resolveRole(role.role_id, role.role_name)}
                       </SelectItem>
@@ -588,6 +602,24 @@ export function InviteUserDialog({
                   </p>
                 )}
               </div>
+
+              {/* ── Team lead flag ── */}
+              <label className="flex items-start gap-3 cursor-pointer rounded-md border border-border p-3">
+                <Checkbox
+                  id="is-lead"
+                  checked={isLead}
+                  onCheckedChange={(checked) => setIsLead(checked === true)}
+                  className="mt-0.5"
+                />
+                <div>
+                  <p className="text-sm font-medium leading-none">Team lead</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Marks this person as a location lead on top of their role above.
+                    Their weekly Pro Moves still come from that role, so there's no
+                    separate "Lead" role to pick.
+                  </p>
+                </div>
+              </label>
 
               {/* ── Pro Move programme enrollment ── */}
               <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">

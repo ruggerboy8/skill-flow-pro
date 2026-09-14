@@ -33,7 +33,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { Skeleton } from '@/components/ui/skeleton';
 import DOMPurify from 'dompurify';
-import { upgradeBlastBodyToHtml, hasBlastBodyContent, reconcileNormalizedLoad } from '@/lib/leadWeekBlastHtml';
+import { upgradeBlastBodyToHtml, hasBlastBodyContent, reconcileNormalizedLoad, convertQuillListFlavors } from '@/lib/leadWeekBlastHtml';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -668,11 +668,17 @@ function BlastSlot({
           dangerouslySetInnerHTML approach the app already uses for other
           stored rich text (CombinedPrepView, MeetingOutcomeCapture,
           DoctorReviewPrep, EvaluationViewer, InsightsDisplay).
+
+          Codex review (PR #116, P2): convertQuillListFlavors runs BEFORE
+          DOMPurify -- DOMPurify's ALLOWED_ATTR: [] below strips data-list
+          along with every other attribute, so a Quill-flavored bullet list
+          (`<ol><li data-list="bullet">`) has to become a real `<ul>` first
+          or it renders as a numbered list here too.
         */}
         <div
           className="prose prose-sm max-w-none rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground dark:prose-invert"
           dangerouslySetInnerHTML={{
-            __html: DOMPurify.sanitize(upgradeBlastBodyToHtml(weekBlast.body), BLAST_SANITIZE_CONFIG),
+            __html: DOMPurify.sanitize(convertQuillListFlavors(upgradeBlastBodyToHtml(weekBlast.body)), BLAST_SANITIZE_CONFIG),
           }}
         />
         <div className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">

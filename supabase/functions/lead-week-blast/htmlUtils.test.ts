@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   sanitizeBlastHtml, blastHtmlToPlainText, hasVisibleText, upgradeBlastBodyToHtml,
-  CANONICAL_BLAST_TAGS,
+  CANONICAL_BLAST_TAGS, convertQuillListFlavors,
 } from './htmlUtils';
 
 describe('sanitizeBlastHtml', () => {
@@ -172,12 +172,89 @@ describe('sanitizeBlastHtml', () => {
       '<p><img src=x onerror=alert(1)></p>',
       '<a href="javascript:alert(1)">click</a>',
       '<<script>alert(1)</script>',
+      // Codex review (PR #116, P2): Quill-flavored list markup, now rewritten
+      // by convertQuillListFlavors ahead of the stripping pass above -- pin
+      // that the rewrite itself never introduces a bracket the closed
+      // alphabet doesn't recognize.
+      '<ol><li data-list="bullet"><span class="ql-ui" contenteditable="false"></span>One</li></ol>',
+      '<ol><li data-list="bullet" onclick=alert(1)>One</li></ol>',
     ];
 
     it.each(payloads)('holds for payload: %s', (payload) => {
       const result = sanitizeBlastHtml(payload);
       expect(everyAngleBracketStartsACanonicalTag(result)).toBe(true);
     });
+  });
+});
+
+describe('convertQuillListFlavors', () => {
+  // Codex review (PR #116, P2): the exact shape Quill 2 actually produces
+  // for a bullet list, pinned against RichTextEditor's own test fixtures
+  // (both flavors are `<ol><li data-list="...">`, never a bare `<ul>`).
+  it('restores a Quill-flavored bullet list to a real <ul>', () => {
+    const quillShaped = '<ol><li data-list="bullet"><span class="ql-ui" contenteditable="false"></span>One</li><li data-list="bullet"><span class="ql-ui" contenteditable="false"></span>Two</li></ol>';
+    expect(convertQuillListFlavors(quillShaped)).toBe(
+      '<ul><li><span class="ql-ui" contenteditable="false"></span>One</li><li><span class="ql-ui" contenteditable="false"></span>Two</li></ul>'
+    );
+  });
+
+  it('leaves a Quill-flavored ordered list as <ol>', () => {
+    const quillShaped = '<ol><li data-list="ordered">One</li><li data-list="ordered">Two</li></ol>';
+    expect(convertQuillListFlavors(quillShaped)).toBe('<ol><li>One</li><li>Two</li></ol>');
+  });
+
+  it('treats an <li> with no data-list attribute as matching its container', () => {
+    expect(convertQuillListFlavors('<ul><li>One</li></ul>')).toBe('<ul><li>One</li></ul>');
+    expect(convertQuillListFlavors('<ol><li>One</li></ol>')).toBe('<ol><li>One</li></ol>');
+  });
+
+  // Quill's mixed case: bullet and ordered lists typed back to back collapse
+  // into one <ol> holding both flavors of <li>. Split conservatively into
+  // adjacent lists, in the order the items appeared -- never merged or
+  // re-sorted.
+  it('splits a mixed <ol> (both li flavors) into adjacent <ul> and <ol> runs, in order', () => {
+    const mixed = '<ol><li data-list="bullet">Bullet one</li><li data-list="bullet">Bullet two</li><li data-list="ordered">Ordered one</li></ol>';
+    expect(convertQuillListFlavors(mixed)).toBe(
+      '<ul><li>Bullet one</li><li>Bullet two</li></ul><ol><li>Ordered one</li></ol>'
+    );
+  });
+
+  it('splits an alternating mixed list into one run per flavor change', () => {
+    const alternating = '<ol><li data-list="bullet">A</li><li data-list="ordered">B</li><li data-list="bullet">C</li></ol>';
+    expect(convertQuillListFlavors(alternating)).toBe(
+      '<ul><li>A</li></ul><ol><li>B</li></ol><ul><li>C</li></ul>'
+    );
+  });
+
+  it('leaves non-list HTML untouched', () => {
+    expect(convertQuillListFlavors('<p><strong>Focus</strong></p>')).toBe('<p><strong>Focus</strong></p>');
+  });
+
+  it('is empty-safe', () => {
+    expect(convertQuillListFlavors(null)).toBe('');
+    expect(convertQuillListFlavors(undefined)).toBe('');
+    expect(convertQuillListFlavors('')).toBe('');
+  });
+});
+
+describe('sanitizeBlastHtml + convertQuillListFlavors integration', () => {
+  // The actual bug: a Quill-flavored bullet list survived sanitizeBlastHtml
+  // as a bare, attribute-stripped <ol> -- a numbered list -- because
+  // ALLOWED_TAGS's attribute-stripping pass threw data-list away before
+  // anything read it. This is the end-to-end regression pin.
+  it('a Quill-shaped bullet list survives sanitizeBlastHtml as a <ul>, not a numbered list', () => {
+    const quillShaped = '<ol><li data-list="bullet"><span class="ql-ui" contenteditable="false"></span>One</li><li data-list="bullet"><span class="ql-ui" contenteditable="false"></span>Two</li></ol>';
+    expect(sanitizeBlastHtml(quillShaped)).toBe('<ul><li>One</li><li>Two</li></ul>');
+  });
+
+  it('a genuinely ordered list stays an <ol> through sanitizeBlastHtml', () => {
+    const quillShaped = '<ol><li data-list="ordered"><span class="ql-ui" contenteditable="false"></span>One</li><li data-list="ordered"><span class="ql-ui" contenteditable="false"></span>Two</li></ol>';
+    expect(sanitizeBlastHtml(quillShaped)).toBe('<ol><li>One</li><li>Two</li></ol>');
+  });
+
+  it('a mixed Quill list sanitizes to adjacent <ul> and <ol> blocks', () => {
+    const mixed = '<ol><li data-list="bullet">Bullet</li><li data-list="ordered">Ordered</li></ol>';
+    expect(sanitizeBlastHtml(mixed)).toBe('<ul><li>Bullet</li></ul><ol><li>Ordered</li></ol>');
   });
 });
 

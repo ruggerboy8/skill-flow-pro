@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isLikelyBlastHtml, upgradeBlastBodyToHtml, blastHtmlToPlainText, hasBlastBodyContent,
-  reconcileNormalizedLoad,
+  reconcileNormalizedLoad, convertQuillListFlavors,
 } from './leadWeekBlastHtml';
 
 describe('isLikelyBlastHtml', () => {
@@ -78,6 +78,56 @@ describe('upgradeBlastBodyToHtml', () => {
 
   it('drops empty/whitespace-only paragraphs from leading/trailing blank lines', () => {
     expect(upgradeBlastBodyToHtml('\n\nOnly paragraph.\n\n')).toBe('<p>Only paragraph.</p>');
+  });
+});
+
+describe('convertQuillListFlavors', () => {
+  // Codex review (PR #116, P2): the exact shape Quill 2 actually produces
+  // for a bullet list, pinned against RichTextEditor's own test fixtures
+  // (both flavors are `<ol><li data-list="...">`, never a bare `<ul>`).
+  it('restores a Quill-flavored bullet list to a real <ul>', () => {
+    const quillShaped = '<ol><li data-list="bullet"><span class="ql-ui" contenteditable="false"></span>One</li><li data-list="bullet"><span class="ql-ui" contenteditable="false"></span>Two</li></ol>';
+    expect(convertQuillListFlavors(quillShaped)).toBe(
+      '<ul><li><span class="ql-ui" contenteditable="false"></span>One</li><li><span class="ql-ui" contenteditable="false"></span>Two</li></ul>'
+    );
+  });
+
+  it('leaves a Quill-flavored ordered list as <ol>', () => {
+    const quillShaped = '<ol><li data-list="ordered">One</li><li data-list="ordered">Two</li></ol>';
+    expect(convertQuillListFlavors(quillShaped)).toBe('<ol><li>One</li><li>Two</li></ol>');
+  });
+
+  it('treats an <li> with no data-list attribute as matching its container', () => {
+    expect(convertQuillListFlavors('<ul><li>One</li></ul>')).toBe('<ul><li>One</li></ul>');
+    expect(convertQuillListFlavors('<ol><li>One</li></ol>')).toBe('<ol><li>One</li></ol>');
+  });
+
+  // Quill's mixed case: bullet and ordered lists typed back to back collapse
+  // into one <ol> holding both flavors of <li>. Split conservatively into
+  // adjacent lists, in the order the items appeared -- never merged or
+  // re-sorted.
+  it('splits a mixed <ol> (both li flavors) into adjacent <ul> and <ol> runs, in order', () => {
+    const mixed = '<ol><li data-list="bullet">Bullet one</li><li data-list="bullet">Bullet two</li><li data-list="ordered">Ordered one</li></ol>';
+    expect(convertQuillListFlavors(mixed)).toBe(
+      '<ul><li>Bullet one</li><li>Bullet two</li></ul><ol><li>Ordered one</li></ol>'
+    );
+  });
+
+  it('splits an alternating mixed list into one run per flavor change', () => {
+    const alternating = '<ol><li data-list="bullet">A</li><li data-list="ordered">B</li><li data-list="bullet">C</li></ol>';
+    expect(convertQuillListFlavors(alternating)).toBe(
+      '<ul><li>A</li></ul><ol><li>B</li></ol><ul><li>C</li></ul>'
+    );
+  });
+
+  it('leaves non-list HTML untouched', () => {
+    expect(convertQuillListFlavors('<p><strong>Focus</strong></p>')).toBe('<p><strong>Focus</strong></p>');
+  });
+
+  it('is empty-safe', () => {
+    expect(convertQuillListFlavors(null)).toBe('');
+    expect(convertQuillListFlavors(undefined)).toBe('');
+    expect(convertQuillListFlavors('')).toBe('');
   });
 });
 

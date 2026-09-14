@@ -395,7 +395,7 @@ export default function StaffDetailV2() {
   }
 
   // The staff row itself is the source of truth for whether this person
-  // exists — a missing/failed lookup here is a genuine "not found." This is
+  // exists. A missing/failed lookup here is a genuine "not found." This is
   // intentionally independent of the weekly-scores RPC below: that RPC can
   // legitimately return zero rows for a real staff member (see comment on
   // staffInfo above).
@@ -473,11 +473,17 @@ export default function StaffDetailV2() {
         <div className="space-y-1">
           <h1 className="text-3xl font-bold">{staffInfo.name}</h1>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span>{resolveRole(staffInfo.role_id, staffInfo.role_name)}</span>
-            <span>•</span>
-            <span>{staffInfo.location_name}</span>
-            <span>•</span>
-            <span>{staffInfo.group_name}</span>
+            {/* Omit absent segments instead of rendering dangling bullets
+                when role/location/group is missing. */}
+            <span>
+              {[
+                resolveRole(staffInfo.role_id, staffInfo.role_name),
+                staffInfo.location_name,
+                staffInfo.group_name,
+              ]
+                .filter(Boolean)
+                .join(' • ')}
+            </span>
           </div>
         </div>
       </div>

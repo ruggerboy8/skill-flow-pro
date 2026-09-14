@@ -96,3 +96,33 @@ export function getArchetype(code: string | null | undefined): ArchetypeBehavior
   if (!code) return undefined;
   return ARCHETYPES[code as ArchetypeCode];
 }
+
+/**
+ * Archetypes whose `roles` rows must never be offered as a selectable
+ * role_id when inviting or reassigning a staff member's role.
+ *
+ * `lead_dental_assistant` has `hasPlannerTab: false` above (see its comment):
+ * the weekly planner has no tab to build rotations for it, so a staff row
+ * created with this role_id gets zero weekly Pro Moves, forever. The
+ * correct way to mark someone a lead is the BASE role (e.g. Dental
+ * Assistant) plus `staff.is_lead = true` — that's the config used by every
+ * real Alcan lead. Picking "Lead Dental Assistant" as a role_id directly is
+ * a UI trap, not a valid alternative (role-picker-trap ticket, 2026-09).
+ *
+ * This does not make the role rows themselves invalid — they're still used
+ * for competency lookups (see useLeadRoleId) and content authoring, so they
+ * stay in the `roles` table and keep showing up correctly for any staff row
+ * that already has one. Only the list of pickable options is filtered.
+ */
+export const DISPLAY_ONLY_ROLE_ARCHETYPES: ArchetypeCode[] = ['lead_dental_assistant'];
+
+/**
+ * True if a role should appear as an option in an assignable role picker
+ * (inviting a new staff member, or reassigning an existing one's role_id).
+ * Roles with no archetype_code (not yet backfilled) are treated as
+ * assignable rather than silently hidden.
+ */
+export function isAssignableRoleOption(role: { archetype_code?: string | null }): boolean {
+  if (!role.archetype_code) return true;
+  return !DISPLAY_ONLY_ROLE_ARCHETYPES.includes(role.archetype_code as ArchetypeCode);
+}

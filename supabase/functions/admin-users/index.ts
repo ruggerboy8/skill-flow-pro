@@ -305,7 +305,7 @@ serve(async (req: Request) => {
       }
 
       case "invite_user": {
-        const { email, name, role_id, location_id, organization_id, participation_start_at, is_participant, capabilities } = payload ?? {};
+        const { email, name, role_id, location_id, organization_id, participation_start_at, is_participant, is_lead, capabilities } = payload ?? {};
 
         // Determine participant status — default true for backward compatibility
         const isParticipantUser: boolean = is_participant !== undefined ? Boolean(is_participant) : true;
@@ -415,6 +415,9 @@ serve(async (req: Request) => {
           email,
           primary_location_id: resolvedLocationId,
           is_participant: isParticipantUser,
+          // Leads use their normal role_id plus this flag, never a distinct
+          // "Lead ..." role_id — see role-picker-trap ticket.
+          is_lead: is_lead === true,
           user_id: invite.user.id,
         };
 

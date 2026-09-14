@@ -532,6 +532,57 @@ serve(async (req: Request) => {
           }
         }
 
+        // 4.5) For Team leads, provision Team-surface access. Setting
+        // staff.is_lead alone is not enough: is_coach_or_admin() (and every
+        // RLS policy gated on it) also requires user_capabilities.can_view_
+        // submissions = true, and the Team surface reads coach_scopes to know
+        // which staff a lead can see. Mirrors the coach_scopes + user_
+        // capabilities writes in the role_preset="lead" branch below, scoped
+        // to the invitee's own location (narrower than the org-wide scope
+        // most existing leads carry; an admin can widen this later via the
+        // role_preset UI). Both writes are upserts so they're safe to retry,
+        // and failures here are logged loudly but non-fatal: the staff row
+        // and auth user already exist, and we don't want to strand a half-
+        // created invite over a secondary write.
+        if (is_lead === true && staff?.id) {
+          const { error: leadScopeErr } = await admin
+            .from("coach_scopes")
+            .upsert(
+              {
+                staff_id: staff.id,
+                scope_type: 'location',
+                scope_id: resolvedLocationId,
+              },
+              { onConflict: 'staff_id,scope_type,scope_id' },
+            );
+
+          if (leadScopeErr) {
+            console.error(
+              `Failed to create coach_scope for lead invite (staff_id=${staff.id}):`,
+              leadScopeErr,
+            );
+          }
+
+          const { error: leadCapsErr } = await admin
+            .from("user_capabilities")
+            .upsert(
+              {
+                staff_id: staff.id,
+                can_view_submissions: true,
+                is_participant: isParticipantUser,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'staff_id' },
+            );
+
+          if (leadCapsErr) {
+            console.error(
+              `Failed to upsert user_capabilities for lead invite (staff_id=${staff.id}):`,
+              leadCapsErr,
+            );
+          }
+        }
+
         // 5) Update user metadata with staff_id
         await admin.auth.admin.updateUserById(invite.user.id, {
           user_metadata: { staff_id: staff.id }
@@ -1876,7 +1927,9 @@ async function rejectDisplayOnlyRole(admin: any, roleId: number): Promise<Respon
     .maybeSingle();
   if (error) {
     console.error("rejectDisplayOnlyRole: roles lookup failed", error);
-    return null; // don't block the request on a transient lookup failure
+    // Fail closed: a schema-cache hiccup here must not let a display-only
+    // role_id slip through. The caller can retry.
+    return json({ error: "Could not verify the selected role. Try again." }, 500);
   }
   if (role?.archetype_code && DISPLAY_ONLY_ROLE_ARCHETYPES.includes(role.archetype_code)) {
     return json(

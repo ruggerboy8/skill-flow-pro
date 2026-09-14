@@ -161,20 +161,46 @@ export default function StaffDetailV2() {
     })).sort((a, b) => getDomainOrderIndex(a.domain) - getDomainOrderIndex(b.domain));
   }, [rawData]);
 
-  // Get staff info from first available summary
-  const staffInfo = useMemo(() => {
-    const firstSummary = Array.from(weekSummaries.values())[0];
-    if (!firstSummary) return null;
-    return {
-      name: firstSummary.staff_name,
-      email: firstSummary.staff_email,
-      role_id: firstSummary.role_id,
-      role_name: firstSummary.role_name,
-      location_id: firstSummary.location_id,
-      location_name: firstSummary.location_name,
-      group_name: firstSummary.group_name,
-    };
-  }, [weekSummaries]);
+  // Staff header identity comes from a direct lookup on the staff table, not
+  // from the weekly-scores RPC. A real staff member with no scores yet (e.g.
+  // a brand-new hire whose first participation week hasn't started) still
+  // has a staff row, so the header must not depend on
+  // get_staff_all_weekly_scores returning any rows.
+  // (BUG: staff-not-found, verified 2026-09-14)
+  const {
+    data: staffInfo,
+    isLoading: staffInfoLoading,
+    error: staffInfoError,
+  } = useQuery({
+    queryKey: ['staff-identity', staffId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('staff')
+        .select(`
+          name,
+          role_id,
+          primary_location_id,
+          roles ( role_name ),
+          locations ( name, practice_groups!locations_org_fkey ( name ) )
+        `)
+        .eq('id', staffId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) return null;
+
+      const row = data as any;
+      return {
+        name: row.name as string,
+        role_id: (row.role_id as number | null) ?? 0,
+        role_name: (row.roles?.role_name as string | null) ?? '',
+        location_id: row.primary_location_id as string | null,
+        location_name: (row.locations?.name as string | null) ?? '',
+        group_name: (row.locations?.practice_groups?.name as string | null) ?? '',
+      };
+    },
+    enabled: !!staffId,
+  });
 
   // Group weeks by year/month for accordion (filter out future weeks)
   const groupedWeeks = useMemo(() => {
@@ -344,7 +370,7 @@ export default function StaffDetailV2() {
     );
   }
 
-  if (loading) {
+  if (loading || staffInfoLoading) {
     return (
       <div className="space-y-6">
         <Breadcrumb>
@@ -368,7 +394,39 @@ export default function StaffDetailV2() {
     );
   }
 
-  if (error || !staffInfo) {
+  // The staff row itself is the source of truth for whether this person
+  // exists — a missing/failed lookup here is a genuine "not found." This is
+  // intentionally independent of the weekly-scores RPC below: that RPC can
+  // legitimately return zero rows for a real staff member (see comment on
+  // staffInfo above).
+  if (staffInfoError || !staffInfo) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/coach" className="cursor-pointer" onClick={(e) => { e.preventDefault(); navigate('/coach'); }}>
+                Coach Dashboard
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Not found</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-destructive">Staff not found</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // A real RPC failure (not just "zero rows") still stops the page here,
+  // same as before this fix.
+  if (error) {
     return (
       <div className="space-y-6">
         <Breadcrumb>
@@ -386,9 +444,7 @@ export default function StaffDetailV2() {
         </Breadcrumb>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-destructive">
-              {error ? `Error loading data: ${error.message}` : 'Staff not found'}
-            </p>
+            <p className="text-destructive">Error loading data: {error.message}</p>
           </CardContent>
         </Card>
       </div>
@@ -474,7 +530,7 @@ export default function StaffDetailV2() {
           {groupedWeeks.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
-                No performance history available
+                No pro moves or scores yet for this staff member
               </CardContent>
             </Card>
           ) : (
@@ -614,7 +670,7 @@ export default function StaffDetailV2() {
               staffInfo={{
                 name: staffInfo.name,
                 role_id: staffInfo.role_id,
-                location_id: staffInfo.location_id,
+                location_id: staffInfo.location_id ?? undefined,
               }}
               currentUserId={user.id}
             />

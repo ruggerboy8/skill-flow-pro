@@ -683,7 +683,7 @@ function RecipientReviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-lg">
+      <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Send to doctors</DialogTitle>
           <DialogDescription>Review who this goes to before sending. It cannot be sent twice.</DialogDescription>
@@ -706,7 +706,18 @@ function RecipientReviewDialog({
           <span className="text-xs font-semibold text-muted-foreground">{buildSendingSummary(recipients.length, excludedIds.size)}</span>
         </div>
 
-        <ScrollArea className="-mx-1 max-h-[45vh] px-1">
+        {/*
+          LRM-8: fixed header/subject/Everyone toggle above, fixed footer
+          below -- only this region scrolls. flex-1 (not a fixed max-h) lets
+          it take exactly whatever space is left inside DialogContent's own
+          max-h-[85vh] budget, so it stays reachable regardless of how many
+          location groups or doctors there are. min-h-0 overrides the flex
+          item's default min-height:auto, which otherwise refuses to shrink
+          below its content size and lets the list spill out of the dialog
+          uncontained instead of scrolling internally -- the actual bug
+          reported live with 15+ recipients.
+        */}
+        <ScrollArea className="-mx-1 min-h-0 flex-1 px-1">
           <div className="space-y-3">
             {groups.map((group) => {
               const groupChecked = isGroupFullyIncluded(excludedIds, group);

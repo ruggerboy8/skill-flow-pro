@@ -41,6 +41,7 @@ import { toast } from 'sonner';
 import { getLocationSubmissionGates, type SubmissionGates } from '@/lib/submissionStatus';
 import { nowUtc } from '@/lib/centralTime';
 import { getChicagoMonday } from '@/lib/plannerUtils';
+import { resolveStaffDetailViewState } from '@/lib/staffDetailViewState';
 
 type ExcusedSubmission = {
   id: string;
@@ -168,7 +169,7 @@ export default function StaffDetailV2() {
   // get_staff_all_weekly_scores returning any rows.
   // (BUG: staff-not-found, verified 2026-09-14)
   const {
-    data: staffInfo,
+    data: directStaffInfo,
     isLoading: staffInfoLoading,
     error: staffInfoError,
   } = useQuery({
@@ -201,6 +202,40 @@ export default function StaffDetailV2() {
     },
     enabled: !!staffId,
   });
+
+  // Fallback identity, used only when the direct lookup above comes back
+  // empty. The RPC below authorizes a viewer via can_current_user_view_staff,
+  // which has a coach_scopes branch (e.g. a lead with is_lead plus a scope
+  // row passes without can_view_submissions) that the direct staff-table RLS
+  // policies do not mirror. That lets a viewer be authorized for the RPC
+  // while the direct lookup legitimately returns null, so falling back to
+  // the RPC's own week-summary data here keeps that viewer from seeing a
+  // false "Staff not found". (Codex review, PR #112, P1)
+  const rpcDerivedStaffInfo = useMemo(() => {
+    const firstSummary = Array.from(weekSummaries.values())[0];
+    if (!firstSummary) return null;
+    return {
+      name: firstSummary.staff_name,
+      role_id: firstSummary.role_id,
+      role_name: firstSummary.role_name,
+      location_id: firstSummary.location_id,
+      location_name: firstSummary.location_name,
+      group_name: firstSummary.group_name,
+    };
+  }, [weekSummaries]);
+
+  // Decision table (direct lookup x RPC -> rendered state) lives in
+  // resolveStaffDetailViewState so it can be unit tested on its own.
+  // (Codex review, PR #112)
+  const staffDetailViewState = resolveStaffDetailViewState({
+    loading,
+    staffInfoLoading,
+    error,
+    staffInfoError: staffInfoError as Error | null,
+    directStaffInfo,
+    rpcDerivedStaffInfo,
+  });
+  const staffInfo = staffDetailViewState.kind === 'ready' ? staffDetailViewState.staffInfo : null;
 
   // Group weeks by year/month for accordion (filter out future weeks)
   const groupedWeeks = useMemo(() => {
@@ -370,7 +405,7 @@ export default function StaffDetailV2() {
     );
   }
 
-  if (loading || staffInfoLoading) {
+  if (staffDetailViewState.kind === 'loading') {
     return (
       <div className="space-y-6">
         <Breadcrumb>
@@ -394,12 +429,39 @@ export default function StaffDetailV2() {
     );
   }
 
-  // The staff row itself is the source of truth for whether this person
-  // exists. A missing/failed lookup here is a genuine "not found." This is
-  // intentionally independent of the weekly-scores RPC below: that RPC can
-  // legitimately return zero rows for a real staff member (see comment on
-  // staffInfo above).
-  if (staffInfoError || !staffInfo) {
+  // Errors take precedence over "not found": a transient failure in either
+  // the identity lookup or the RPC must never claim the person does not
+  // exist. When both errored, this still renders a single error state.
+  // (Codex review, PR #112, P2)
+  if (staffDetailViewState.kind === 'error') {
+    return (
+      <div className="space-y-6">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/coach" className="cursor-pointer" onClick={(e) => { e.preventDefault(); navigate('/coach'); }}>
+                Coach Dashboard
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Error</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-destructive">Error loading data: {staffDetailViewState.message}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Neither the direct staff-table lookup nor the RPC fallback (see
+  // rpcDerivedStaffInfo above) produced an identity, and neither errored.
+  // That combination is a genuine "not found." (Codex review, PR #112, P1)
+  if (staffDetailViewState.kind === 'not-found' || !staffInfo) {
     return (
       <div className="space-y-6">
         <Breadcrumb>
@@ -418,33 +480,6 @@ export default function StaffDetailV2() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-destructive">Staff not found</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // A real RPC failure (not just "zero rows") still stops the page here,
-  // same as before this fix.
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/coach" className="cursor-pointer" onClick={(e) => { e.preventDefault(); navigate('/coach'); }}>
-                Coach Dashboard
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Error</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-destructive">Error loading data: {error.message}</p>
           </CardContent>
         </Card>
       </div>

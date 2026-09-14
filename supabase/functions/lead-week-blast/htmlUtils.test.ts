@@ -4,7 +4,10 @@
 // actual server-side sanitizer, not a duplicate of it.
 
 import { describe, it, expect } from 'vitest';
-import { sanitizeBlastHtml, blastHtmlToPlainText, hasVisibleText, upgradeBlastBodyToHtml } from './htmlUtils';
+import {
+  sanitizeBlastHtml, blastHtmlToPlainText, hasVisibleText, upgradeBlastBodyToHtml,
+  CANONICAL_BLAST_TAGS,
+} from './htmlUtils';
 
 describe('sanitizeBlastHtml', () => {
   it('keeps allowlisted tags and strips attributes', () => {
@@ -81,6 +84,100 @@ describe('sanitizeBlastHtml', () => {
 
   it('escapes a bare stray angle bracket in plain text that never formed a tag at all', () => {
     expect(sanitizeBlastHtml('<p>score < 3 & rising</p>')).toBe('<p>score &lt; 3 & rising</p>');
+  });
+
+  // QA fix #2's exact payloads (bug: the trailing escape pass checked only
+  // that a `<` was followed by an allowlisted tag NAME plus a word boundary
+  // -- a word boundary matches after a space just as well as after `>`, so
+  // an attribute-bearing fragment glued to a legitimate duplicate tag
+  // survived with its attributes, and jsdom parsed a live onclick).
+  // Parses sanitized output the way a browser (or the client's
+  // dangerouslySetInnerHTML render) actually would, so "does onclick
+  // survive" is checked as a real DOM property, not a raw substring --
+  // the escaped fragment still contains the literal word "onclick" as
+  // inert text, which is exactly the safe outcome, so a plain
+  // `.not.toContain('onclick')` assertion is the wrong test (it was the
+  // same mistake made once already against QA's first sanitizer bypass).
+  function hasLiveOnclickAttribute(html: string): boolean {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    return div.querySelector('[onclick]') !== null;
+  }
+
+  describe('QA payload: attribute-bearing tag glued to a legitimate duplicate tag', () => {
+    const payload = '<strong onclick=alert(1) <strong>bold</strong>';
+
+    it('produces no element with a live onclick attribute when parsed as HTML', () => {
+      expect(hasLiveOnclickAttribute(sanitizeBlastHtml(payload))).toBe(false);
+    });
+
+    it('still renders the legitimate trailing <strong>bold</strong>', () => {
+      expect(sanitizeBlastHtml(payload)).toContain('<strong>bold</strong>');
+    });
+
+    it('produces exactly the expected sanitized output', () => {
+      expect(sanitizeBlastHtml(payload)).toBe('&lt;strong onclick=alert(1) <strong>bold</strong>');
+    });
+  });
+
+  describe('QA payload: attribute-bearing <p> glued to a legitimate duplicate tag', () => {
+    const payload = '<p onclick=alert(document.cookie) <p>click me</p>';
+
+    it('produces no element with a live onclick attribute when parsed as HTML', () => {
+      expect(hasLiveOnclickAttribute(sanitizeBlastHtml(payload))).toBe(false);
+    });
+
+    it('still renders the legitimate trailing <p>click me</p>', () => {
+      expect(sanitizeBlastHtml(payload)).toContain('<p>click me</p>');
+    });
+
+    it('produces exactly the expected sanitized output', () => {
+      expect(sanitizeBlastHtml(payload)).toBe('&lt;p onclick=alert(document.cookie) <p>click me</p>');
+    });
+  });
+
+  // Structural invariant, not another one-off payload assertion: whatever
+  // the exact shape of a future bypass attempt, sanitizeBlastHtml's output
+  // must never contain a `<` that begins anything other than one of the
+  // exact canonical tag literals. Checking this directly, rather than only
+  // asserting "no onclick" or "no <img", means a regex change that reopens
+  // a hole through some other attribute or tag name still fails this test.
+  function everyAngleBracketStartsACanonicalTag(html: string): boolean {
+    for (let i = 0; i < html.length; i++) {
+      if (html[i] !== '<') continue;
+      if (!CANONICAL_BLAST_TAGS.some((tag) => html.startsWith(tag, i))) return false;
+    }
+    return true;
+  }
+
+  describe('structural invariant: every < in the output begins an exact canonical tag literal', () => {
+    const payloads = [
+      // benign, well-formed content
+      '<p><strong>Focus</strong></p><ul><li>One</li></ul><br>',
+      '<p><em>note</em></p><ol><li>a</li><li>b</li></ol>',
+      // every previous QA bypass, kept here as permanent regression pins
+      '<p>Before</p><img src=x onerror=alert(1)',
+      '<p>Before</p><img src=x onerror=alert(1)<p>Next</p>',
+      '<p>score < 3 & rising</p>',
+      '<strong onclick=alert(1) <strong>bold</strong>',
+      '<p onclick=alert(document.cookie) <p>click me</p>',
+      // other adversarial shapes, none of them QA-reported, added to widen
+      // the net this invariant casts
+      '<div onclick=alert(1)>text</div>',
+      '<STRONG ONCLICK=ALERT(1)>x</STRONG>',
+      '<script>alert(1)</script><p>after</p>',
+      '<br onclick=alert(1)>',
+      '<brx>not br</brx>',
+      '< strong>space after bracket</ strong>',
+      '<p><img src=x onerror=alert(1)></p>',
+      '<a href="javascript:alert(1)">click</a>',
+      '<<script>alert(1)</script>',
+    ];
+
+    it.each(payloads)('holds for payload: %s', (payload) => {
+      const result = sanitizeBlastHtml(payload);
+      expect(everyAngleBracketStartsACanonicalTag(result)).toBe(true);
+    });
   });
 });
 

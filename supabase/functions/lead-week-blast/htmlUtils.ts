@@ -45,6 +45,22 @@ export function upgradeBlastBodyToHtml(value: string | null | undefined): string
 const ALLOWED_TAGS = new Set(['p', 'ul', 'ol', 'li', 'strong', 'em', 'br']);
 
 /**
+ * QA fix #2: the exact, closed set of strings the main pass below can ever
+ * emit for a kept tag -- bare tag name, no attributes, always lowercase, `br`
+ * always self-normalized to this one form (never a separate closing variant).
+ * This is the single source of truth for "what does a legitimate tag look
+ * like in our output", used both by the final escape pass's lookahead and by
+ * this file's own tests (a structural invariant: every `<` in sanitized
+ * output must begin one of these exact literals). If the main pass's
+ * emission logic ever changes, update this list and the lookahead below
+ * together.
+ */
+export const CANONICAL_BLAST_TAGS = [
+  '<p>', '</p>', '<ul>', '</ul>', '<ol>', '</ol>', '<li>', '</li>',
+  '<strong>', '</strong>', '<em>', '</em>', '<br>',
+] as const;
+
+/**
  * Reduces `html` to the allowlist above: every other tag is stripped
  * (unwrapped -- its own text content survives, just without the tag), every
  * attribute on a kept tag is dropped, and <script>/<style> are removed
@@ -52,18 +68,33 @@ const ALLOWED_TAGS = new Set(['p', 'ul', 'ol', 'li', 'strong', 'em', 'br']);
  * rendered or emailed output. Deliberately not a full HTML parser: this is a
  * small, deterministic set of text substitutions, not a dependency.
  *
- * QA fix: the tag-matching regex used to scan for attributes with `[^>]*`,
- * which does not stop at a `<`. An unclosed/malformed fragment (no closing
- * `>` of its own, e.g. `<img src=x onerror=alert(1)` with the bracket
- * missing) either survived untouched (no `>` anywhere later in the string
- * to close the match) or, worse, reached forward and grabbed the NEXT real
- * tag's `>` as its own -- swallowing that legitimate tag's opening bracket
- * along with the malicious fragment. `[^<>]*` stops the match at the next
- * `<`, so a malformed tag can never consume a subsequent real one. The
- * trailing pass below is the second half of the fix: it escapes any `<`
- * that survives without starting one of the allowlisted tags (a real
- * unclosed fragment, once it can no longer swallow anything, still needs
- * this step to be reduced to inert text instead of passing through as-is).
+ * QA fix #1: the tag-matching regex used to scan for attributes with
+ * `[^>]*`, which does not stop at a `<`. An unclosed/malformed fragment (no
+ * closing `>` of its own, e.g. `<img src=x onerror=alert(1)` with the
+ * bracket missing) either survived untouched (no `>` anywhere later in the
+ * string to close the match) or, worse, reached forward and grabbed the NEXT
+ * real tag's `>` as its own -- swallowing that legitimate tag's opening
+ * bracket along with the malicious fragment. `[^<>]*` stops the match at the
+ * next `<`, so a malformed tag can never consume a subsequent real one.
+ *
+ * QA fix #2: the trailing escape pass originally checked only that a `<` was
+ * followed by an allowlisted tag NAME plus a word boundary (`\b`). A word
+ * boundary matches after a space just as well as after `>`, so
+ * `<strong onclick=alert(1) ` (tag name, then a space, then attributes)
+ * satisfied the lookahead and the `<` was never escaped -- the attribute
+ * text survived untouched and jsdom (and a real mail client) parsed it as a
+ * live `onclick`.
+ *
+ * The output is now a CLOSED ALPHABET instead: the main pass above only
+ * ever re-emits an allowed tag as one of the exact bare strings in
+ * CANONICAL_BLAST_TAGS, with no attributes. So the lookahead requires the
+ * exact closing `>` immediately after the tag name (or, for `br`, the exact
+ * literal `br>`, since `br` never gets a separate closing form) -- not just
+ * a word boundary. A malformed fragment like `<strong onclick=...` has a
+ * space right after the tag name, fails this exact match, and gets escaped
+ * whole: attributes and all, since nothing between an escaped `<` and the
+ * next real `<` (or the end of the string) can ever be re-interpreted as
+ * "inside a legitimate tag" again.
  */
 export function sanitizeBlastHtml(html: string | null | undefined): string {
   if (!html) return '';
@@ -81,10 +112,13 @@ export function sanitizeBlastHtml(html: string | null | undefined): string {
     return isClosing ? `</${tag}>` : `<${tag}>`;
   });
 
-  // Any `<` still standing at this point is either a genuine unclosed/
-  // malformed fragment or stray text that merely looks like the start of a
-  // tag -- neither should reach the client or an email as a live `<`.
-  out = out.replace(/<(?!\/?(?:p|ul|ol|li|strong|em|br)\b)/gi, '&lt;');
+  // Any `<` still standing at this point must begin one of the exact
+  // canonical literals above (an optional `/` then one of p/ul/ol/li/
+  // strong/em immediately followed by `>`, or the literal `br>` with no
+  // slash form) or it gets escaped whole -- no attribute-bearing or
+  // otherwise malformed fragment can survive, because nothing except an
+  // immediate `>` after the tag name satisfies the lookahead.
+  out = out.replace(/<(?!\/?(?:p|ul|ol|li|strong|em)>|br>)/gi, '&lt;');
 
   return out;
 }

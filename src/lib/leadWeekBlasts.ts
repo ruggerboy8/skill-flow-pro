@@ -5,6 +5,7 @@
 
 import type { LeadWeekBlastRow } from '@/types/leadWeekBlasts';
 import type { BadgeStatus } from '@/components/ui/StatusBadge';
+import { hasBlastBodyContent } from '@/lib/leadWeekBlastHtml';
 
 /**
  * The one hard rule (see spec "Decisions locked"): a blast needs at least a
@@ -124,9 +125,14 @@ export function buildDefaultBlastSubject(weekStartDate: string): string {
  * in flight. The "blast is sent" case is handled separately: the draft
  * editor, and this button with it, is only ever rendered while the blast's
  * status is 'draft' in the first place.
+ *
+ * LRM-10: `body` is HTML since the composer moved to RichTextEditor, so
+ * emptiness is checked with hasBlastBodyContent rather than a bare
+ * `.trim()` -- a blank Quill document is `<p><br></p>`, not `''`, and would
+ * otherwise read as "has text" forever.
  */
 export function canPolish(body: string, busy: boolean): boolean {
-  return !!body.trim() && !busy;
+  return hasBlastBodyContent(body) && !busy;
 }
 
 /**

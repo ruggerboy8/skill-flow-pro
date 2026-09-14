@@ -51,6 +51,19 @@ const ALLOWED_TAGS = new Set(['p', 'ul', 'ol', 'li', 'strong', 'em', 'br']);
  * together with their content since that content should never survive into
  * rendered or emailed output. Deliberately not a full HTML parser: this is a
  * small, deterministic set of text substitutions, not a dependency.
+ *
+ * QA fix: the tag-matching regex used to scan for attributes with `[^>]*`,
+ * which does not stop at a `<`. An unclosed/malformed fragment (no closing
+ * `>` of its own, e.g. `<img src=x onerror=alert(1)` with the bracket
+ * missing) either survived untouched (no `>` anywhere later in the string
+ * to close the match) or, worse, reached forward and grabbed the NEXT real
+ * tag's `>` as its own -- swallowing that legitimate tag's opening bracket
+ * along with the malicious fragment. `[^<>]*` stops the match at the next
+ * `<`, so a malformed tag can never consume a subsequent real one. The
+ * trailing pass below is the second half of the fix: it escapes any `<`
+ * that survives without starting one of the allowlisted tags (a real
+ * unclosed fragment, once it can no longer swallow anything, still needs
+ * this step to be reduced to inert text instead of passing through as-is).
  */
 export function sanitizeBlastHtml(html: string | null | undefined): string {
   if (!html) return '';
@@ -60,13 +73,18 @@ export function sanitizeBlastHtml(html: string | null | undefined): string {
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '');
 
-  out = out.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g, (match, tagName: string) => {
+  out = out.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^<>]*>/g, (match, tagName: string) => {
     const tag = tagName.toLowerCase();
     if (!ALLOWED_TAGS.has(tag)) return '';
     if (tag === 'br') return '<br>';
     const isClosing = match.startsWith('</');
     return isClosing ? `</${tag}>` : `<${tag}>`;
   });
+
+  // Any `<` still standing at this point is either a genuine unclosed/
+  // malformed fragment or stray text that merely looks like the start of a
+  // tag -- neither should reach the client or an email as a live `<`.
+  out = out.replace(/<(?!\/?(?:p|ul|ol|li|strong|em|br)\b)/gi, '&lt;');
 
   return out;
 }

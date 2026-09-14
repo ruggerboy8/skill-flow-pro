@@ -62,6 +62,19 @@ export function upgradeBlastBodyToHtml(value: string | null | undefined): string
  * mixing bullet and ordered items back to back gets two adjacent lists on
  * render, which matches what she actually typed.
  *
+ * QA finding (PR #116): the flavor lookup used to match `data-list=...`
+ * anywhere in the li's attribute string, with no requirement that it
+ * actually START an attribute. `<li title="data-list=ordered"
+ * data-list="bullet">` has that shape inside the (unrelated) title
+ * attribute's VALUE, and the old regex happily matched that decoy
+ * substring first, misreading a bullet item as ordered. Real HTML
+ * attributes are always preceded by whitespace, so the lookup now requires
+ * a leading `\s` before `data-list` -- a decoy sitting inside a quoted
+ * attribute VALUE is preceded by a quote character, not whitespace, and no
+ * longer matches. The attrs string is prefixed with a space before
+ * matching so this holds even in the edge case where `data-list` is the
+ * very first (and only) attribute with no leading space of its own.
+ *
  * Deliberately regex-based, matching sanitizeBlastHtml's own approach,
  * rather than a DOM parser -- Deno has no DOM available here, and this needs
  * to behave identically to its client-side mirror (see
@@ -80,7 +93,7 @@ export function convertQuillListFlavors(html: string | null | undefined): string
     let liMatch: RegExpExecArray | null;
     while ((liMatch = liPattern.exec(inner)) !== null) {
       const [, attrs, content] = liMatch;
-      const dataListMatch = /data-list\s*=\s*["']?(bullet|ordered)["']?/i.exec(attrs);
+      const dataListMatch = /\sdata-list\s*=\s*["']?(bullet|ordered)["']?/i.exec(' ' + attrs);
       const flavor = dataListMatch
         ? (dataListMatch[1].toLowerCase() as 'bullet' | 'ordered')
         : (containerTag.toLowerCase() === 'ul' ? 'bullet' : 'ordered');

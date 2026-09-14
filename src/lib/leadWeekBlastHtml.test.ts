@@ -102,6 +102,14 @@ describe('convertQuillListFlavors', () => {
     expect(convertQuillListFlavors('<ol><li>One</li></ol>')).toBe('<ol><li>One</li></ol>');
   });
 
+  // QA finding (PR #116): a decoy "data-list=..."-shaped substring inside an
+  // unrelated attribute's VALUE must not be mistaken for the real data-list
+  // attribute. The real attribute (preceded by whitespace) wins.
+  it('is not fooled by a data-list-shaped decoy inside another attribute value', () => {
+    const decoy = '<ol><li title="data-list=ordered" data-list="bullet">One</li></ol>';
+    expect(convertQuillListFlavors(decoy)).toBe('<ul><li>One</li></ul>');
+  });
+
   // Quill's mixed case: bullet and ordered lists typed back to back collapse
   // into one <ol> holding both flavors of <li>. Split conservatively into
   // adjacent lists, in the order the items appeared -- never merged or
@@ -132,36 +140,90 @@ describe('convertQuillListFlavors', () => {
 });
 
 describe('needsSaveBeforeSend', () => {
+  const BODY = '<p>Saved draft</p>';
+  const SUBJECT = 'Custom saved subject';
+  const DEFAULT_SUBJECT = 'This week with your Lead RDAs: Week of Jan 5';
+
   // blast-send-trap incident: the real bug was Send/Test-send reading a
   // stale saved body while the editor held newer, unsaved text.
-  it('is true when the editor has real unsaved edits', () => {
-    expect(needsSaveBeforeSend('<p>Edited text</p>', '<p>Original draft</p>')).toBe(true);
+  it('is true when the editor has real unsaved body edits (subject unchanged)', () => {
+    expect(needsSaveBeforeSend('<p>Edited text</p>', SUBJECT, BODY, SUBJECT, DEFAULT_SUBJECT)).toBe(true);
   });
 
-  it('is false when the editor exactly matches the saved body', () => {
-    const same = '<p>Same on both sides</p>';
-    expect(needsSaveBeforeSend(same, same)).toBe(false);
+  // QA fail: the first version of this compared body only. The review
+  // dialog shows editedSubject live while the send reads the DB row, so a
+  // subject-only edit reproduced the exact same incident class.
+  it('is true when the editor has real unsaved subject edits (body unchanged)', () => {
+    expect(needsSaveBeforeSend(BODY, 'Edited subject line', BODY, SUBJECT, DEFAULT_SUBJECT)).toBe(true);
+  });
+
+  it('is false when both body and subject exactly match the saved row', () => {
+    expect(needsSaveBeforeSend(BODY, SUBJECT, BODY, SUBJECT, DEFAULT_SUBJECT)).toBe(false);
   });
 
   // Deliberately conservative: a normalization difference alone (not a real
   // edit) still reports "needs save" -- an extra idempotent save is
   // accepted rather than risk missing a real edit with a cleverer
-  // comparison. See the function's own doc comment.
-  it('is true for a normalization-only difference (Quill-flavored vs semantic list), by design', () => {
+  // comparison. See the function's own doc comment. Subject does NOT get
+  // this same leniency (see the default-subject tests below) because the
+  // saved-subject-empty case is provably safe to skip, unlike Quill
+  // normalization.
+  it('is true for a normalization-only body difference (Quill-flavored vs semantic list), by design', () => {
     const editedBody = '<ol><li data-list="bullet">One</li></ol>';
     const savedBody = '<ul><li>One</li></ul>';
-    expect(needsSaveBeforeSend(editedBody, savedBody)).toBe(true);
+    expect(needsSaveBeforeSend(editedBody, SUBJECT, savedBody, SUBJECT, DEFAULT_SUBJECT)).toBe(true);
   });
 
   it('is true when the saved body is null or undefined (nothing persisted yet)', () => {
-    expect(needsSaveBeforeSend('<p>Hello</p>', null)).toBe(true);
-    expect(needsSaveBeforeSend('<p>Hello</p>', undefined)).toBe(true);
+    expect(needsSaveBeforeSend('<p>Hello</p>', SUBJECT, null, SUBJECT, DEFAULT_SUBJECT)).toBe(true);
+    expect(needsSaveBeforeSend('<p>Hello</p>', SUBJECT, undefined, SUBJECT, DEFAULT_SUBJECT)).toBe(true);
   });
 
-  it('is false when both the editor and the saved body are empty', () => {
-    expect(needsSaveBeforeSend('', '')).toBe(false);
-    expect(needsSaveBeforeSend('', null)).toBe(false);
-    expect(needsSaveBeforeSend('', undefined)).toBe(false);
+  it('is false when body and subject are both empty/default and nothing was persisted yet', () => {
+    expect(needsSaveBeforeSend('', DEFAULT_SUBJECT, '', '', DEFAULT_SUBJECT)).toBe(false);
+    expect(needsSaveBeforeSend('', DEFAULT_SUBJECT, null, null, DEFAULT_SUBJECT)).toBe(false);
+    expect(needsSaveBeforeSend('', DEFAULT_SUBJECT, undefined, undefined, DEFAULT_SUBJECT)).toBe(false);
+  });
+
+  // Subject-default handling: editedSubject's own useState initializer is
+  // `weekBlast?.subject || buildDefaultBlastSubject(weekStartDate)`, so an
+  // empty saved subject means editedSubject starts out equal to the
+  // default, not empty. The send edge function falls back to that exact
+  // same default when the saved subject is empty, so if nothing was typed,
+  // skipping the save must not force one -- the email would come out
+  // identical either way.
+  describe('saved subject is empty (falls back to the default)', () => {
+    it('is false when editedSubject still equals the default (nothing was typed)', () => {
+      expect(needsSaveBeforeSend(BODY, DEFAULT_SUBJECT, BODY, '', DEFAULT_SUBJECT)).toBe(false);
+      expect(needsSaveBeforeSend(BODY, DEFAULT_SUBJECT, BODY, null, DEFAULT_SUBJECT)).toBe(false);
+      expect(needsSaveBeforeSend(BODY, DEFAULT_SUBJECT, BODY, undefined, DEFAULT_SUBJECT)).toBe(false);
+    });
+
+    // A whitespace-only saved subject is treated the same as empty, mirroring
+    // the send edge function's own `subject.trim()` fallback check exactly.
+    it('is false for a whitespace-only saved subject when editedSubject equals the default', () => {
+      expect(needsSaveBeforeSend(BODY, DEFAULT_SUBJECT, BODY, '   ', DEFAULT_SUBJECT)).toBe(false);
+    });
+
+    // The default WOULD change what sends here: she typed something other
+    // than the default, so skipping the save would email the wrong subject.
+    // This is a real, savable edit.
+    it('is true when editedSubject differs from the default (a real edit over an empty saved subject)', () => {
+      expect(needsSaveBeforeSend(BODY, 'A subject she actually typed', BODY, '', DEFAULT_SUBJECT)).toBe(true);
+    });
+  });
+
+  describe('saved subject is non-empty', () => {
+    it('is false when editedSubject matches the saved (non-default) subject exactly', () => {
+      expect(needsSaveBeforeSend(BODY, SUBJECT, BODY, SUBJECT, DEFAULT_SUBJECT)).toBe(false);
+    });
+
+    it('is true when editedSubject differs from the saved subject, even if editedSubject happens to equal the default', () => {
+      // Saved subject is a real, non-empty subject; editedSubject was
+      // changed to something that happens to equal the default. That's
+      // still a real edit relative to what's saved, so it must save.
+      expect(needsSaveBeforeSend(BODY, DEFAULT_SUBJECT, BODY, SUBJECT, DEFAULT_SUBJECT)).toBe(true);
+    });
   });
 });
 

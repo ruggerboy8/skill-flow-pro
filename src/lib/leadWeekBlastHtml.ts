@@ -77,6 +77,19 @@ export function upgradeBlastBodyToHtml(value: string | null | undefined): string
  * mixing bullet and ordered items back to back gets two adjacent lists on
  * render, which matches what she actually typed.
  *
+ * QA finding (PR #116): the flavor lookup used to match `data-list=...`
+ * anywhere in the li's attribute string, with no requirement that it
+ * actually START an attribute. `<li title="data-list=ordered"
+ * data-list="bullet">` has that shape inside the (unrelated) title
+ * attribute's VALUE, and the old regex happily matched that decoy
+ * substring first, misreading a bullet item as ordered. Real HTML
+ * attributes are always preceded by whitespace, so the lookup now requires
+ * a leading `\s` before `data-list` -- a decoy sitting inside a quoted
+ * attribute VALUE is preceded by a quote character, not whitespace, and no
+ * longer matches. The attrs string is prefixed with a space before
+ * matching so this holds even in the edge case where `data-list` is the
+ * very first (and only) attribute with no leading space of its own.
+ *
  * Deliberately regex-based, matching sanitizeBlastHtml's own approach,
  * rather than a DOM parser -- Deno's copy of this function (see
  * supabase/functions/lead-week-blast/htmlUtils.ts) has no DOM available, and
@@ -94,7 +107,7 @@ export function convertQuillListFlavors(html: string | null | undefined): string
     let liMatch: RegExpExecArray | null;
     while ((liMatch = liPattern.exec(inner)) !== null) {
       const [, attrs, content] = liMatch;
-      const dataListMatch = /data-list\s*=\s*["']?(bullet|ordered)["']?/i.exec(attrs);
+      const dataListMatch = /\sdata-list\s*=\s*["']?(bullet|ordered)["']?/i.exec(' ' + attrs);
       const flavor = dataListMatch
         ? (dataListMatch[1].toLowerCase() as 'bullet' | 'ordered')
         : (containerTag.toLowerCase() === 'ul' ? 'bullet' : 'ordered');
@@ -128,9 +141,20 @@ export function convertQuillListFlavors(html: string | null | undefined): string
  * blast-send-trap incident: whether the editor's current content needs to be
  * persisted before Send / Test-send fire. Before this, the editor was local
  * state persisted only by an explicit "Save draft" click, while the send
- * paths read `body` straight from the DB row -- a user could edit, click
- * Send, and have the STALE saved draft go out instead of what was on her
- * screen. That happened live: 16 doctors got the pre-edit AI draft.
+ * paths read `body` (and `subject`) straight from the DB row -- a user could
+ * edit, click Send, and have the STALE saved draft go out instead of what
+ * was on her screen. That happened live: 16 doctors got the pre-edit AI
+ * draft.
+ *
+ * QA follow-up: the first version of this only compared body. The review
+ * dialog renders `subject={editedSubject}` (the live input) while the send
+ * itself reads the DB row's subject, so a SUBJECT-only edit reproduced the
+ * exact same incident class -- the dialog previews the new subject, the
+ * email goes out with the old one. Both fields she can see and edit are now
+ * covered, and the caller must persist BOTH `editedBody` and `editedSubject`
+ * verbatim when this returns true (not `weekBlast.subject`, unlike the
+ * Polish/Regenerate save-body calls -- see BlastSlot's onSendClick /
+ * onTestSendClick comment for why the send path's contract is different).
  *
  * `editedBody` is Quill-normalized HTML (see RichTextEditor / BlastSlot's
  * onEditorReady); `savedBody` is the raw stored row, which can still be
@@ -141,9 +165,35 @@ export function convertQuillListFlavors(html: string | null | undefined): string
  * and harmless, while a normalization-aware comparison risks the one
  * failure mode that actually matters here, ruling out a save that should
  * have happened for a real edit. When in doubt, save.
+ *
+ * Subject gets one deliberate exception to that "when in doubt, save"
+ * stance, because it's not ambiguous the way Quill normalization is: when
+ * the saved row's subject is empty, BOTH the client (editedSubject's own
+ * `useState` initializer) and the send edge function fall back to the exact
+ * same computed default (`buildDefaultBlastSubject` /
+ * `buildDefaultSubject`, kept in sync by hand -- see either's doc comment).
+ * So if `editedSubject` still equals that default and nothing else changed,
+ * skipping the save is provably correct: the email would go out with that
+ * same default subject whether or not this saves. `defaultSubject` is the
+ * caller's already-computed `buildDefaultBlastSubject(weekStartDate)`,
+ * passed in rather than imported here to avoid a circular import with
+ * src/lib/leadWeekBlasts.ts (which already imports from this file). If the
+ * saved subject is empty AND editedSubject differs from that default, that
+ * is a real, savable edit (she typed something other than the default), so
+ * this still returns true.
  */
-export function needsSaveBeforeSend(editedBody: string, savedBody: string | null | undefined): boolean {
-  return editedBody !== (savedBody ?? '');
+export function needsSaveBeforeSend(
+  editedBody: string,
+  editedSubject: string,
+  savedBody: string | null | undefined,
+  savedSubject: string | null | undefined,
+  defaultSubject: string,
+): boolean {
+  if (editedBody !== (savedBody ?? '')) return true;
+  // Mirrors the send edge function's own fallback formula exactly:
+  // `(blastRow.subject && blastRow.subject.trim()) || buildDefaultSubject(...)`.
+  const effectiveSavedSubject = savedSubject && savedSubject.trim() ? savedSubject : defaultSubject;
+  return editedSubject !== effectiveSavedSubject;
 }
 
 /**

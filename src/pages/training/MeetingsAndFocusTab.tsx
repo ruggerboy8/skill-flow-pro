@@ -627,20 +627,35 @@ function BlastSlot({
 
   // blast-send-trap incident: the editor is local state, previously
   // persisted only by an explicit "Save draft" click, while both send paths
-  // read `body` straight from the DB row. A real user edited her draft and
-  // clicked Send; the stale saved AI draft reached 16 doctors instead of
-  // what she was looking at. Both send paths now persist editedBody first,
-  // whenever it differs from what's saved (needsSaveBeforeSend), and only
-  // proceed on that save's success -- see the function's own doc comment
-  // for why "differs" is intentionally the conservative, no-normalization
-  // strict comparison. The in-flight lock this shares with "Save draft"
+  // read `body` (and `subject`) straight from the DB row. A real user edited
+  // her draft and clicked Send; the stale saved AI draft reached 16 doctors
+  // instead of what she was looking at. Both send paths now persist
+  // editedBody AND editedSubject first, whenever either differs from what's
+  // saved (needsSaveBeforeSend), and only proceed on that save's success --
+  // see the function's own doc comment for why "differs" is intentionally
+  // the conservative, no-normalization strict comparison for body, and why
+  // subject gets one narrow, provably-safe exception.
+  //
+  // QA follow-up: the first version of this saved `subject: weekBlast.subject`
+  // (the STALE saved subject), matching the Polish/Regenerate convention of
+  // never touching subject. That reproduced the exact same incident class
+  // for a subject-only edit -- the review dialog renders
+  // `subject={editedSubject}` (the live input) while the send reads the DB
+  // row, so the dialog previewed the new subject and the email went out
+  // with the old one. The send path's contract is different from
+  // Polish/Regenerate on purpose: generation paths must never clobber a
+  // subject she's mid-typing while a draft/polish call is in flight, but
+  // Send and Test-send are what-you-see-is-what-sends for every visible
+  // field, so they now persist `subject: editedSubject` here, verbatim.
+  //
+  // The in-flight lock this shares with "Save draft"
   // (blastsHook.updateBlastBody.isPending disables both send buttons, see
   // the JSX below) means a concurrent manual save can't race this one.
   const onTestSendClick = async () => {
     if (!weekBlast) return;
-    if (needsSaveBeforeSend(editedBody, weekBlast.body)) {
+    if (needsSaveBeforeSend(editedBody, editedSubject, weekBlast.body, weekBlast.subject, buildDefaultBlastSubject(weekStartDate))) {
       try {
-        await blastsHook.updateBlastBody.mutateAsync({ id: weekBlast.id, body: editedBody, subject: weekBlast.subject });
+        await blastsHook.updateBlastBody.mutateAsync({ id: weekBlast.id, body: editedBody, subject: editedSubject });
       } catch {
         // Failure toast already shown by the hook's onError (including the
         // sent-status seatbelt inside updateBlastBody) -- do not fire the
@@ -657,11 +672,13 @@ function BlastSlot({
     if (!weekBlast) return;
     setRecipientsLoading(true);
     try {
-      if (needsSaveBeforeSend(editedBody, weekBlast.body)) {
+      if (needsSaveBeforeSend(editedBody, editedSubject, weekBlast.body, weekBlast.subject, buildDefaultBlastSubject(weekStartDate))) {
         // Persist before recipients are even fetched, let alone the review
-        // dialog opens -- the dialog previews no body, so this is the only
-        // gate standing between a stale draft and a real send.
-        await blastsHook.updateBlastBody.mutateAsync({ id: weekBlast.id, body: editedBody, subject: weekBlast.subject });
+        // dialog opens -- the dialog previews no body and previews subject
+        // from live editor state, not the DB row, so this is the only gate
+        // standing between a stale draft (or stale subject) and a real
+        // send.
+        await blastsHook.updateBlastBody.mutateAsync({ id: weekBlast.id, body: editedBody, subject: editedSubject });
       }
       const list = await blastsHook.fetchRecipients.mutateAsync();
       // Fresh every open: nothing carries over from a previous review.

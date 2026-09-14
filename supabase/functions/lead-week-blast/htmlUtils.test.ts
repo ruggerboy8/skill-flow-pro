@@ -208,6 +208,14 @@ describe('convertQuillListFlavors', () => {
     expect(convertQuillListFlavors('<ol><li>One</li></ol>')).toBe('<ol><li>One</li></ol>');
   });
 
+  // QA finding (PR #116): a decoy "data-list=..."-shaped substring inside an
+  // unrelated attribute's VALUE must not be mistaken for the real data-list
+  // attribute. The real attribute (preceded by whitespace) wins.
+  it('is not fooled by a data-list-shaped decoy inside another attribute value', () => {
+    const decoy = '<ol><li title="data-list=ordered" data-list="bullet">One</li></ol>';
+    expect(convertQuillListFlavors(decoy)).toBe('<ul><li>One</li></ul>');
+  });
+
   // Quill's mixed case: bullet and ordered lists typed back to back collapse
   // into one <ol> holding both flavors of <li>. Split conservatively into
   // adjacent lists, in the order the items appeared -- never merged or

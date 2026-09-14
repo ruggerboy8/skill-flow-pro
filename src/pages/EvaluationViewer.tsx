@@ -174,7 +174,7 @@ export default function EvaluationViewer() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get('returnTo');
-  const { user, isCoach, isSuperAdmin, isLead } = useAuth();
+  const { user, isCoach, isSuperAdmin, isLead, roleLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [evaluation, setEvaluation] = useState<EvaluationWithItems | null>(null);
   const [staffName, setStaffName] = useState<string>('');
@@ -186,10 +186,14 @@ export default function EvaluationViewer() {
   const [needsReview, setNeedsReview] = useState(false);
 
   useEffect(() => {
-    if (!user || !evalId) return;
+    // Wait for role flags before running the access checks below — deciding
+    // with isCoach/isSuperAdmin still at their initial false would wrongly
+    // deny coaches and admins on a hard page load.
+    if (!user || !evalId || roleLoading) return;
 
     (async () => {
       try {
+        setError(null);
         // Get current user's staff id (+ location, for the lead-access check below)
         const { data: staff } = await supabase
           .from('staff')
@@ -210,9 +214,16 @@ export default function EvaluationViewer() {
           return;
         }
 
-        // Check access: must be submitted, and either this user's evaluation OR user is coach/admin
+        // This page only renders submitted evaluations. A draft that lands here
+        // (e.g. from the admin Delivery tab) sends editors to the capture
+        // surface where the draft actually lives, instead of dead-ending them
+        // with an access error.
         if (evalData.status !== 'submitted') {
-          setError("You don't have access to this evaluation.");
+          if (isCoach || isSuperAdmin) {
+            navigate(`/coach/${evalData.staff_id}/eval/${evalId}/capture`, { replace: true });
+            return;
+          }
+          setError("This evaluation is still being worked on and isn't ready to view yet.");
           return;
         }
 
@@ -290,7 +301,7 @@ export default function EvaluationViewer() {
         setLoading(false);
       }
     })();
-  }, [user, evalId]);
+  }, [user, evalId, roleLoading, isCoach, isSuperAdmin, isLead]);
 
   if (loading) {
     return (

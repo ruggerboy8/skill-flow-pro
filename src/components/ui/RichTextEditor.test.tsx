@@ -258,4 +258,71 @@ describe('RichTextEditor', () => {
     });
     expect(container.querySelectorAll('.ql-container')).toHaveLength(1);
   });
+
+  // LRM-10: onReady exposes Quill's normalized HTML for a silent
+  // (non-user) write, without ever standing in for onChange. Needed because
+  // Quill can rewrite structural markup on load (e.g. `<ul>` -> `<ol
+  // data-list="bullet">`) with no 'text-change' event at all, so a caller
+  // that needs to compare "has this changed since it loaded" needs a
+  // normalized baseline that onChange alone never provides for a load.
+  it('fires onReady (not onChange) with Quill-normalized HTML on initial mount', async () => {
+    const onChange = vi.fn();
+    const onReady = vi.fn();
+    const { container } = render(
+      <RichTextEditor
+        value="<ul><li>One</li><li>Two</li></ul>"
+        onChange={onChange}
+        onReady={onReady}
+        modules={{ toolbar: false }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(onReady).toHaveBeenCalled();
+    });
+    expect(onChange).not.toHaveBeenCalled();
+    const normalized = onReady.mock.calls.at(-1)?.[0];
+    expect(normalized).toContain('One');
+    expect(normalized).toContain('Two');
+    // Pin the actual observed Quill rewrite so a future Quill upgrade that
+    // changes this normalization is caught here, not as a mystery bug in a
+    // caller relying on onReady for a stale-edit baseline.
+    expect(normalized).toContain('data-list="bullet"');
+
+    const editor = container.querySelector('.ql-editor') as HTMLElement;
+    expect(editor.innerHTML).toBe(normalized);
+  });
+
+  it('fires onReady again for an external value-prop change, still without onChange', async () => {
+    const onChange = vi.fn();
+    const onReady = vi.fn();
+    function Harness({ value }: { value: string }) {
+      return (
+        <RichTextEditor
+          value={value}
+          onChange={onChange}
+          onReady={onReady}
+          modules={{ toolbar: false }}
+        />
+      );
+    }
+    const { rerender } = render(<Harness value="<p>First</p>" />);
+    await waitFor(() => expect(onReady).toHaveBeenCalledTimes(1));
+
+    rerender(<Harness value="<p>Second</p>" />);
+    await waitFor(() => expect(onReady).toHaveBeenCalledTimes(2));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onReady.mock.calls[1][0]).toContain('Second');
+  });
+
+  it('does not require onReady -- existing callers that omit it are unaffected', async () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <RichTextEditor value="<p>a</p>" onChange={onChange} modules={{ toolbar: false }} />
+    );
+    await waitFor(() => {
+      expect(container.querySelector('.ql-editor')).not.toBeNull();
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

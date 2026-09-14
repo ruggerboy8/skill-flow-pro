@@ -1515,19 +1515,41 @@ serve(async (req: Request) => {
         const { user_id } = payload ?? {};
         if (!user_id) return json({ error: "user_id required" }, 400);
 
-        // Only super admins can delete users
-        if (!me.is_super_admin) {
-          return json({ error: "Only super admins can delete users" }, 403);
+        // Super and platform admins can delete anyone; org admins with
+        // user-management rights can delete users, limited to their own org
+        // by the same-org guard below.
+        const canDeleteUsers =
+          me.is_super_admin || meCaps?.is_platform_admin ||
+          me.is_org_admin || meCaps?.is_org_admin || meCaps?.can_manage_users;
+        if (!canDeleteUsers) {
+          return json({ error: "Only admins with user-management access can delete users" }, 403);
         }
+        const deleteOrgGuard = await assertSameOrgTarget(user_id);
+        if (deleteOrgGuard) return deleteOrgGuard;
 
         // Get staff record
         const { data: staffToDelete, error: fetchErr } = await admin
           .from("staff")
-          .select("id")
+          .select("id, is_super_admin")
           .eq("user_id", user_id)
           .maybeSingle();
 
         if (fetchErr) throw fetchErr;
+
+        // Privileged accounts (super/platform admins) may share an org with
+        // regular org admins; only a super/platform caller may delete them.
+        if (staffToDelete) {
+          const { data: targetCaps } = await admin
+            .from("user_capabilities")
+            .select("is_platform_admin")
+            .eq("staff_id", staffToDelete.id)
+            .maybeSingle();
+          const targetIsPrivileged = staffToDelete.is_super_admin || targetCaps?.is_platform_admin;
+          const callerIsPrivileged = me.is_super_admin || meCaps?.is_platform_admin;
+          if (targetIsPrivileged && !callerIsPrivileged) {
+            return json({ error: "Only super admins can delete a super admin account" }, 403);
+          }
+        }
 
         if (staffToDelete) {
           const sid = staffToDelete.id;

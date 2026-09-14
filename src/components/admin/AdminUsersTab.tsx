@@ -287,7 +287,16 @@ export function AdminUsersTab() {
       const { error } = await supabase.functions.invoke('admin-users', {
         body: { action: 'delete_user', user_id: userToDelete.user_id },
       });
-      if (error) throw error;
+      if (error) {
+        // Surface the function's real message (e.g. a permission denial)
+        // instead of the generic "Edge Function returned a non-2xx status code".
+        let message = error.message;
+        try {
+          const body = await (error as { context?: Response }).context?.json();
+          if (body?.error) message = body.error;
+        } catch { /* keep the generic message */ }
+        throw new Error(message);
+      }
 
       toast({
         title: "Success",

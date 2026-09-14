@@ -174,7 +174,7 @@ export default function EvaluationViewer() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get('returnTo');
-  const { user, isCoach, isSuperAdmin, isLead } = useAuth();
+  const { user, isCoach, isSuperAdmin, isLead, roleLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [evaluation, setEvaluation] = useState<EvaluationWithItems | null>(null);
   const [staffName, setStaffName] = useState<string>('');
@@ -186,16 +186,26 @@ export default function EvaluationViewer() {
   const [needsReview, setNeedsReview] = useState(false);
 
   useEffect(() => {
-    if (!user || !evalId) return;
+    // Wait for role flags before running the access checks below — deciding
+    // with isCoach/isSuperAdmin still at their initial false would wrongly
+    // deny coaches and admins on a hard page load.
+    if (!user || !evalId || roleLoading) return;
+
+    // Cancellation guard: this effect re-runs when role flags settle, and an
+    // older in-flight load finishing late could otherwise clobber the newer
+    // run's state with decisions made from stale role flags.
+    let cancelled = false;
 
     (async () => {
       try {
+        setError(null);
         // Get current user's staff id (+ location, for the lead-access check below)
         const { data: staff } = await supabase
           .from('staff')
           .select('id, primary_location_id')
           .eq('user_id', user.id)
           .maybeSingle();
+        if (cancelled) return;
 
         if (!staff) {
           setError("Staff record not found.");
@@ -204,15 +214,23 @@ export default function EvaluationViewer() {
 
         // Get evaluation
         const evalData = await getEvaluation(evalId);
+        if (cancelled) return;
 
         if (!evalData) {
           setError("Evaluation not found.");
           return;
         }
 
-        // Check access: must be submitted, and either this user's evaluation OR user is coach/admin
+        // This page only renders submitted evaluations. A draft that lands here
+        // (e.g. from the admin Delivery tab) sends editors to the capture
+        // surface where the draft actually lives, instead of dead-ending them
+        // with an access error.
         if (evalData.status !== 'submitted') {
-          setError("You don't have access to this evaluation.");
+          if (isCoach || isSuperAdmin) {
+            navigate(`/coach/${evalData.staff_id}/eval/${evalId}/capture`, { replace: true });
+            return;
+          }
+          setError("This evaluation is still being worked on and isn't ready to view yet.");
           return;
         }
 
@@ -228,6 +246,7 @@ export default function EvaluationViewer() {
             .select('primary_location_id')
             .eq('id', evalData.staff_id)
             .maybeSingle();
+          if (cancelled) return;
           isLeadForThisStaff = targetStaff?.primary_location_id === staff.primary_location_id;
         }
         if (!isOwnEval && !isCoach && !isSuperAdmin && !isLeadForThisStaff) {
@@ -247,6 +266,7 @@ export default function EvaluationViewer() {
           .select('name')
           .eq('id', evalData.staff_id)
           .single();
+        if (cancelled) return;
 
         if (staffData) {
           setStaffName(staffData.name);
@@ -259,6 +279,7 @@ export default function EvaluationViewer() {
             .select('name')
             .eq('id', evalData.evaluator_id)
             .maybeSingle();
+          if (cancelled) return;
           if (evaluatorData) setEvaluatorName(evaluatorData.name);
         }
 
@@ -276,6 +297,7 @@ export default function EvaluationViewer() {
           } catch (e) {
             console.warn('Failed to mark eval as viewed:', e);
           }
+          if (cancelled) return;
         }
 
         // Track whether this is own eval and if review is needed
@@ -284,13 +306,16 @@ export default function EvaluationViewer() {
 
         setEvaluation(evalData);
       } catch (err) {
+        if (cancelled) return;
         console.error('Error loading evaluation:', err);
         setError("Failed to load evaluation.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, [user, evalId]);
+
+    return () => { cancelled = true; };
+  }, [user, evalId, roleLoading, isCoach, isSuperAdmin, isLead]);
 
   if (loading) {
     return (

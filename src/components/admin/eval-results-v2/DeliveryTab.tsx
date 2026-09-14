@@ -325,10 +325,15 @@ function StaffRow({ staff, isPending, onRelease }: StaffRowProps) {
   const hasEval = !!staff.evalId && staff.status !== 'no_eval';
 
   const handleNameClick = () => {
-    if (hasEval && staff.evalId) {
-      const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
-      navigate(`/evaluation/${staff.evalId}?returnTo=${returnTo}`);
+    if (!hasEval || !staff.evalId) return;
+    // Drafts live on the capture surface; the /evaluation viewer only renders
+    // submitted evals and would bounce the click.
+    if (staff.status === 'draft') {
+      navigate(`/coach/${staff.staffId}/eval/${staff.evalId}/capture`);
+      return;
     }
+    const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+    navigate(`/evaluation/${staff.evalId}?returnTo=${returnTo}`);
   };
 
   return (

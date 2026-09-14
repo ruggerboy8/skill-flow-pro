@@ -22,14 +22,14 @@ if [ "$TOOL_NAME" = "Bash" ]; then
 
   # Block push to main
   if echo "$COMMAND" | grep -qE 'git\s+push\s.*(main|origin\s+main|origin\/main)'; then
-    echo '{"decision": "block", "reason": "Blocked: pushing to main is not allowed. Use a branch and open a PR instead."}'
-    exit 0
+    echo "Blocked: pushing to main is not allowed. Use a branch and open a PR instead." >&2
+    exit 2
   fi
 
   # Block force push
   if echo "$COMMAND" | grep -qE 'git\s+push\s.*--force'; then
-    echo '{"decision": "block", "reason": "Blocked: force-pushing is not allowed. It rewrites history and can destroy work."}'
-    exit 0
+    echo "Blocked: force-pushing is not allowed. It rewrites history and can destroy work." >&2
+    exit 2
   fi
 fi
 
@@ -37,10 +37,12 @@ fi
 if [ "$TOOL_NAME" = "Edit" ] || [ "$TOOL_NAME" = "Write" ]; then
   FILE_PATH="$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')"
   if echo "$FILE_PATH" | grep -qE '(^|/)CLAUDE\.md$'; then
-    echo '{"decision": "block", "reason": "Blocked: CLAUDE.md is project policy and must not be edited by AI sessions. Ask John to update it manually."}'
-    exit 0
+    echo "Blocked: CLAUDE.md is project policy and must not be edited by AI sessions. Ask John to update it manually." >&2
+    exit 2
   fi
 fi
 
-# Allow everything else
-echo '{"decision": "allow"}'
+# Allow everything else: exit 0 with no output. (Printing JSON here is what
+# caused the "Hook JSON output validation failed" spam — "allow" is not a
+# valid decision value, and the pass-through case needs no output at all.)
+exit 0

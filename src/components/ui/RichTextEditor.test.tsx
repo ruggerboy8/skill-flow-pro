@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, waitFor } from '@testing-library/react';
 import { RichTextEditor } from './RichTextEditor';
@@ -363,5 +363,86 @@ describe('RichTextEditor', () => {
     // Both baselines land on the exact same normalized string, so a
     // same-content comparison (shouldConfirmRegenerate) reads "unchanged".
     expect(contentRef.current).toBe(lastGeneratedRef.current);
+  });
+
+  // Codex review (PR #116, P2): pins the mount-ordering bug in BlastSlot's
+  // "pending sync" gate, which the test above doesn't model -- that one
+  // reconciles unconditionally on every onReady call, but BlastSlot only
+  // consumes onReady ONCE, guarded by a flag, so it can safely ignore an
+  // onReady it didn't ask for (Polish's, deliberately left unarmed -- see
+  // MeetingsAndFocusTab.tsx's onPolishClick). The bug: a CHILD component's
+  // own mount effect runs BEFORE the parent's (React commits child effects
+  // bottom-up), so a parent that arms this flag from its OWN effect (not
+  // render) sees the initial onReady arrive already-unarmed and misses it --
+  // the flag then stays armed for whatever onReady fires NEXT, wrongly
+  // adopting a later, unrelated write (e.g. a Polish result) as the
+  // "generated" baseline. The fix: arm the flag with useRef's INITIAL value,
+  // set during render, before the child ever mounts.
+  function ArmBeforeMountHarness({
+    initial,
+    polishText,
+    onSettled,
+  }: {
+    initial: string;
+    polishText?: string;
+    onSettled: (state: { editedBody: string; lastGenerated: string }) => void;
+  }) {
+    const [editedBody, setEditedBody] = useState(initial);
+    const lastGeneratedRef = useRef('');
+    // The fix under test: armed from render, not from an effect.
+    const pendingGeneratedSyncRef = useRef(true);
+    const pendingWrittenValueRef = useRef(initial);
+
+    const onReady = (html: string) => {
+      if (pendingGeneratedSyncRef.current) {
+        pendingGeneratedSyncRef.current = false;
+        lastGeneratedRef.current = html;
+        setEditedBody((current) => reconcileNormalizedLoad(current, pendingWrittenValueRef.current, html));
+      }
+    };
+
+    // Stand-in for onPolishClick: sets editedBody directly, deliberately
+    // WITHOUT arming pendingGeneratedSyncRef -- lastGeneratedRef must stay
+    // on the pre-polish baseline.
+    useEffect(() => {
+      if (polishText !== undefined) setEditedBody(polishText);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [polishText]);
+
+    useEffect(() => {
+      onSettled({ editedBody, lastGenerated: lastGeneratedRef.current });
+    });
+
+    return <RichTextEditor value={editedBody} onChange={setEditedBody} onReady={onReady} modules={{ toolbar: false }} />;
+  }
+
+  it('arms the pending-sync flag from render so the initial mount onReady is consumed, not a later Polish-like write', async () => {
+    const writtenValue = '<ul><li>One</li></ul>';
+    let latest = { editedBody: '', lastGenerated: '' };
+    const { rerender } = render(
+      <ArmBeforeMountHarness initial={writtenValue} onSettled={(s) => { latest = s; }} />
+    );
+
+    await waitFor(() => {
+      expect(latest.lastGenerated).toContain('data-list="bullet"');
+    });
+    // The initial onReady was consumed -- both baselines normalized and
+    // equal to each other, not the raw written value.
+    expect(latest.editedBody).toBe(latest.lastGenerated);
+    const normalizedBaseline = latest.lastGenerated;
+
+    // Same component instance (rerender, not remount) receives a
+    // Polish-like update next.
+    rerender(
+      <ArmBeforeMountHarness initial={writtenValue} polishText="<p>Polished</p>" onSettled={(s) => { latest = s; }} />
+    );
+
+    await waitFor(() => {
+      expect(latest.editedBody).toBe('<p>Polished</p>');
+    });
+    // The already-consumed flag must not reawaken for this write --
+    // lastGeneratedRef stays on the pre-polish, normalized baseline, so a
+    // subsequent Regenerate still warns that the polish result will be lost.
+    expect(latest.lastGenerated).toBe(normalizedBaseline);
   });
 });

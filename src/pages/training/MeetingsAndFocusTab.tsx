@@ -483,8 +483,36 @@ function BlastSlot({
   // Deliberately NOT armed for Polish (see onPolishClick): that
   // intentionally leaves lastGeneratedRef (and now editedBody's sync)
   // pointing at the pre-polish text.
-  const pendingGeneratedSyncRef = useRef(false);
-  const pendingWrittenValueRef = useRef('');
+  //
+  // Codex review (PR #116, P2): a CHILD component's own mount effect runs
+  // BEFORE this component's effects (React commits child effects
+  // bottom-up), and RichTextEditor calls onReady synchronously while
+  // seeding its initial content. So on first mount with an existing draft,
+  // onReady's first call arrived here BEFORE the week-switch effect below
+  // had a chance to arm this flag -- it was still `false`, the arm-worthy
+  // onReady call was silently ignored, and the flag stayed armed from the
+  // week-switch effect's own run, waiting for whatever onReady fired NEXT.
+  // That next call was often a Polish result (Polish sets editedBody -> the
+  // editor's controlled-value-sync effect -> onReady), so the polish
+  // output got wrongly adopted as the "generated" baseline and Regenerate
+  // stopped warning before discarding a fresh polish.
+  //
+  // Fixed two ways together (traced empirically, not just reasoned through
+  // -- React batches this component's own effect with the child's into one
+  // update, so either fix alone still lets the second clobber the first):
+  // 1. These two refs are armed with their INITIAL values during render
+  //    (useRef's initial argument), before the child ever mounts, so the
+  //    very first onReady call has something correct to consume.
+  // 2. The week-switch effect below skips its arm-then-set body on its own
+  //    first run (isFirstRunRef) -- that effect always fires once at mount
+  //    regardless of its dependency array, and since it unconditionally
+  //    overwrites editedBody with the RAW (pre-Quill-normalization) body,
+  //    letting it run at mount would silently undo the correction onReady
+  //    just made. On a REAL week switch (not mount), isFirstRunRef is
+  //    already false, so the effect's existing arm-then-set ordering runs
+  //    exactly as before -- that path was never broken.
+  const pendingGeneratedSyncRef = useRef(true);
+  const pendingWrittenValueRef = useRef(editedBody);
   const onEditorReady = (html: string) => {
     if (pendingGeneratedSyncRef.current) {
       pendingGeneratedSyncRef.current = false;
@@ -493,6 +521,19 @@ function BlastSlot({
     }
   };
 
+  // Codex review (PR #116, P2): this effect always fires once at mount too
+  // (React runs every effect after the initial render regardless of its
+  // dependency array), and its unconditional setEditedBody(upgraded) would
+  // overwrite editedBody's already-correct, Quill-normalized value (set
+  // moments earlier by the render-time-armed onEditorReady above) with the
+  // raw pre-normalization body -- re-breaking the very thing the arming
+  // above just fixed. Skipping this effect's body on its own first run
+  // avoids that: render-time arming already seeded everything correctly for
+  // the initial-mount case, so there is nothing for this run to do. On a
+  // REAL week switch, isFirstRunRef is already false, so this effect's
+  // existing arm-then-set ordering runs exactly as before.
+  const isFirstRunRef = useRef(true);
+
   // Re-sync local edit state when a different week's draft loads. Keyed on
   // id + week so it doesn't stomp on in-progress typing when the query
   // silently refetches the same row. Existing rows are plain text (bare
@@ -500,6 +541,10 @@ function BlastSlot({
   // a body that's already HTML, and converts one that isn't into equivalent
   // HTML paragraphs so nothing is lost visually in the editor.
   useEffect(() => {
+    if (isFirstRunRef.current) {
+      isFirstRunRef.current = false;
+      return;
+    }
     const upgraded = upgradeBlastBodyToHtml(weekBlast?.body ?? '');
     setEditedBody(upgraded);
     setEditedSubject(weekBlast?.subject || buildDefaultBlastSubject(weekStartDate));

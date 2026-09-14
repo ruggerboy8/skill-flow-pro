@@ -1,0 +1,707 @@
+<!-- Pro Moves — Explore drill prototype
+     The "Explore" tab: wander your role from domain -> competency -> pro move
+     -> learning materials. A drill INSIDE the shipped mobile app, matching the
+     shell in mobile-shell-prototype.html (tokens, type scale, domain spines,
+     slide transitions). Not the "museum" (that's the Alcan Way).
+
+     REAL CONTENT: pulled read-only from live DB (project yeypngaufuualdfzcjpk)
+     for the Dental Assistant role (role_id 2). 4 domains, 16 competencies,
+     60 pro moves, verbatim action_statements + descriptions, and real script
+     text for the moves that have it. Domain/competency/move copy is production
+     content shown as-is, so a few DB strings contain em dashes; the prototype's
+     own chrome copy does not. Move 59 has a genuinely empty description on
+     purpose, to show the graceful "no why yet" case.
+
+     Data reality that shapes the design: 328 of 339 active moves have a
+     description; only ~55 have any script/audio/video. So the description is
+     the near-universal teaching content, and a description-only move page is
+     designed to read as finished, not missing media. -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Explore · Pro Moves</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<style>
+  /* Tokens mirror src/index.css (bare HSL triplets), light theme. */
+  :root {
+    --bg: 210 40% 98%;
+    --ink: 222 47% 11%;
+    --muted: 215 16% 47%;
+    --muted-tint: 215 20% 38%;
+    --card: 0 0% 100%;
+    --border: 214 32% 91%;
+    --primary: 215 25% 27%;
+    --primary-ink: 210 40% 98%;
+
+    --clinical: 211 85% 55%;  --clinical-pastel: 211 100% 92%; --clinical-ink: 211 70% 30%;
+    --clerical: 123 60% 45%;  --clerical-pastel: 123 41% 88%;  --clerical-ink: 123 45% 22%;
+    --cultural: 330 85% 60%;  --cultural-pastel: 354 70% 89%;  --cultural-ink: 330 50% 32%;
+    --caseacc: 36 90% 55%;    --caseacc-pastel: 36 100% 90%;   --caseacc-ink: 30 70% 28%;
+
+    /* the traveling domain color — set as you descend, cleared at Explore */
+    --accent: 215 25% 27%;
+    --accent-pastel: 214 32% 91%;
+    --accent-ink: 215 25% 27%;
+
+    --radius: 16px;
+    --gap-card: 12px;
+    --gap-group: 20px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --display: "Fraunces", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: 222 30% 9%;
+      --ink: 210 40% 96%;
+      --muted: 215 16% 62%;
+      --muted-tint: 215 18% 68%;
+      --card: 222 26% 13%;
+      --border: 216 22% 22%;
+      --primary: 210 40% 90%;
+      --primary-ink: 222 30% 12%;
+      --clinical-pastel: 211 50% 22%; --clinical-ink: 211 80% 78%;
+      --clerical-pastel: 123 45% 20%; --clerical-ink: 123 55% 72%;
+      --cultural-pastel: 330 50% 22%; --cultural-ink: 330 75% 82%;
+      --caseacc-pastel: 36 55% 22%;   --caseacc-ink: 36 90% 72%;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font); background: hsl(215 25% 92%); color: hsl(var(--ink));
+    -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column; align-items: center; min-height: 100dvh;
+  }
+  @media (prefers-color-scheme: dark) { body { background: hsl(222 30% 6%); } }
+  button { font-family: inherit; cursor: pointer; color: inherit; }
+
+  /* ---- phone frame ---- */
+  .phone {
+    position: relative;
+    width: 100%; max-width: 430px; height: min(900px, calc(100dvh - 24px));
+    background: hsl(var(--bg)); display: flex; flex-direction: column;
+    border-radius: 26px; overflow: hidden; box-shadow: 0 12px 50px hsl(215 30% 20% / .22);
+  }
+  @media (max-width: 460px) {
+    body { background: hsl(var(--bg)); }
+    .phone { height: 100dvh; border-radius: 0; box-shadow: none; max-width: none; }
+  }
+
+  .appbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px 10px; border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--card)); flex: none; z-index: 5; }
+  .appbar .brand { display: flex; align-items: center; gap: 8px; }
+  .appbar img { height: 22px; width: auto; display: block; }
+  .appbar .wordmark { font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: hsl(var(--muted)); }
+  .surprise { display: inline-flex; align-items: center; gap: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); border-radius: 999px; padding: 8px 12px; font-size: 12px; font-weight: 600; color: hsl(var(--primary)); min-height: 36px; }
+  .surprise:active { background: hsl(var(--primary) / .06); transform: scale(.97); }
+  .surprise svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---- breadcrumb trail: the sense of "where am I" ---- */
+  .crumbs { display: flex; align-items: center; gap: 4px; padding: 9px 14px; background: hsl(var(--card)); border-bottom: 1px solid hsl(var(--border)); flex: none; overflow-x: auto; scrollbar-width: none; min-height: 40px; }
+  .crumbs::-webkit-scrollbar { display: none; }
+  .crumbs.hidden { display: none; }
+  .crumb { border: 0; background: none; font-size: 12px; font-weight: 600; color: hsl(var(--muted)); white-space: nowrap; padding: 4px 2px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; flex: none; }
+  .crumb.here { color: hsl(var(--accent-ink)); max-width: 190px; }
+  .crumb-sep { color: hsl(var(--muted)); opacity: .5; flex: none; font-size: 12px; }
+  .crumb-dot { width: 8px; height: 8px; border-radius: 50%; background: hsl(var(--accent)); flex: none; margin-right: 4px; }
+
+  .screens { flex: 1; overflow: hidden; position: relative; }
+  .screen { position: absolute; inset: 0; overflow-y: auto; padding: 18px 16px 30px; display: none; }
+  .screen.active { display: block; }
+  .screen.active.in-fwd { animation: slideFwd .24s cubic-bezier(.32,.72,0,1); }
+  .screen.active.in-back { animation: slideBack .24s cubic-bezier(.32,.72,0,1); }
+  @keyframes slideFwd { from { opacity: .3; transform: translateX(26px); } }
+  @keyframes slideBack { from { opacity: .3; transform: translateX(-26px); } }
+
+  /* ---- type ---- */
+  h1 { font-size: 23px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2; text-wrap: balance; }
+  h2 { font-size: 15px; font-weight: 600; }
+  .display { font-family: var(--display); font-weight: 600; letter-spacing: -.01em; }
+  .eyebrow { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: hsl(var(--muted)); }
+  .sub { color: hsl(var(--muted)); font-size: 13px; line-height: 1.5; }
+  .meta { font-size: 11px; color: hsl(var(--muted)); }
+
+  /* ---- back pill (reads as a button, per shell) ---- */
+  .backlink { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 999px; color: hsl(var(--accent-ink)); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; padding: 11px 15px 11px 11px; margin-bottom: 14px; min-height: 44px; }
+  .backlink:active { background: hsl(var(--accent) / .06); transform: scale(.98); }
+
+  /* ---- Explore landing: domain doorways ---- */
+  .lede { font-size: 15px; line-height: 1.55; color: hsl(var(--muted-tint)); margin: 4px 0 4px; }
+  .doorways { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+  .doorway {
+    position: relative; width: 100%; text-align: left; border: 1px solid hsl(var(--d) / .35);
+    border-radius: 18px; padding: 18px 16px 16px; overflow: hidden;
+    background:
+      radial-gradient(120% 120% at 100% 0%, hsl(var(--d-pastel) / .9) 0%, hsl(var(--card)) 62%);
+    transition: transform .1s ease, box-shadow .2s ease;
+  }
+  .doorway:active { transform: scale(.985); box-shadow: 0 6px 20px hsl(var(--d) / .18); }
+  .doorway .glyph { position: absolute; right: -12px; top: -26px; font-family: var(--display); font-size: 120px; font-weight: 600; line-height: 1; color: hsl(var(--d) / .14); pointer-events: none; }
+  .doorway .dn { font-family: var(--display); font-size: 22px; font-weight: 600; color: hsl(var(--d-ink)); position: relative; }
+  .doorway .dd { font-size: 13px; line-height: 1.5; color: hsl(var(--muted-tint)); margin-top: 5px; max-width: 90%; position: relative; }
+  .doorway .df { display: flex; align-items: center; gap: 8px; margin-top: 14px; position: relative; }
+  .doorway .pill { font-size: 11px; font-weight: 700; letter-spacing: .02em; color: hsl(var(--d-ink)); background: hsl(var(--d) / .12); border-radius: 999px; padding: 5px 10px; }
+  .doorway .enter { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: hsl(var(--d-ink)); }
+  .doorway .enter svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---- domain page header ---- */
+  .domain-hero { position: relative; border-radius: 18px; padding: 18px 16px 16px; overflow: hidden; margin-bottom: 4px;
+    background: radial-gradient(140% 120% at 0% 0%, hsl(var(--accent-pastel) / .85) 0%, hsl(var(--card)) 70%);
+    border: 1px solid hsl(var(--accent) / .3); }
+  .domain-hero .glyph { position: absolute; right: -10px; bottom: -40px; font-family: var(--display); font-size: 150px; font-weight: 600; line-height: 1; color: hsl(var(--accent) / .1); pointer-events: none; }
+  .tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 4px 9px; border-radius: 999px; display: inline-block; background: hsl(var(--accent) / .12); color: hsl(var(--accent-ink)); }
+  .domain-hero h1 { margin-top: 10px; font-family: var(--display); font-weight: 600; color: hsl(var(--accent-ink)); position: relative; }
+  .domain-hero p { font-size: 14px; line-height: 1.55; color: hsl(var(--muted-tint)); margin-top: 8px; position: relative; max-width: 92%; }
+  .domain-hero .count { position: relative; margin-top: 12px; font-size: 12px; font-weight: 700; color: hsl(var(--accent-ink)); }
+
+  .section-label { display: flex; align-items: center; gap: 8px; margin: 20px 2px 8px; }
+  .section-label .eyebrow { color: hsl(var(--muted)); }
+  .section-label .line { flex: 1; height: 1px; background: hsl(var(--border)); }
+
+  /* ---- competency list rows (inside a domain) ---- */
+  .comp-card { position: relative; width: 100%; text-align: left; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 14px; padding: 14px 14px 14px 16px; margin-top: 10px; display: flex; gap: 12px; align-items: stretch; transition: transform .08s ease; }
+  .comp-card:active { transform: scale(.99); background: hsl(var(--accent) / .03); }
+  .comp-card .spine { width: 6px; border-radius: 3px; background: hsl(var(--accent)); flex: none; }
+  .comp-card .body { flex: 1; min-width: 0; }
+  .comp-card .tl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: hsl(var(--accent-ink)); }
+  .comp-card .nm { font-size: 15px; font-weight: 600; line-height: 1.3; margin-top: 3px; }
+  .comp-card .mc { font-size: 12px; color: hsl(var(--muted)); margin-top: 7px; display: flex; align-items: center; gap: 8px; }
+  .comp-card .arrow { color: hsl(var(--muted)); font-size: 18px; align-self: center; flex: none; }
+  .explore-dots { display: inline-flex; gap: 3px; align-items: center; }
+  .explore-dots i { width: 5px; height: 5px; border-radius: 50%; background: hsl(var(--border)); display: block; }
+  .explore-dots i.on { background: hsl(var(--accent)); }
+
+  /* ---- competency page ---- */
+  .comp-shorthand { font-size: 13px; font-weight: 600; color: hsl(var(--accent-ink)); margin-top: 6px; }
+  .comp-intro { font-size: 15px; line-height: 1.6; color: hsl(var(--ink)); margin-top: 12px; }
+  /* aspirational identity line, styled as the app describing the person at their best */
+  .comp-quote { font-family: var(--display); font-size: 16px; font-weight: 500; font-style: italic; line-height: 1.5; color: hsl(var(--accent-ink)); background: hsl(var(--accent) / .05); border-left: 3px solid hsl(var(--accent)); border-radius: 0 12px 12px 0; padding: 14px 16px; margin-top: 16px; }
+  .move-list { margin-top: 8px; }
+  .move-card { position: relative; width: 100%; text-align: left; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 14px; padding: 14px; margin-top: 10px; display: flex; gap: 12px; align-items: stretch; transition: transform .08s ease; }
+  .move-card:active { transform: scale(.99); background: hsl(var(--accent) / .03); }
+  .move-card .num { flex: none; width: 26px; height: 26px; border-radius: 8px; background: hsl(var(--accent) / .1); color: hsl(var(--accent-ink)); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+  .move-card .mtxt { flex: 1; min-width: 0; }
+  .move-card .mstate { font-size: 14px; line-height: 1.4; font-weight: 500; }
+  .move-card .mat-icons { display: inline-flex; align-items: center; gap: 9px; margin-top: 10px; }
+  .move-card .mat-icons svg { width: 15px; height: 15px; stroke: hsl(var(--accent-ink)); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .7; }
+  .move-card .mcard-arrow { color: hsl(var(--muted)); font-size: 18px; align-self: center; flex: none; }
+
+  /* ---- move page (the star) ---- */
+  .move-eyebrow { display: flex; align-items: center; gap: 8px; }
+  .move-title { font-family: var(--display); font-size: 22px; font-weight: 600; line-height: 1.28; letter-spacing: -.01em; margin-top: 12px; text-wrap: balance; }
+  /* description: the centerpiece, shown with no label above it */
+  .desc-card { margin-top: 18px; border-radius: 16px; padding: 18px; background: hsl(var(--accent) / .06); border: 1px solid hsl(var(--accent) / .18); }
+  .desc-card p { font-size: 16px; line-height: 1.6; color: hsl(var(--ink)); }
+  .why-card { margin-top: 18px; border-radius: 16px; padding: 18px; background: hsl(var(--accent) / .06); border: 1px solid hsl(var(--accent) / .18); }
+  .why-card .wl { display: flex; align-items: center; gap: 8px; }
+  .why-card .wl .dot { width: 18px; height: 18px; border-radius: 6px; background: hsl(var(--accent) / .18); color: hsl(var(--accent-ink)); display: flex; align-items: center; justify-content: center; }
+  .why-card .wl .dot svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2.4; }
+  .why-card .wl span { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: hsl(var(--accent-ink)); }
+  .why-card p { font-size: 16px; line-height: 1.6; color: hsl(var(--ink)); margin-top: 10px; }
+  .why-card.plain { background: hsl(var(--card)); border-style: dashed; }
+  .why-card.plain p { color: hsl(var(--muted-tint)); font-size: 15px; }
+
+  .sec-head { display: flex; align-items: center; gap: 8px; margin: 24px 0 10px; }
+  .sec-head .ico { width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex: none; background: hsl(var(--accent) / .12); color: hsl(var(--accent-ink)); }
+  .sec-head .ico svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .sec-head h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: hsl(var(--muted)); }
+  .verbiage { margin-top: 16px; padding: 18px; border-radius: 16px; background: hsl(var(--accent) / .05); border-left: 4px solid hsl(var(--accent)); }
+  .verbiage p { font-family: var(--display); font-size: 17px; font-weight: 500; line-height: 1.55; color: hsl(var(--ink)); }
+  /* tap-to-hear: a small speaker, no label */
+  .hearwrap { display: flex; align-items: center; gap: 12px; }
+  .verbiage .hearwrap { margin-top: 14px; }
+  .hearwrap.solo { margin-top: 16px; }
+  .hear { width: 44px; height: 44px; border-radius: 50%; border: 0; background: hsl(var(--accent) / .14); color: hsl(var(--accent-ink)); display: flex; align-items: center; justify-content: center; flex: none; transition: transform .08s ease, background .1s ease; }
+  .hear:active { transform: scale(.94); }
+  .hear.playing { background: hsl(var(--accent) / .26); }
+  .hear svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .hearwrap .bar { flex: 1; height: 5px; border-radius: 3px; background: hsl(var(--border)); position: relative; overflow: hidden; }
+  .hearwrap .bar b { position: absolute; inset: 0; width: 0%; background: hsl(var(--accent)); border-radius: 3px; transition: width .2s linear; display: block; }
+  .reslink { display: flex; align-items: center; gap: 10px; padding: 13px 14px; border: 1px solid hsl(var(--border)); border-radius: 14px; margin-top: 8px; font-size: 14px; font-weight: 500; }
+  .reslink .ri { width: 30px; height: 30px; border-radius: 8px; background: hsl(var(--accent) / .1); color: hsl(var(--accent-ink)); display: flex; align-items: center; justify-content: center; flex: none; }
+  .reslink .ri svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .reslink .arrow { margin-left: auto; color: hsl(var(--muted)); }
+
+  .closing { margin-top: 22px; padding: 16px; border-radius: 14px; background: hsl(var(--accent) / .04); text-align: center; }
+  .closing p { font-size: 13px; line-height: 1.55; color: hsl(var(--muted-tint)); }
+
+  /* ---- momentum footer: a plain Next move button ---- */
+  .momentum { margin-top: 24px; border-top: 1px solid hsl(var(--border)); padding-top: 16px; }
+  .next-move { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid hsl(var(--accent) / .35); background: hsl(var(--accent) / .07); color: hsl(var(--accent-ink)); border-radius: 14px; padding: 15px; font-size: 15px; font-weight: 600; transition: transform .08s ease; }
+  .next-move:active { transform: scale(.99); }
+  .next-move svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---- tab bar (place-setting; Explore is the live one) ---- */
+  .tabbar { display: flex; border-top: 1px solid hsl(var(--border)); background: hsl(var(--card)); padding-bottom: env(safe-area-inset-bottom); flex: none; }
+  .tab { flex: 1; background: none; border: none; padding: 9px 0 11px; display: flex; flex-direction: column; align-items: center; gap: 3px; color: hsl(var(--muted)); font-size: 10px; font-weight: 500; min-height: 54px; }
+  .tab svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .tab[aria-selected="true"] { color: hsl(var(--primary)); font-weight: 700; }
+  .tab:active { background: hsl(var(--primary) / .05); }
+
+  .toast { position: absolute; left: 50%; bottom: 74px; transform: translateX(-50%) translateY(10px); background: hsl(var(--ink)); color: hsl(var(--bg)); font-size: 12px; font-weight: 500; padding: 10px 16px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease; z-index: 30; white-space: nowrap; }
+  .toast.show { opacity: .95; transform: translateX(-50%) translateY(0); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  :focus-visible { outline: 2px solid hsl(var(--accent)); outline-offset: 2px; }
+</style>
+
+<div class="phone">
+  <header class="appbar">
+    <div class="brand">
+      <img src="data:image/png;base64,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" alt="Alcan">
+      <span class="wordmark">Pro Moves</span>
+    </div>
+    <button class="surprise" id="surpriseBtn">
+      <svg viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M4 4l5 5"/></svg>
+      Surprise me
+    </button>
+  </header>
+
+  <nav class="crumbs hidden" id="crumbs" aria-label="Trail"></nav>
+
+  <div class="screens" id="screens">
+    <section class="screen" id="scr-explore"></section>
+    <section class="screen" id="scr-domain"></section>
+    <section class="screen" id="scr-comp"></section>
+    <section class="screen" id="scr-move"></section>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <nav class="tabbar" role="tablist" aria-label="Main navigation">
+    <button class="tab" role="tab" aria-selected="false" data-tab="Home">
+      <svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>Home
+    </button>
+    <button class="tab" role="tab" aria-selected="true" data-tab="Explore">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Explore
+    </button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="Performance">
+      <svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v5h-5"/></svg>Performance
+    </button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="More">
+      <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>More
+    </button>
+  </nav>
+</div>
+
+<script>
+// ============================================================
+//  REAL CONTENT — Dental Assistant (role_id 2), live DB read-only.
+//  Backtick strings so verbatim apostrophes / quotes / em dashes pass through.
+// ============================================================
+const M = {
+  // Clinical
+  19:{s:`I always use gloves only when handling contaminated instruments or chemicals, and remove them before touching anything clean or sterile.`,d:`Clean and sterile items stay safe when you use gloves only for what's dirty. This habit prevents cross-contamination and protects both patients and the clinical team.`,rt:''},
+  56:{s:`I always set up the tray for the scheduled procedure and any likely alternatives before bringing the patient back.`,d:`Preparing the full tray in advance keeps appointments smooth and prevents scrambling once the patient is seated. It creates confidence for the doctor, the patient, and for you.`,rt:''},
+  102:{s:`I always review the entire room reset checklist and confirm every item is complete before considering the room ready for the next patient.`,d:`A complete reset keeps every patient safe and every provider set up for success. Following the checklist ensures nothing gets missed and the room starts clean, stocked, and ready.`,rt:''},
+  120:{s:`I always use fresh cleaning rags for each individual patient encounter`,d:`Using a new rag for every patient protects against cross-contamination and keeps the room visibly clean. It's a small step that makes a big difference in safety.`,rt:''},
+  25:{s:`I always verify that my Xrays are usable for the doctor before moving the patient from the Xray machine`,d:`Checking the image right away saves time and prevents repeat exposures. Ensuring clarity helps the doctor diagnose accurately and keeps the visit moving.`,rt:''},
+  62:{s:`I always anticipate the next instrument the doctor will need and have it in hand before the doctor asks for it.`,d:`Smooth assisting feels almost choreographed. Anticipating the doctor's needs creates a seamless experience for the patient and keeps procedures efficient.`,rt:''},
+  28:{s:`I always ask the doctor to review my charting for accuracy before the doctor leaves the chair.`,d:`A quick accuracy check prevents rework later. Confirming while the doctor is still present keeps charting clean, complete, and reliable.`,rt:''},
+  65:{s:`As the doctor calls out findings, I actively listen and accurately record correct conditions on correct teeth (both in note and charted on the odontogram)`,d:`Accurate charting helps the whole team deliver safe, consistent care. Listening closely and recording precisely avoids errors and protects the patient record.`,rt:''},
+  76:{s:`As the doctor presents treatment options, I always actively listen, and accurately record all mutually agreed upon treatment.`,d:`Documenting agreed treatment clearly supports scheduling, billing, and follow-up care. Precise notes prevent confusion and keep the patient journey smooth.`,rt:''},
+  22:{s:`I always tell, show, do before performing any action on a patient.`,d:`Kids feel safer when they know what's coming. Showing and explaining each step builds trust, reduces fear, and helps the visit go smoothly.`,rt:''},
+  59:{s:`I always notice and verbally affirm specific positive behaviors during clinical activities`,d:``,rt:''},
+  98:{s:`I always monitor patient comfort, scanning for breathing, tension, and signs of anxiety, and narrate progress or use distraction to reduce stress, unless the doctor is already managing comfort, in which case I support their lead.`,d:`Comfort cues are easy to miss. Noticing a child's breathing or body tension early lets you step in before anxiety builds. If the doctor's already leading, your role is quiet support, matching tone and reinforcing calm.`,rt:'audio,script'},
+  126:{s:`When the doctor enters, I always present the patient by name, state the planned procedure, share relevant medical history, and relay any parent questions or concerns.`,d:`A smooth handoff helps the doctor focus immediately and shows the family that you're all on the same page. Presenting the patient clearly builds trust and keeps the visit efficient.`,rt:'audio,script'},
+  127:{s:`I always play the correct Parent Pre-Treatment video prior to Dr. arrival in the room`,d:`This video helps make sure parents understand their role is during the treatment, and helps prevent interruptions as much as possible.`,rt:''},
+  157:{s:`Before treatment begins, I always preview the doctor, the procedure, and invite any questions or concerns from the parent or patient.`,d:`Kids relax when they know what's about to happen, and parents trust you when you take time to include them. A calm preview sets the tone, everyone understands what's next, and the doctor walks into a prepared, confident room.`,rt:'audio,script'},
+  195:{s:`After treatment I always share clear instructions and set expectations for patients and parents about numbness, food/drink to avoid, and reasons to call in case of concern.`,d:`You are the conductor, even though the doctor performs the procedure, it's your patient. You make sure that the parents and patients understand what they need to in order to have the best post-op experience possible`,rt:'audio,script'},
+  // Clerical
+  26:{s:`I check Uptime and complete outstanding tasks prior to departure every day`,d:`Finishing Uptime tasks daily keeps the practice safe, compliant, and ready for the next day. Consistent follow-through prevents surprises and protects patient care.`,rt:''},
+  63:{s:`When I have 45 minutes or more between patients I always use that time to send messages to the Reschedule list to help fill the schedule.`,d:`Small pockets of time add up. Using those moments to reach out to the Reschedule list keeps the day efficient and helps patients stay on track with needed care.`,rt:'audio,link,video'},
+  97:{s:`Before lunch and at the end of the day, I always check high-turnover disposables and note anything running low so we never start short.`,d:`Quick supply checks prevent mid-day shortages. Catching low items early keeps procedures running smoothly and protects the pace of care.`,rt:''},
+  128:{s:`I'm always prepared to perform any maintenance or compliance task listed in the Uptime checklist when assigned.`,d:`Staying ready for maintenance tasks keeps the office safe and compliant. Following the checklist consistently supports the entire team's workflow.`,rt:''},
+  156:{s:`I always schedule the 6-month recare apppointment while the patient is in-chair`,d:`Keeping our patients in a consistent flow is crucial, and you're in the best position to make sure this gets done every time.`,rt:'audio,script'},
+  23:{s:`I always immediately change patient status to "In Chair" when they are seated and "Treatment Complete" when they are ready to be checked out.`,d:`Updating status right away keeps the whole team coordinated. It helps the doctor see who's ready and keeps families from waiting longer than necessary.`,rt:''},
+  60:{s:`When I notice that I'm starting an appointment more than 10 minutes late, I check with the Lead RDA before starting so that I understand the plan to get back on track.`,d:`Time warnings help you stay ahead of delays. Looping in the lead quickly keeps the day flowing and prevents small issues from becoming big bottlenecks.`,rt:''},
+  129:{s:`I always actively manage doctor flow by clearly communicating when and where patients are ready, including location, procedure, and patient type, to keep the schedule running smoothly.`,d:`Clear, proactive updates keep the doctor moving efficiently. Sharing the right details at the right moment prevents confusion and helps the entire day run smoothly.`,rt:''},
+  130:{s:`I always maintain the same professional pace and focus whether the office is calm or hectic.`,d:`A steady pace builds trust with both patients and the team. Staying consistent, even when things get busy, helps the day feel organized instead of chaotic.`,rt:''},
+  21:{s:`I always check the patient memo and ensure a complete medical history before beginning the appointment`,d:`Reviewing memos and history before you start keeps everyone safe and prevents surprises. It helps you walk into the room prepared and confident.`,rt:''},
+  58:{s:`I always accurately enter patient's height and weight in the proper units and double check for errors before seating them.`,d:`Accurate measurements matter for safe dosing and charting. Double-checking helps you avoid mistakes and keeps the appointment on track.`,rt:''},
+  123:{s:`After each applicable procedure, I always attach one intraoral photo to support patient understanding and insurance documentation.`,d:`A clear photo helps parents understand the procedure and strengthens documentation for the doctor and insurance. It's a quick step that adds clarity for everyone.`,rt:''},
+  124:{s:`I always complete and save clinical notes as a draft before the end of each appointment.`,d:`Complete notes keep the entire care team aligned. Finishing them before the appointment ends ensures accuracy and prevents details from being forgotten.`,rt:''},
+  29:{s:`I always verify that proper consent forms have been completed prior to beginning the appointment`,d:`Confirming consents protects both the patient and the practice. A quick check at the start ensures care begins safely and legally.`,rt:''},
+  66:{s:`After taking an x-ray I always label the teeth in the images before leaving the workstation`,d:`Labeling images immediately keeps records clear and helps the doctor diagnose without delay. It also prevents mix-ups later in the day.`,rt:''},
+  78:{s:`For all patients, I always verify that the adult with them is listed on the Authorized Individual Form before beginning the appointment`,d:`Checking authorization keeps every interaction safe and compliant. This quick verification protects patients, families, and the practice.`,rt:''},
+  // Cultural
+  30:{s:`After scheduling the next appointment, I always verbally emphasize the importance keeping that appointment and the consequences for missing it.`,d:`A brief reminder sets expectations early. Emphasizing the importance helps families commit to care and prevents unnecessary delays in treatment.`,rt:'audio,script'},
+  67:{s:`Except in extreme cases, I always request that all families leave us a Google review after their appointment, and direct them to the QR code to scan.`,d:`Google reviews are a huge part of families discovering our excellent care. We ask for them to help make sure other people can find us and get great oral healthcare.`,rt:'audio,script'},
+  24:{s:`I always take a moment to assess the parent's and patient's mood after changing status to 'In Chair,' and I quietly share any concerns with the doctor.`,d:`Reading the room early helps the doctor understand what kind of visit it may be. Quietly passing along concerns allows the doctor to adjust their approach with care and sensitivity.`,rt:''},
+  61:{s:`Before beginning a clinical activity I tell the patient that they can raise their hand to ask me to pause at any time`,d:`Giving kids permission to pause puts them back in control. It lowers fear, builds trust, and helps the whole visit feel more predictable.`,rt:'audio,script'},
+  83:{s:`When I notice my own stress rising, I always pause for one deep breath to center myself before speaking or acting.`,d:`A quick reset protects the room from tension. One calm breath helps you show up with patience, clarity, and kindness, even in busy moments.`,rt:''},
+  20:{s:`I always greet the patient by name, smile with eye contact, and introduce myself by name.`,d:`The first moments set the tone. A warm greeting with eye contact helps the child feel safe and helps parents relax, knowing you're attentive and present.`,rt:'audio,script'},
+  57:{s:`I always ask the patient a curious open-ended question as I am seating them`,d:`Simple, curious questions help kids feel seen and ease into the visit. It turns the room into a friendlier place and helps you build trust early.`,rt:''},
+  105:{s:`I always use the question "What are your goals for your child's oral health over the next 5 years?" during a new patient appointment.`,d:`Asking about goals shows the parent that their priorities matter. It gives the doctor helpful context and helps families feel like true partners in their child's care.`,rt:'audio,script'},
+  121:{s:`I always offer parents a coffee and patients a blanket prior to all procedures.`,d:`Small gestures make big impressions. Offering comfort items helps families relax and shows that you're thinking about their experience, not just the procedure.`,rt:'audio,script'},
+  122:{s:`I always set patients up for comfort by offering a headset and asking them what they'd like to watch.`,d:`Helping the patient choose something to watch gives them control and distraction during the visit. It turns an unfamiliar procedure into something familiar and safe.`,rt:''},
+  32:{s:`When responding to frustration, I always remain calm and first attempt to restate the guardian's complaint.`,d:`Starting with calmness keeps tough conversations productive. Restating what you heard shows that you're listening and takes the tension out of the moment.`,rt:'audio,script'},
+  69:{s:`After restating critical feedback, I always use the phrase "tell me more" and actively listen to the response.`,d:`"Tell me more" opens the door for clarity. It signals that you're not defending, you're understanding. Active listening helps families feel heard and respected.`,rt:'audio,script'},
+  132:{s:`When presented with critical feedback or conflict from a parent or guardian, I always ensure that a next-step or resolution has been found before finishing the interaction.`,d:`Every piece of feedback needs a clear finish. Ending with a concrete next step shows professionalism and turns criticism into forward motion.`,rt:'audio,script'},
+  // Case Acceptance
+  31:{s:`When a parent is uncertain about a procedure, I always reassure them about the importance of the procedure, and inform the doctor about the conversation`,d:`Parents worry because they care. Offering calm reassurance and looping in the doctor keeps communication clear and helps families feel supported.`,rt:'audio,script'},
+  68:{s:`I always link the dentist's recommended treatment to the parent's desired outcome for their child`,d:`Parents care most about the end result, linking the treatment to their goals helps everything make sense. When you make that connection clear, it builds trust and keeps the path forward focused on what matters to them.`,rt:'audio,script'},
+  73:{s:`When hesitation surfaces, I always identify the primary concern, comfort, time, or cost, so I can respond to the right thing.`,d:`You're likely the first person to hear about a worry. That means you're the most likely to understand exactly where it's coming from.`,rt:''},
+  85:{s:`When cost is a concern, I explain that the doctor has prioritized what's most important to do first but that we can plan the rest in safe stages. I communicate the worries with the treatment coordinator.`,d:`Cost worries are normal. Staying calm and explaining that the doctor has already prioritized the safest order helps families feel supported, not pressured. Handing off to the treatment coordinator keeps the conversation clear, kind, and organized.`,rt:'audio,script'},
+  131:{s:`I always communicate the importance of X-rays to our standard of care any time a parent objects or attempts to decline them.`,d:`X-rays help the doctor catch things we can't see with our eyes. Explaining that clearly, and kindly, helps parents understand that imaging isn't optional; it's part of providing complete and safe care.`,rt:'audio,script'},
+  163:{s:`When discussing Zirconia crowns with a guardian, I always communicate their value by highlighting that we're unique in placing them, their improved appearance, and their long term durability.`,d:`We believe in this treatment, even if insurers don't. So we need to be able to explain why, and why the family should care.`,rt:'audio,script'},
+  27:{s:`If I help explain a treatment plan, I always ask the parent "How does that sound to you?" or "How are you feeling about this plan?".`,d:`A gentle check-in helps parents feel heard and reassured. Asking how the plan feels opens the door for real questions before they become concerns.`,rt:'audio,script'},
+  64:{s:`After the doctor explains the treatment and leaves the chair, I always check for comprehension and clearly narrate next steps`,d:`When the doctor steps away, parents often still have questions. A quick, friendly recap ensures understanding and builds trust in the plan.`,rt:'audio,script'},
+  77:{s:`I always invite the guardian to share back the key parts of the post-op plan to confirm their understanding and comfort with next steps.`,d:`A brief teach-back helps you catch misunderstandings early. It makes parents feel supported while ensuring their child's recovery stays on track.`,rt:'audio,script'},
+  161:{s:`I always use "estimated insurance benefits/ savings" and "patient portion/ responsibility" instead of "covered/not covered" and "out-of-pocket".`,d:`We always refer to insurance as a benefit or a savings so there's less surprise when treatment isn't fully covered. "Out-of-pocket" gives families the mental image that we're "reaching into their pocket" for money.`,rt:'audio,script'},
+  33:{s:`I always preview the patient's doctor by name, and comment specifically on that doctor's expertise or experience`,d:`Introducing the doctor with a quick note about their skill builds instant confidence. It helps parents feel at ease before the doctor even enters the room.`,rt:'audio,script'},
+  70:{s:`When pulling up radiographs prior to doctor's arrival, I always highlight OVERJET, and explain the benefits to the patient.`,d:`By speaking confidently about the technology we use, it gives us credibility and authority.`,rt:'audio,script'},
+  91:{s:`I always share a quick, positive story about how this treatment helped another child feel better or stay healthy (no names or details), so parents can picture the real benefit.`,d:`A short, anonymous success story helps parents imagine the positive outcome for their own child. It replaces fear with a clearer picture of what good care can do.`,rt:'audio,script'},
+  34:{s:`When confirming next steps, I always highlight the health risks of delaying treatment or recare.`,d:`Delays can create real risks, and parents appreciate honesty delivered with care. Explaining those risks clearly helps them make informed, confident decisions.`,rt:''},
+  90:{s:`Before dismissal, I always ensure the next visit is scheduled at the clinically appropriate interval`,d:`Locking in the next visit keeps treatment on track. Making sure families know exactly who to reach out to prevents confusion and gives them a clear pathway for support.`,rt:''},
+};
+
+// Real script text (pro_move_resources.content_md), verbatim where we have it.
+const SCRIPTS = {
+  31:`I totally understand being a little worried about a first filling. It's really important that we remove the decay from the tooth. We're going to work hard to make sure Jessie is as comfortable as possible the whole time.`,
+  64:`Just to make sure everything feels clear, here's the plan Dr. Reyes went over: we'll take care of that small cavity with a simple filling, and doing it now keeps it from turning into something more serious. The next step is finding a time this week that works for you, let's get you set up before you head out.`,
+  68:`I know you said one of your goals is to help her avoid future cavities, this sealant is the first step that gets us there.`,
+  85:`Dr. Alex put this in order of what needs to happen first, and we can definitely do the rest in stages. Our treatment coordinator will walk through the options with you before you leave, how does that sound?`,
+  98:`You're doing great. We're almost through this next part. If you need a break, just let me know.`,
+  126:`Dr. Alex, Max is 5 years old and is here today with his mom, Mrs Smith. This is the 2nd time we've seen Max and he's in today for his check up and cleaning. Max has a history of asthma and uses an inhaler when he is sick. Mrs. Smith mentioned that she is concerned he hasn't lost any teeth and would like you to check on that. Max did great for his cleaning, x-rays were a little hard for him to bite on but I'm really proud of him for trying today! I am sure you remember that Max loves monster trucks, so I told him you were going to check and see if there were any monster truck tracks in his mouth today!`,
+  157:`Ok, so Dr. Alex will be starting that extraction in a second. Before I go and get her, can you tell me how you're feeling about the procedure today?`,
+};
+
+// Domains -> competencies (real names, taglines, friendly descriptions, formal descriptions).
+const DOMAINS = [
+  { key:'clinical', name:'Clinical', glyph:'C',
+    intro:`The hands-on craft of the operatory. Clean rooms, smooth procedures, and kids who feel safe in the chair.`,
+    comps:[
+      { id:17, name:`Sterilization and Procedure Preparation`, tagline:`Room ready, gear clean`,
+        friendly:`Safety starts with you. By maintaining a pristine clinical environment, you protect every patient and set the stage for flawless procedures.`,
+        formal:`Ensures that all equipment, instruments, and treatment rooms are thoroughly sterilized, properly stocked, and correctly set up for each specific procedure.`,
+        moves:[19,56,102,120] },
+      { id:18, name:`Mastery of Dental Procedures`, tagline:`Procedures on point`,
+        friendly:`You are the dentist's right hand. Executing procedures with precision and anticipating needs makes the appointment smoother for everyone.`,
+        formal:`Demonstrates exceptional knowledge and skill in performing all dental procedures, both independently and when assisting the dentist.`,
+        moves:[25,62] },
+      { id:19, name:`Accurate Charting`, tagline:`Chart like a pro`,
+        friendly:`You write the history of their care. Accurate, professional charting ensures that every future decision is based on the full picture.`,
+        formal:`Demonstrates comprehensive knowledge of dental terminology, oral anatomy, and practice software to accurately record patient information and clinical notes.`,
+        moves:[28,65,76] },
+      { id:20, name:`Patient Comfort and Communication During Procedures`, tagline:`Keep patient calm`,
+        friendly:`You are the patient's advocate in the chair. Monitoring their comfort and easing their fears turns a scary appointment into a safe one.`,
+        formal:`Continuously centers the patient's experience by monitoring comfort, understanding, and emotional state, and communicating throughout treatment.`,
+        moves:[22,59,98,126,127,157,195] },
+    ] },
+  { key:'clerical', name:'Clerical', glyph:'L',
+    intro:`The quiet work that keeps the day running. Records, supplies, and patient flow nobody notices when it is done right.`,
+    comps:[
+      { id:21, name:`Office Task Management`, tagline:`Stock and fix stuff`,
+        friendly:`A great practice runs on details. Managing inventory and equipment behind the scenes guarantees the clinical team never has to hit pause.`,
+        formal:`Effectively handles non-clinical administrative tasks such as inventory management, ordering supplies, and coordinating equipment maintenance.`,
+        moves:[26,63,97,128,156] },
+      { id:22, name:`Coordinating Patient Flow`, tagline:`Move 'em smoothly`,
+        friendly:`You keep the rhythm of the back office going. Coordinating with the front desk minimizes wait times and respects everyone's schedule.`,
+        formal:`Ensures a seamless flow of patients through the practice by coordinating with the dental team and front office staff.`,
+        moves:[23,60,129,130] },
+      { id:23, name:`Patient Record Management`, tagline:`Records airtight`,
+        friendly:`Accuracy is your hallmark. Maintaining airtight patient records protects the practice and ensures the highest standard of care continuity.`,
+        formal:`Maintains accurate, up-to-date patient records, applying record-keeping protocols and confidentiality requirements.`,
+        moves:[21,58,123,124] },
+      { id:24, name:`Clerical Procedure Requirements`, tagline:`Paperwork done right`,
+        friendly:`You close the loop on care. Handling consents and follow-ups promptly means the patient's journey is complete and compliant.`,
+        formal:`Ensures clerical tasks tied to procedures, such as consent forms, insurance verification, and follow-up scheduling, are completed accurately and promptly.`,
+        moves:[29,66,78] },
+    ] },
+  { key:'cultural', name:'Cultural', glyph:'U',
+    intro:`How the practice feels to walk into. The warmth, the read on the room, and the trust you build one family at a time.`,
+    comps:[
+      { id:25, name:`Empathetic Practice Policy Education`, tagline:`Rules with care`,
+        friendly:`You guide patients with kindness. Helping them understand our policies prevents frustration and keeps the relationship positive.`,
+        formal:`Communicates and enforces practice policies in a firm yet empathetic manner, educating patients without causing frustration.`,
+        moves:[30,67] },
+      { id:26, name:`Demonstrating Emotional Intelligence`, tagline:`EQ on display`,
+        friendly:`You read the room perfectly. Managing emotions, yours and theirs, creates a supportive atmosphere where everyone feels safe.`,
+        formal:`Exhibits high emotional intelligence by managing personal emotions and responding appropriately to patients and colleagues.`,
+        moves:[24,61,83] },
+      { id:27, name:`Trust Building Interactions`, tagline:`Earn their trust`,
+        friendly:`You are the face of care. Remembering personal details and treating patients like friends builds a trust that keeps them coming back.`,
+        formal:`Builds genuine connections through personalized interactions, making patients feel known, appreciated, and truly cared for.`,
+        moves:[20,57,105,121,122] },
+      { id:28, name:`Handling Constructive Feedback`, tagline:`Turn complaints into wins`,
+        friendly:`You listen to understand. Responding to concerns with calm professionalism turns a moment of friction into a moment of connection.`,
+        formal:`Responds to complaints or negative feedback calmly and professionally, seeking mutually beneficial solutions.`,
+        moves:[32,69,132] },
+    ] },
+  { key:'caseacc', name:'Case Acceptance', glyph:'A',
+    intro:`Helping families say yes to the care their child needs. Clear answers, honest value, and no pressure.`,
+    comps:[
+      { id:29, name:`Effective Objection Handling`, tagline:`Overcome "no"`,
+        friendly:`You help them see the value. When you gently address a concern about treatment, you act as a partner in their long-term health.`,
+        formal:`Skillfully addresses objections to recommended treatment, such as cost, urgency, or convenience, by reinforcing clinical necessity and benefit.`,
+        moves:[31,68,73,85,131,163] },
+      { id:30, name:`Clear Treatment Communication`, tagline:`Explain in plain talk`,
+        friendly:`You make the complex simple. Explaining treatment in plain language removes fear and empowers patients to take ownership of their smile.`,
+        formal:`Clearly and confidently explains treatment options and plans so patients understand the procedures, benefits, and what to expect.`,
+        moves:[27,64,77,161] },
+      { id:31, name:`Establishing Credibility`, tagline:`Show we're experts`,
+        friendly:`You validate their choice. Reminding patients of the team's expertise reassures them that they are receiving world-class care.`,
+        formal:`Builds trust by communicating the practice's and dentists' expertise, experience, and commitment to quality care.`,
+        moves:[33,70,91] },
+      { id:32, name:`Empowering Informed Decisions`, tagline:`Help them choose care`,
+        friendly:`You empower action. By clearly outlining the "why" behind the treatment, you help patients make the best decision for their future without feeling pressured.`,
+        formal:`Provides information about the clinical need for treatment and the risks of delay, enabling fully informed decisions without pressure.`,
+        moves:[34,90] },
+    ] },
+];
+
+// ============================================================
+//  Navigation: a small state stack. Each entry names a level.
+//  Descending sets the traveling accent color; back restores it.
+// ============================================================
+const EXPLORED = new Set();          // moves opened this session (discovery, not a grade)
+let stack = [{ v:'explore' }];
+const $ = id => document.getElementById(id);
+
+function domByKey(k){ return DOMAINS.find(d => d.key === k); }
+function compById(dom, id){ return dom.comps.find(c => c.id === id); }
+function moveMeta(id){ const m = M[id]; const rt = (m.rt||'').split(',').filter(Boolean);
+  return { s:m.s, d:m.d, hasScript: !!SCRIPTS[id], script: SCRIPTS[id]||null,
+           hasAudio: rt.includes('audio'), hasVideo: rt.includes('video'), hasLink: rt.includes('link') }; }
+
+function setAccent(key){
+  const p = $('screens').parentElement; // .phone
+  if (!key){ p.style.setProperty('--accent','var(--primary)'); p.style.setProperty('--accent-pastel','var(--border)'); p.style.setProperty('--accent-ink','var(--primary)'); return; }
+  p.style.setProperty('--accent', `var(--${key})`);
+  p.style.setProperty('--accent-pastel', `var(--${key}-pastel)`);
+  p.style.setProperty('--accent-ink', `var(--${key}-ink)`);
+}
+
+const ICON = {
+  script:`<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+  audio:`<svg viewBox="0 0 24 24"><path d="M3 10v4h4l5 5V5L7 10H3z"/><path d="M16 8a5 5 0 0 1 0 8"/></svg>`,
+  video:`<svg viewBox="0 0 24 24"><rect x="2" y="5" width="14" height="14" rx="2"/><path d="m16 10 6-3v10l-6-3"/></svg>`,
+  link:`<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>`,
+  check:`<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>`,
+  arrow:`<svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg>`,
+  spark:`<svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/></svg>`,
+};
+
+// ---- renderers ----
+function renderExplore(){
+  const totalMoves = DOMAINS.reduce((n,d)=>n + d.comps.reduce((s,c)=>s+c.moves.length,0), 0);
+  const totalComps = DOMAINS.reduce((n,d)=>n + d.comps.length, 0);
+  $('scr-explore').innerHTML = `
+    <p class="eyebrow">Dental Assistant</p>
+    <h1 class="display" style="margin-top:6px">Explore your role</h1>
+    <p class="lede">Wander the four domains of the Dental Assistant craft. ${totalComps} areas, ${totalMoves} Pro Moves, and the reason behind each one. No scores here, just a place to look around.</p>
+    <div class="doorways">
+      ${DOMAINS.map(d=>{
+        const mv = d.comps.reduce((s,c)=>s+c.moves.length,0);
+        return `<button class="doorway" style="--d:var(--${d.key}); --d-pastel:var(--${d.key}-pastel); --d-ink:var(--${d.key}-ink)" onclick="openDomain('${d.key}')">
+          <span class="dn">${d.name}</span>
+          <span class="dd">${d.intro}</span>
+          <span class="df">
+            <span class="pill">${d.comps.length} areas</span>
+            <span class="pill">${mv} Pro Moves</span>
+            <span class="enter">Enter ${ICON.arrow}</span>
+          </span>
+        </button>`;
+      }).join('')}
+    </div>
+    <p class="meta" style="text-align:center; margin-top:22px; line-height:1.6">Real Pro Moves and coaching content from your role's framework.<br>Tap “Surprise me” to land on a random one.</p>`;
+}
+
+function renderDomain(key){
+  const d = domByKey(key);
+  const mv = d.comps.reduce((s,c)=>s+c.moves.length,0);
+  $('scr-domain').innerHTML = `
+    <button class="backlink" onclick="back()">‹ Explore</button>
+    <div class="domain-hero">
+      <span class="tag">Domain</span>
+      <h1>${d.name}</h1>
+      <p>${d.intro}</p>
+      <p class="count">${d.comps.length} competencies · ${mv} Pro Moves</p>
+    </div>
+    <div class="section-label"><span class="eyebrow">Areas to explore</span><span class="line"></span></div>
+    ${d.comps.map(c=>{
+      const seen = c.moves.filter(id=>EXPLORED.has(id)).length;
+      const dots = c.moves.slice(0,7).map((id,i)=>`<i class="${EXPLORED.has(id)?'on':''}"></i>`).join('');
+      return `<button class="comp-card" onclick="openComp('${key}',${c.id})">
+        <span class="spine"></span>
+        <span class="body">
+          <span class="tl">${c.tagline}</span>
+          <span class="nm">${c.name}</span>
+          <span class="mc">
+            <span>${c.moves.length} Pro Moves</span>
+            <span class="explore-dots" title="${seen} opened">${dots}</span>
+          </span>
+        </span>
+        <span class="arrow">›</span>
+      </button>`;
+    }).join('')}`;
+}
+
+function renderComp(key, id){
+  const d = domByKey(key), c = compById(d, id);
+  const seen = c.moves.filter(m=>EXPLORED.has(m)).length;
+  $('scr-comp').innerHTML = `
+    <button class="backlink" onclick="back()">‹ ${d.name}</button>
+    <h1>${c.name}</h1>
+    <p class="comp-shorthand">${c.tagline}</p>
+    <p class="comp-intro">${c.formal}</p>
+    <blockquote class="comp-quote">${c.friendly}</blockquote>
+    <div class="section-label"><span class="eyebrow">${c.moves.length} Pro Moves${seen?` · ${seen} opened`:''}</span><span class="line"></span></div>
+    <div class="move-list">
+      ${c.moves.map((mid,i)=>{
+        const m = moveMeta(mid);
+        const icons = [];
+        if (m.hasScript) icons.push(ICON.script);
+        if (m.hasAudio) icons.push(ICON.audio);
+        if (m.hasVideo) icons.push(ICON.video);
+        if (m.hasLink) icons.push(ICON.link);
+        const iconRow = icons.length ? `<span class="mat-icons">${icons.join('')}</span>` : '';
+        return `<button class="move-card" onclick="openMove('${key}',${id},${mid})">
+          <span class="num">${i+1}</span>
+          <span class="mtxt">
+            <span class="mstate">${m.s}</span>
+            ${iconRow}
+          </span>
+          <span class="mcard-arrow">›</span>
+        </button>`;
+      }).join('')}
+    </div>`;
+}
+
+function renderMove(key, cid, mid){
+  EXPLORED.add(mid);
+  const d = domByKey(key), c = compById(d, cid), m = moveMeta(mid);
+  const idx = c.moves.indexOf(mid);
+  const nextId = c.moves[(idx+1) % c.moves.length];
+
+  // Description: shown plainly, no label above it. Omitted entirely when absent.
+  const descBlock = m.d ? `<div class="desc-card"><p>${m.d}</p></div>` : '';
+
+  // Script / audio: no section labels. A script shows the actual words; if the
+  // move also has audio, a small speaker sits under it (tap to hear). An
+  // audio-only move shows just the speaker. Anything absent renders nothing.
+  let materials = '';
+  if (m.hasScript){
+    materials += `<div class="verbiage">
+      <p>“${m.script}”</p>
+      ${m.hasAudio ? `<div class="hearwrap"><button class="hear" onclick="playDemo(this)" aria-label="Hear this said aloud">${ICON.audio}</button><span class="bar"><b></b></span></div>` : ''}
+    </div>`;
+  } else if (m.hasAudio){
+    materials += `<div class="hearwrap solo"><button class="hear" onclick="playDemo(this)" aria-label="Hear this said aloud">${ICON.audio}</button><span class="bar"><b></b></span></div>`;
+  }
+  if (m.hasVideo){
+    materials += `<div class="reslink"><span class="ri">${ICON.video}</span><span>Watch the walkthrough</span><span class="arrow">›</span></div>`;
+  }
+  if (m.hasLink){
+    materials += `<div class="reslink"><span class="ri">${ICON.link}</span><span>Open the reference</span><span class="arrow">›</span></div>`;
+  }
+
+  $('scr-move').innerHTML = `
+    <button class="backlink" onclick="back()">‹ ${c.name}</button>
+    <div class="move-eyebrow">
+      <span class="tag">${d.name}</span>
+      <span class="meta">${c.tagline}</span>
+    </div>
+    <h1 class="move-title">${m.s}</h1>
+    ${descBlock}
+    ${materials}
+    <div class="momentum">
+      <button class="next-move" onclick="openMove('${key}',${cid},${nextId})">Next move ${ICON.arrow}</button>
+    </div>`;
+}
+
+// ---- transitions + stack ----
+function showScreen(id, dir){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active','in-fwd','in-back'));
+  const el = $(id);
+  el.classList.add('active');
+  if (dir==='back') el.classList.add('in-back');
+  else if (dir==='fwd') el.classList.add('in-fwd');
+  el.scrollTop = 0;
+}
+function renderCurrent(dir){
+  const e = stack[stack.length-1];
+  if (e.v==='explore'){ setAccent(null); renderExplore(); showScreen('scr-explore', dir); }
+  else if (e.v==='domain'){ setAccent(e.d); renderDomain(e.d); showScreen('scr-domain', dir); }
+  else if (e.v==='comp'){ setAccent(e.d); renderComp(e.d, e.c); showScreen('scr-comp', dir); }
+  else { setAccent(e.d); renderMove(e.d, e.c, e.m); showScreen('scr-move', dir); }
+  renderCrumbs();
+}
+function push(entry){ stack.push(entry); renderCurrent('fwd'); }
+function back(){ if (stack.length>1){ stack.pop(); renderCurrent('back'); } }
+
+// entry points (also used to jump directly, e.g. Surprise me)
+function openDomain(key){ push({v:'domain', d:key}); }
+function openComp(key, id){
+  if (stack[stack.length-1].v==='explore') push({v:'domain', d:key});
+  push({v:'comp', d:key, c:id});
+}
+function openMove(key, cid, mid){
+  const top = stack[stack.length-1];
+  if (top.v==='move'){ // moving sideways to the next move: replace, keep depth
+    stack[stack.length-1] = {v:'move', d:key, c:cid, m:mid};
+    renderCurrent('fwd');
+  } else {
+    push({v:'move', d:key, c:cid, m:mid});
+  }
+}
+
+function renderCrumbs(){
+  const bar = $('crumbs');
+  const e = stack[stack.length-1];
+  if (e.v==='explore'){ bar.classList.add('hidden'); bar.innerHTML=''; return; }
+  bar.classList.remove('hidden');
+  const d = domByKey(e.d);
+  const parts = [`<span class="crumb-dot"></span>`,
+    `<button class="crumb" onclick="popTo('explore')">Explore</button>`];
+  const sep = `<span class="crumb-sep">›</span>`;
+  if (e.v==='domain'){ parts.push(sep, `<button class="crumb here">${d.name}</button>`); }
+  if (e.v==='comp'){ const c=compById(d,e.c);
+    parts.push(sep, `<button class="crumb" onclick="popTo('domain')">${d.name}</button>`, sep, `<button class="crumb here">${c.tagline}</button>`); }
+  if (e.v==='move'){ const c=compById(d,e.c);
+    parts.push(sep, `<button class="crumb" onclick="popTo('domain')">${d.name}</button>`, sep, `<button class="crumb" onclick="popTo('comp')">${c.tagline}</button>`); }
+  bar.innerHTML = parts.join('');
+}
+function popTo(level){
+  if (level==='explore'){ stack = [{v:'explore'}]; renderCurrent('back'); return; }
+  // pop until the top matches the requested level
+  const order = { domain:1, comp:2 };
+  while (stack.length>1 && ({explore:0,domain:1,comp:2,move:3}[stack[stack.length-1].v]) > order[level]) stack.pop();
+  renderCurrent('back');
+}
+
+// ---- surprise me: land on a random real move ----
+$('surpriseBtn').addEventListener('click', ()=>{
+  const d = DOMAINS[Math.floor(Math.random()*DOMAINS.length)];
+  const c = d.comps[Math.floor(Math.random()*d.comps.length)];
+  const mid = c.moves[Math.floor(Math.random()*c.moves.length)];
+  stack = [{v:'explore'},{v:'domain',d:d.key},{v:'comp',d:d.key,c:c.id},{v:'move',d:d.key,c:c.id,m:mid}];
+  renderCurrent('fwd');
+});
+
+// ---- audio demo (fake progress; no real file loaded in prototype) ----
+let demoTimer = null;
+function playDemo(btn){
+  const bar = btn.parentElement.querySelector('.bar b');
+  if (btn.classList.contains('playing')){ clearInterval(demoTimer); demoTimer=null; btn.classList.remove('playing'); return; }
+  clearInterval(demoTimer);
+  document.querySelectorAll('.hear.playing').forEach(b=>b.classList.remove('playing'));
+  btn.classList.add('playing');
+  let p=0; if (bar) bar.style.width='0%';
+  demoTimer=setInterval(()=>{ p+=2.5; if (bar) bar.style.width=Math.min(p,100)+'%';
+    if (p>=100){ clearInterval(demoTimer); demoTimer=null; btn.classList.remove('playing'); } }, 90);
+}
+
+// ---- tab bar (place-setting) ----
+let toastTimer=null;
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),1900); }
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click', ()=>{
+  if (t.dataset.tab==='Explore'){ stack=[{v:'explore'}]; renderCurrent('back'); }
+  else toast(`This prototype focuses on the Explore tab.`);
+}));
+
+// ---- init ----
+renderCurrent();
+</script>

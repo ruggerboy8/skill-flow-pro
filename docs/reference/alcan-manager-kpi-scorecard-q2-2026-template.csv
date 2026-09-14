@@ -1,0 +1,18 @@
+,,,,,,,,
+Week Of: 5/11/26,Standard,Status,Lagging indicator,Process for regional review,Report rating,Weight,Score,Notes for manager success
+Daily Production Report,"Previous day info updated first thing in AM, remainder of month updated weekly on Mondays, following month filled out on the 16th of current month",,NA,"Regional Manager checks before 10AM, if not fully completed, status is changed to red",0.0,5,0.0,
+Carestack To Do list,0 Overdue at end of previous day,,,"Regional Manager checks before 10AM, if not fully completed, status is changed to red.  Also look for compliance and utilization/adoption of the system.",0.0,4.25,0.0,
+Voicestack To Do list,0 left at end of day,,,"Regional Manager checks before 10AM, if not fully completed, status is changed to red.  Also look for compliance and utilization/adoption of the system.",0.0,8.25,0.0,
+"Online Appointment, Referral hub bookings and requests",Every new appointment booked gets a call and a warm welcome from the practice,,New Patient numbers,"All direct scheduled must have memo showing call and text to welcome to practice, there should be no active appointment requests or messages at the end of the day",0.0,5.25,0.0,
+Call answer rate,85% or above,,Call answer rate and or new patient seen,Binary: above 85 is green below is red,0.0,10,0.0,
+Weekly Reports,Completed by EOD Friday,,run reports monday morning ,"If any uncompleted outstanding items, mark it incomplete",0.0,2,0.0,
+New patients booked,Goal is X,,New patient visits,Regional writes # at end of week from daily production spreadsheet,0.0,10,0.0,"voicestack opportunities tab, conversion rate, marketing spreadsheet, referral baskets"
+On Time Collection rate - combined,Over 95% for last 7 days,,Monthly bank deposits,Regional writes # at end of week from analytics dashboard,0.0,10,0.0,"Insurance and patient combined.  Claim flags, pre-auths, Pending AR, Provider Changes, unapplied credits, claims on hold, claims flagged to practice"
+Adjustment rate,Less than $750 per week,,Adjustments,Monday during adjustment report - Tim approves final #,0.0,10,0.0,"Worklist for insurance pending, pre-auths, claim flags, claims on hold, insurance verification, provider changes, etc."
+Uptime Checklists,90% compliance rate for location,,Patient reviews and uptime compliance rate,Automatic red if item is checked off and not completed/ enlisting help of owner Dr for remote locations 1x/ week to assure compliance,0.0,5,0.0,
+Completed Appointments,10% higher than same period last year,,Production,Monthly goal set by regional and then broken down by week,0.0,7,0.0,"ReSchedule rate and broken appointment rate, worklist for unconfirmed appointments"
+Reviews,1 per patient facing day - averaged throughout week,,New patients,Daily Production report.  ,0.0,5,0.0,"Pro Moves utilization, office condition"
+Morning Huddle,Follows the script every day,,Team moral and patient experience,Sit in on one huddle for each location every week or have doctor on duty report back with checklist,0.0,8.25,0.0,Morning Opportunity meeting checklist
+DFI participation in Edustack,min 5 activities per week,,EduStack report,Regional can review Johno's report at end of week,0.0,5,0.0,
+Work the 10 items per week on AR hotlist,10 largest claims with pending AR + Additional claims close to Timely Filing,,Collections,"Regional will provide new report every week, Tim will review both PM comments and RM comments at end of week and provide approval",0.0,5,0.0,
+Total Score for week:,0.0,,,,,100,0.0,

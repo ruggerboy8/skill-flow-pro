@@ -1,0 +1,22 @@
+[
+  {
+    "domain_id": 1,
+    "domain_name": "Clinical",
+    "color_hex": "#3B82F6"
+  },
+  {
+    "domain_id": 2,
+    "domain_name": "Clerical",
+    "color_hex": "#22C55E"
+  },
+  {
+    "domain_id": 3,
+    "domain_name": "Cultural",
+    "color_hex": "#EC4899"
+  },
+  {
+    "domain_id": 4,
+    "domain_name": "Case Acceptance",
+    "color_hex": "#F97316"
+  }
+]

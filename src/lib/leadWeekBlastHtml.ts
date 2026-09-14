@@ -125,6 +125,28 @@ export function convertQuillListFlavors(html: string | null | undefined): string
 }
 
 /**
+ * blast-send-trap incident: whether the editor's current content needs to be
+ * persisted before Send / Test-send fire. Before this, the editor was local
+ * state persisted only by an explicit "Save draft" click, while the send
+ * paths read `body` straight from the DB row -- a user could edit, click
+ * Send, and have the STALE saved draft go out instead of what was on her
+ * screen. That happened live: 16 doctors got the pre-edit AI draft.
+ *
+ * `editedBody` is Quill-normalized HTML (see RichTextEditor / BlastSlot's
+ * onEditorReady); `savedBody` is the raw stored row, which can still be
+ * pre-normalization (or plain text, for a row predating LRM-10) even when
+ * the user hasn't touched a single character since loading it. A strict
+ * inequality therefore also returns true on some sends where nothing
+ * actually changed -- accepted deliberately: that extra save is idempotent
+ * and harmless, while a normalization-aware comparison risks the one
+ * failure mode that actually matters here, ruling out a save that should
+ * have happened for a real edit. When in doubt, save.
+ */
+export function needsSaveBeforeSend(editedBody: string, savedBody: string | null | undefined): boolean {
+  return editedBody !== (savedBody ?? '');
+}
+
+/**
  * QA fix (LRM-10): decides what a "current content" baseline should become
  * after a programmatic write settles and reports its normalized HTML back
  * (RichTextEditor's onReady). `writtenValue` is the raw string that was

@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isLikelyBlastHtml, upgradeBlastBodyToHtml, blastHtmlToPlainText, hasBlastBodyContent,
-  reconcileNormalizedLoad, convertQuillListFlavors,
+  reconcileNormalizedLoad, convertQuillListFlavors, needsSaveBeforeSend,
 } from './leadWeekBlastHtml';
 
 describe('isLikelyBlastHtml', () => {
@@ -128,6 +128,40 @@ describe('convertQuillListFlavors', () => {
     expect(convertQuillListFlavors(null)).toBe('');
     expect(convertQuillListFlavors(undefined)).toBe('');
     expect(convertQuillListFlavors('')).toBe('');
+  });
+});
+
+describe('needsSaveBeforeSend', () => {
+  // blast-send-trap incident: the real bug was Send/Test-send reading a
+  // stale saved body while the editor held newer, unsaved text.
+  it('is true when the editor has real unsaved edits', () => {
+    expect(needsSaveBeforeSend('<p>Edited text</p>', '<p>Original draft</p>')).toBe(true);
+  });
+
+  it('is false when the editor exactly matches the saved body', () => {
+    const same = '<p>Same on both sides</p>';
+    expect(needsSaveBeforeSend(same, same)).toBe(false);
+  });
+
+  // Deliberately conservative: a normalization difference alone (not a real
+  // edit) still reports "needs save" -- an extra idempotent save is
+  // accepted rather than risk missing a real edit with a cleverer
+  // comparison. See the function's own doc comment.
+  it('is true for a normalization-only difference (Quill-flavored vs semantic list), by design', () => {
+    const editedBody = '<ol><li data-list="bullet">One</li></ol>';
+    const savedBody = '<ul><li>One</li></ul>';
+    expect(needsSaveBeforeSend(editedBody, savedBody)).toBe(true);
+  });
+
+  it('is true when the saved body is null or undefined (nothing persisted yet)', () => {
+    expect(needsSaveBeforeSend('<p>Hello</p>', null)).toBe(true);
+    expect(needsSaveBeforeSend('<p>Hello</p>', undefined)).toBe(true);
+  });
+
+  it('is false when both the editor and the saved body are empty', () => {
+    expect(needsSaveBeforeSend('', '')).toBe(false);
+    expect(needsSaveBeforeSend('', null)).toBe(false);
+    expect(needsSaveBeforeSend('', undefined)).toBe(false);
   });
 });
 

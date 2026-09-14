@@ -33,7 +33,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { Skeleton } from '@/components/ui/skeleton';
 import DOMPurify from 'dompurify';
-import { upgradeBlastBodyToHtml, hasBlastBodyContent, reconcileNormalizedLoad, convertQuillListFlavors } from '@/lib/leadWeekBlastHtml';
+import { upgradeBlastBodyToHtml, hasBlastBodyContent, reconcileNormalizedLoad, convertQuillListFlavors, needsSaveBeforeSend } from '@/lib/leadWeekBlastHtml';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -625,16 +625,44 @@ function BlastSlot({
     }
   };
 
-  const onTestSendClick = () => {
+  // blast-send-trap incident: the editor is local state, previously
+  // persisted only by an explicit "Save draft" click, while both send paths
+  // read `body` straight from the DB row. A real user edited her draft and
+  // clicked Send; the stale saved AI draft reached 16 doctors instead of
+  // what she was looking at. Both send paths now persist editedBody first,
+  // whenever it differs from what's saved (needsSaveBeforeSend), and only
+  // proceed on that save's success -- see the function's own doc comment
+  // for why "differs" is intentionally the conservative, no-normalization
+  // strict comparison. The in-flight lock this shares with "Save draft"
+  // (blastsHook.updateBlastBody.isPending disables both send buttons, see
+  // the JSX below) means a concurrent manual save can't race this one.
+  const onTestSendClick = async () => {
     if (!weekBlast) return;
+    if (needsSaveBeforeSend(editedBody, weekBlast.body)) {
+      try {
+        await blastsHook.updateBlastBody.mutateAsync({ id: weekBlast.id, body: editedBody, subject: weekBlast.subject });
+      } catch {
+        // Failure toast already shown by the hook's onError (including the
+        // sent-status seatbelt inside updateBlastBody) -- do not fire the
+        // test send on a failed pre-send save.
+        return;
+      }
+    }
     blastsHook.testSendBlast.mutate(weekBlast.id, {
       onSuccess: (data) => toast({ title: 'Test sent', description: `Sent to ${data.email}.` }),
     });
   };
 
   const onSendClick = async () => {
+    if (!weekBlast) return;
     setRecipientsLoading(true);
     try {
+      if (needsSaveBeforeSend(editedBody, weekBlast.body)) {
+        // Persist before recipients are even fetched, let alone the review
+        // dialog opens -- the dialog previews no body, so this is the only
+        // gate standing between a stale draft and a real send.
+        await blastsHook.updateBlastBody.mutateAsync({ id: weekBlast.id, body: editedBody, subject: weekBlast.subject });
+      }
       const list = await blastsHook.fetchRecipients.mutateAsync();
       // Fresh every open: nothing carries over from a previous review.
       setRecipients(list);
@@ -648,7 +676,9 @@ function BlastSlot({
         toast({ title: 'No doctors to send to', description: 'There are no doctors to send this to yet.' });
       }
     } catch {
-      // Failure toast already shown by the hook's onError.
+      // Failure toast already shown by the hook's onError -- whether the
+      // pre-send save or the recipients lookup failed, stop here in both
+      // cases and never open the review dialog.
     } finally {
       setRecipientsLoading(false);
     }

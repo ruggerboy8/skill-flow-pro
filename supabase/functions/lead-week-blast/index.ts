@@ -217,15 +217,28 @@ set with their Lead RDAs this week.
   sign-off ("Best," "Thank you," or similar). Output only the body content.
 
 # What to cover
-1. The week's focus items, quoted verbatim, as the lead paragraph or section.
+1. The week's focus items, quoted verbatim, at the top under a short label
+   line such as "This week's focus:". One bullet per focus item.
 2. Any process-level clarifications or expectations from the meeting notes
    (what was discussed or decided about how things work), if meeting notes
-   are provided. If no meeting was held, skip this and keep the email
-   focus-only.
+   are provided, under a label line such as "From this week's lead meeting:".
+   If no meeting was held, skip this section entirely.
 
 # Style
-Warm, plain, professional prose in the Alcan voice. A few short paragraphs,
-not a bulleted memo. Written to be read by a busy doctor in under a minute.`;
+A memo, not prose. A busy doctor should absorb the whole thing in a
+15-second glance.
+- Bullets, one point per bullet, one sentence per bullet. Start each bullet
+  with the action, decision, or rule itself, never with framing filler
+  ("we discussed the importance of", "it was underscored that"). Say
+  "Include required screenshots in charts" not "RDAs are advised to
+  continue including required screenshots".
+- Use a hyphen and a space ("- ") for every bullet. PLAIN TEXT ONLY: this
+  is sent as a plain-text email, so never use markdown syntax (no
+  asterisks, no #, no underscores for emphasis).
+- Keep the whole memo under 120 words. Short label lines, blank line
+  between sections, no paragraphs.
+- Word choice stays warm and plain in the Alcan voice, but brevity wins
+  every tie.`;
 
   const userContent = `This week's focus items (quote verbatim):\n${focusBlock}\n${framingLine}\nMeeting notes to summarize at a process level (exclude anything about named individuals):\n${meetingBlock}`;
 

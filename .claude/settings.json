@@ -1,4 +1,58 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "model": "claude-fable-5",
+  "fallbackModel": [
+    "claude-opus-4-8",
+    "claude-sonnet-5"
+  ],
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Edit",
+      "Write",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(sed:*)",
+      "Bash(awk:*)",
+      "Bash(jq:*)",
+      "Bash(sort:*)",
+      "Bash(uniq:*)",
+      "Bash(diff:*)",
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "Bash(which:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git switch:*)",
+      "Bash(git stash:*)",
+      "Bash(git mv:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git worktree:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean -fdx:*)",
+      "Bash(gh repo delete:*)",
+      "Bash(launchctl bootout:*)",
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(./.env.*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -11,10 +65,5 @@
         ]
       }
     ]
-  },
-  "model": "claude-fable-5",
-  "fallbackModel": [
-    "claude-opus-4-8",
-    "claude-sonnet-5"
-  ]
+  }
 }
